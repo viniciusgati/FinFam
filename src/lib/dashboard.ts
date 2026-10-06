@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import type { FinanceInput } from "./finance";
-import { monthKey } from "./finance";
+import { isActiveInMonth, monthKey } from "./finance";
 
 export interface DashboardData extends FinanceInput {
   previousPercents: number[];
@@ -13,8 +13,10 @@ function sumByAmount(items: { amountCents: number }[]): number {
 /**
  * Carrega os dados agregados do mês a partir do banco.
  *
+ * As entradas e saídas fixas respeitam a vigência (startMonth/endMonth) além
+ * do flag `active`.
+ *
  * TODO (próximas fases):
- * - Respeitar a vigência (startMonth/endMonth) das entradas e saídas fixas.
  * - Alocar compras de cartão pela regra de fechamento/vencimento (SPEC §3.4)
  *   em vez de usar apenas o mês da compra.
  */
@@ -53,8 +55,12 @@ export async function loadDashboardData(
     ]);
 
   return {
-    monthlyIncomeCents: sumByAmount(incomes),
-    fixedExpensesCents: sumByAmount(fixedExpenses),
+    monthlyIncomeCents: sumByAmount(
+      incomes.filter((item) => isActiveInMonth(item, currentMonthKey)),
+    ),
+    fixedExpensesCents: sumByAmount(
+      fixedExpenses.filter((item) => isActiveInMonth(item, currentMonthKey)),
+    ),
     variableExpensesCents: sumByAmount(variableExpenses),
     cardExpensesCents: sumByAmount(cardPurchases),
     previousPercents: snapshots.map((snapshot) => snapshot.consumedPercent),

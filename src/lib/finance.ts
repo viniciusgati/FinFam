@@ -46,6 +46,25 @@ export function monthKey(date: Date): string {
   return `${year}-${month}`;
 }
 
+/** Campos mínimos para decidir se um item fixo vigora em um mês. */
+export interface MonthVigency {
+  active: boolean;
+  startMonth?: string | null;
+  endMonth?: string | null;
+}
+
+/**
+ * Um item fixo (entrada ou saída) conta no mês `month` (YYYY-MM) quando está
+ * ativo e dentro da vigência. Vigência é inclusiva nas duas pontas e os limites
+ * nulos significam "sem limite" (ver suposições da história #212).
+ */
+export function isActiveInMonth(item: MonthVigency, month: string): boolean {
+  if (item.active !== true) return false;
+  if (item.startMonth && item.startMonth > month) return false;
+  if (item.endMonth && item.endMonth < month) return false;
+  return true;
+}
+
 export function daysInMonth(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }

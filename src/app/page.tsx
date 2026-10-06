@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
@@ -60,6 +61,35 @@ export default async function DashboardPage() {
       <p className="max-w-xl rounded-full bg-black/20 px-6 py-3 text-lg">
         {feedback}
       </p>
+
+      {status.incomeCents <= 0 && !dbError && (
+        <div className="flex max-w-xl flex-col items-center gap-3">
+          <p className="text-base opacity-90">
+            Cadastre suas entradas fixas para acompanhar a renda do mês.
+          </p>
+          <Link
+            href="/entradas"
+            className="rounded-full bg-black/20 px-5 py-2 text-sm font-medium transition hover:bg-black/30"
+          >
+            Cadastrar entrada
+          </Link>
+        </div>
+      )}
+
+      <nav className="flex flex-wrap justify-center gap-3 text-sm">
+        <Link
+          href="/entradas"
+          className="rounded-full bg-black/20 px-5 py-2 font-medium transition hover:bg-black/30"
+        >
+          Entradas fixas
+        </Link>
+        <Link
+          href="/saidas"
+          className="rounded-full bg-black/20 px-5 py-2 font-medium transition hover:bg-black/30"
+        >
+          Saídas fixas
+        </Link>
+      </nav>
 
       {dbError && (
         <p className="max-w-xl text-sm opacity-80">
