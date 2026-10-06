@@ -21,7 +21,7 @@ situação dos gastos.
 - **Tailwind CSS v4** para o dashboard
 - **Prisma ORM** + **PostgreSQL**
 - **PWA** via manifest + service worker (instalável no tablet)
-- **Vitest** para testes unitários da lógica financeira
+- **Vitest** para testes unitários e de integração
 - Sessão via cookie `httpOnly` assinado com **jose**
 
 Detalhes de arquitetura e regras em [`docs/`](./docs):
@@ -89,7 +89,9 @@ deploy`), sem o passo interativo do `db:migrate`; com tudo já aplicado imprime
 | `npm run build` | build de produção |
 | `npm run start` | inicia o build de produção |
 | `npm run typecheck` | checagem de tipos (`tsc --noEmit`) |
-| `npm test` | testes unitários (Vitest) |
+| `npm run lint` | análise estática com ESLint (`eslint .`) |
+| `npm test` | testes unitários (Vitest); não executa `*.integration.test.ts` |
+| `npm run test:integration` | testes de integração contra um PostgreSQL de teste (`TEST_DATABASE_URL`) |
 | `npm run db:migrate` | cria/aplica migrations em dev (`prisma/migrations/`) |
 | `npm run db:deploy` | aplica migrations em produção |
 | `npm run db:seed` | popula o banco com dados de exemplo (idempotente no mesmo mês) |
@@ -97,11 +99,30 @@ deploy`), sem o passo interativo do `db:migrate`; com tudo já aplicado imprime
 | `npm run db:snapshots` | deriva e grava os `monthly_snapshots` a partir das transações (idempotente) |
 | `npm run db:studio` | Prisma Studio |
 
+### Testes de integração
+
+Os testes unitários (`npm test`) rodam offline e não tocam o banco. Já as
+suítes `*.integration.test.ts` usam um PostgreSQL **dedicado de teste** apontado
+por `TEST_DATABASE_URL` (nunca SQLite) e são executadas por:
+
+```bash
+TEST_DATABASE_URL="postgresql://user:pass@host:5432/finfam_test?schema=public" \
+  npm run test:integration
+```
+
+Sem `TEST_DATABASE_URL`, `npm run test:integration` **falha com uma mensagem
+explícita** (não pula em silêncio); `npm test` simplesmente ignora os arquivos
+`*.integration.test.ts`. O helper `src/test/integration.ts` conecta via Prisma e
+expõe `resetDatabase()`/`truncateAllTables()` para limpar as tabelas entre os
+casos.
+
 ## Variáveis de ambiente
 
 Veja [`.env.example`](./.env.example). Principais:
 
 - `DATABASE_URL` — conexão PostgreSQL.
+- `TEST_DATABASE_URL` — conexão PostgreSQL dedicada às suítes de integração
+  (`npm run test:integration`); opcional, apenas para testes.
 - `FINFAM_USER` / `FINFAM_PASS` — credenciais de acesso da família.
 - `FINFAM_SESSION_SECRET` — segredo para assinar o cookie de sessão.
 
