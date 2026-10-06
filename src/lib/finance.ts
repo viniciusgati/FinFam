@@ -7,6 +7,8 @@
  * Regras completas em docs/SPEC.md §4.
  */
 
+import { resolveTimeZone, zonedDateParts } from "./time";
+
 export type FinanceLevel =
   | "neutral"
   | "green"
@@ -48,9 +50,8 @@ export interface FinanceStatus {
 }
 
 export function monthKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
+  const { year, month } = zonedDateParts(date, resolveTimeZone());
+  return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 const MONTH_LABELS = [
@@ -93,9 +94,10 @@ export function monthLabel(monthKey: string): string {
  * montar o histórico de meses fechados do dashboard.
  */
 export function previousMonthKeys(reference: Date): string[] {
+  const current = monthKey(reference);
   const keys: string[] = [];
   for (let offset = 1; offset <= 4; offset++) {
-    keys.push(monthKey(new Date(reference.getFullYear(), reference.getMonth() - offset, 1)));
+    keys.push(shiftMonthKey(current, -offset));
   }
   return keys;
 }
@@ -120,7 +122,8 @@ export function isActiveInMonth(item: MonthVigency, month: string): boolean {
 }
 
 export function daysInMonth(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const { year, month } = zonedDateParts(date, resolveTimeZone());
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 export function consumedCents(input: FinanceInput): number {
@@ -177,8 +180,9 @@ export function projectedPercent(
 
 export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
   const referenceDate = input.referenceDate ?? new Date();
+  const currentMonth = monthKey(referenceDate);
   const totalDays = daysInMonth(referenceDate);
-  const elapsed = referenceDate.getDate();
+  const elapsed = zonedDateParts(referenceDate, resolveTimeZone()).day;
   const remaining = totalDays - elapsed;
   const income = Math.max(input.monthlyIncomeCents, 0);
   const consumed = consumedCents(input);
@@ -190,7 +194,7 @@ export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
   const projected = projectedPercent(percent, totalDays, elapsed, income);
 
   return {
-    monthKey: monthKey(referenceDate),
+    monthKey: currentMonth,
     daysInMonth: totalDays,
     daysElapsed: elapsed,
     daysRemaining: remaining,

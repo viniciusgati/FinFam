@@ -6,7 +6,7 @@
  * `prisma/snapshots.ts` é quem consulta o banco e faz o upsert.
  */
 
-import { monthKey } from "./finance";
+import { monthKey, shiftMonthKey } from "./finance";
 
 export interface SnapshotTransactionInput {
   monthKey: string;
@@ -39,11 +39,10 @@ function sum(items: { amountCents: number }[]): number {
  * cronológica. Nunca inclui o mês corrente.
  */
 export function monthRange(referenceDate: Date, n: number): string[] {
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth();
+  const current = monthKey(referenceDate);
   const keys: string[] = [];
   for (let i = n; i >= 1; i -= 1) {
-    keys.push(monthKey(new Date(year, month - i, 1)));
+    keys.push(shiftMonthKey(current, -i));
   }
   return keys;
 }

@@ -17,28 +17,28 @@ function input(
     variableExpenses: [
       {
         amountCents: 10000,
-        date: new Date(2026, 9, 5),
+        date: new Date(Date.UTC(2026, 9, 5, 12)),
         paymentMethod: "PIX",
       },
       {
         amountCents: 7000,
-        date: new Date(2026, 9, 6),
+        date: new Date(Date.UTC(2026, 9, 6, 12)),
         paymentMethod: "CREDIT",
       },
       {
         amountCents: 8000,
-        date: new Date(2026, 8, 30),
+        date: new Date(Date.UTC(2026, 8, 30, 12)),
         paymentMethod: "CASH",
       },
       {
         amountCents: 5000,
-        date: new Date(2026, 10, 1),
+        date: new Date(Date.UTC(2026, 10, 1, 12)),
         paymentMethod: "DEBIT",
       },
     ],
     cardPurchases: [
-      { amountCents: 30000, purchaseDate: new Date(2026, 9, 8) },
-      { amountCents: 40000, purchaseDate: new Date(2026, 8, 20) },
+      { amountCents: 30000, purchaseDate: new Date(Date.UTC(2026, 9, 8, 12)) },
+      { amountCents: 40000, purchaseDate: new Date(Date.UTC(2026, 8, 20, 12)) },
     ],
     ...overrides,
   };
@@ -46,7 +46,7 @@ function input(
 
 describe("monthRange", () => {
   it("retorna os últimos N meses estritamente anteriores ao corrente", () => {
-    expect(monthRange(new Date(2026, 9, 10), 4)).toEqual([
+    expect(monthRange(new Date(Date.UTC(2026, 9, 10, 12)), 4)).toEqual([
       "2026-06",
       "2026-07",
       "2026-08",
@@ -55,11 +55,11 @@ describe("monthRange", () => {
   });
 
   it("nunca inclui o mês corrente", () => {
-    expect(monthRange(new Date(2026, 9, 10), 4)).not.toContain("2026-10");
+    expect(monthRange(new Date(Date.UTC(2026, 9, 10, 12)), 4)).not.toContain("2026-10");
   });
 
   it("atravessa a virada de ano", () => {
-    expect(monthRange(new Date(2026, 0, 15), 2)).toEqual(["2025-11", "2025-12"]);
+    expect(monthRange(new Date(Date.UTC(2026, 0, 15, 12)), 2)).toEqual(["2025-11", "2025-12"]);
   });
 });
 

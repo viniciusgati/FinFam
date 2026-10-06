@@ -7,48 +7,49 @@ import {
   resolveReferenceDate,
   sumCardExpensesForMonth,
 } from "./invoices";
+import { zonedDateParts } from "./time";
 
 describe("purchaseInvoice", () => {
   it("coloca a compra antes do fechamento no próprio mês", () => {
-    expect(purchaseInvoice(new Date(2026, 2, 10), 20, 5)).toEqual({
+    expect(purchaseInvoice(new Date(Date.UTC(2026, 2, 10, 12)), 20, 5)).toEqual({
       cycleMonthKey: "2026-03",
       dueMonthKey: "2026-04",
     });
   });
 
   it("trata o dia do fechamento como inclusivo", () => {
-    expect(purchaseInvoice(new Date(2026, 2, 20), 20, 5).cycleMonthKey).toBe(
+    expect(purchaseInvoice(new Date(Date.UTC(2026, 2, 20, 12)), 20, 5).cycleMonthKey).toBe(
       "2026-03",
     );
   });
 
   it("empurra a compra após o fechamento para o mês seguinte", () => {
-    expect(purchaseInvoice(new Date(2026, 2, 25), 20, 5).cycleMonthKey).toBe(
+    expect(purchaseInvoice(new Date(Date.UTC(2026, 2, 25, 12)), 20, 5).cycleMonthKey).toBe(
       "2026-04",
     );
   });
 
   it("mantém o ciclo quando dueDay > closingDay", () => {
-    expect(purchaseInvoice(new Date(2026, 2, 10), 20, 25)).toEqual({
+    expect(purchaseInvoice(new Date(Date.UTC(2026, 2, 10, 12)), 20, 25)).toEqual({
       cycleMonthKey: "2026-03",
       dueMonthKey: "2026-03",
     });
   });
 
   it("avança a competência quando dueDay <= closingDay", () => {
-    expect(purchaseInvoice(new Date(2026, 2, 10), 20, 5).dueMonthKey).toBe(
+    expect(purchaseInvoice(new Date(Date.UTC(2026, 2, 10, 12)), 20, 5).dueMonthKey).toBe(
       "2026-04",
     );
   });
 
   it("vira o ano no vencimento", () => {
-    expect(purchaseInvoice(new Date(2026, 11, 10), 20, 5).dueMonthKey).toBe(
+    expect(purchaseInvoice(new Date(Date.UTC(2026, 11, 10, 12)), 20, 5).dueMonthKey).toBe(
       "2027-01",
     );
   });
 
   it("vira o ano no ciclo", () => {
-    expect(purchaseInvoice(new Date(2026, 11, 28), 20, 5).cycleMonthKey).toBe(
+    expect(purchaseInvoice(new Date(Date.UTC(2026, 11, 28, 12)), 20, 5).cycleMonthKey).toBe(
       "2027-01",
     );
   });
@@ -58,7 +59,7 @@ describe("allocateInstallments", () => {
   it("rateia 3x em 10000 cruzando o ano com soma exata", () => {
     const installments = allocateInstallments(
       {
-        purchaseDate: new Date(2026, 10, 15), // 15/11/2026
+        purchaseDate: new Date(Date.UTC(2026, 10, 15, 12)), // 15/11/2026
         amountCents: 10000,
         installmentsTotal: 3,
       },
@@ -85,7 +86,7 @@ describe("allocateInstallments", () => {
   it("mantém a soma exata em qualquer rateio inexato", () => {
     const installments = allocateInstallments(
       {
-        purchaseDate: new Date(2026, 0, 5),
+        purchaseDate: new Date(Date.UTC(2026, 0, 5, 12)),
         amountCents: 10001,
         installmentsTotal: 7,
       },
@@ -102,7 +103,7 @@ describe("allocateInstallments", () => {
 
 describe("sumCardExpensesForMonth", () => {
   const purchase = {
-    purchaseDate: new Date(2026, 10, 15),
+    purchaseDate: new Date(Date.UTC(2026, 10, 15, 12)),
     amountCents: 300000,
     installmentsTotal: 3,
     card: { closingDay: 20, dueDay: 5 },
@@ -136,13 +137,13 @@ describe("cenário do seed de validação manual", () => {
 
   const purchases = [
     {
-      purchaseDate: new Date(2026, 10, 15), // 15/11/2026, cartão A
+      purchaseDate: new Date(Date.UTC(2026, 10, 15, 12)), // 15/11/2026, cartão A
       amountCents: 300000,
       installmentsTotal: 3,
       card: { closingDay: 20, dueDay: 5 },
     },
     {
-      purchaseDate: new Date(2026, 8, 8), // 08/09/2026, à vista
+      purchaseDate: new Date(Date.UTC(2026, 8, 8, 12)), // 08/09/2026, à vista
       amountCents: 60000,
       installmentsTotal: 1,
       card: { closingDay: 20, dueDay: 5 },
@@ -175,7 +176,7 @@ describe("invoiceLinesForMonth", () => {
     id: "p1",
     description: "Notebook",
     category: "Eletrônicos",
-    purchaseDate: new Date(2026, 10, 15), // 15/11/2026
+    purchaseDate: new Date(Date.UTC(2026, 10, 15, 12)), // 15/11/2026
     amountCents: 30000,
     installmentsTotal: 3,
     card: { id: "c1", name: "Nubank", closingDay: 20, dueDay: 5 },
@@ -229,14 +230,37 @@ describe("invoiceLinesForMonth", () => {
 });
 
 describe("resolveReferenceDate", () => {
-  it("interpreta ?mes válido como o primeiro dia do mês", () => {
-    expect(resolveReferenceDate("2026-12", new Date(2026, 9, 6))).toEqual(
-      new Date(2026, 11, 1),
+  it("interpreta ?mes válido como o primeiro dia do mês no fuso do Brasil", () => {
+    const resolved = resolveReferenceDate(
+      "2026-12",
+      new Date(Date.UTC(2026, 9, 6, 12)),
     );
+
+    expect(invoiceDueLabel(resolved)).toBe(
+      "Fatura com vencimento em dezembro/2026",
+    );
+    expect(zonedDateParts(resolved, "America/Sao_Paulo")).toEqual({
+      year: 2026,
+      month: 12,
+      day: 1,
+    });
+  });
+
+  it("respeita o fuso do Brasil mesmo sob TZ=UTC", () => {
+    const resolved = resolveReferenceDate("2026-11");
+
+    expect(invoiceDueLabel(resolved)).toBe(
+      "Fatura com vencimento em novembro/2026",
+    );
+    expect(zonedDateParts(resolved, "America/Sao_Paulo")).toEqual({
+      year: 2026,
+      month: 11,
+      day: 1,
+    });
   });
 
   it("cai no mês atual para valor ausente ou inválido", () => {
-    const now = new Date(2026, 9, 6);
+    const now = new Date(Date.UTC(2026, 9, 6, 12));
     expect(resolveReferenceDate(undefined, now)).toBe(now);
     expect(resolveReferenceDate("2026-13", now)).toBe(now);
     expect(resolveReferenceDate("abc", now)).toBe(now);
@@ -245,11 +269,17 @@ describe("resolveReferenceDate", () => {
 
 describe("invoiceDueLabel", () => {
   it("formata o mês por extenso", () => {
-    expect(invoiceDueLabel(new Date(2026, 11, 1))).toBe(
+    expect(invoiceDueLabel(new Date(Date.UTC(2026, 11, 1, 12)))).toBe(
       "Fatura com vencimento em dezembro/2026",
     );
-    expect(invoiceDueLabel(new Date(2027, 0, 1))).toBe(
+    expect(invoiceDueLabel(new Date(Date.UTC(2027, 0, 1, 12)))).toBe(
       "Fatura com vencimento em janeiro/2027",
+    );
+  });
+
+  it("segue o calendário do Brasil: 23:30 de 31/10 ainda é outubro", () => {
+    expect(invoiceDueLabel(new Date("2026-11-01T02:30:00Z"))).toBe(
+      "Fatura com vencimento em outubro/2026",
     );
   });
 });

@@ -3,11 +3,13 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
+type LoginError = { message: string; kind: "credential" | "config" };
+
 export default function LoginPage() {
   const router = useRouter();
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoginError | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -30,10 +32,28 @@ export default function LoginPage() {
 
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
+        code?: string;
       };
-      setError(data.error ?? "Não foi possível entrar.");
+
+      if (data.code === "CONFIG_ERROR") {
+        setError({
+          message:
+            data.error ??
+            "Serviço indisponível: falta configurar o FinFam. Avise quem administra o FinFam.",
+          kind: "config",
+        });
+        return;
+      }
+
+      setError({
+        message: data.error ?? "Não foi possível entrar.",
+        kind: "credential",
+      });
     } catch {
-      setError("Erro de conexão. Tente novamente.");
+      setError({
+        message: "Erro de conexão. Tente novamente.",
+        kind: "credential",
+      });
     } finally {
       setLoading(false);
     }
@@ -74,11 +94,36 @@ export default function LoginPage() {
           />
         </label>
 
-        {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-            {error}
-          </p>
-        )}
+        {error &&
+          (error.kind === "config" ? (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="mt-0.5 h-4 w-4 flex-shrink-0"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>{error.message}</span>
+            </div>
+          ) : (
+            <p
+              role="alert"
+              aria-live="polite"
+              className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600"
+            >
+              {error.message}
+            </p>
+          ))}
 
         <button
           type="submit"

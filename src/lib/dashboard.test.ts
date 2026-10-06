@@ -14,7 +14,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import { loadDashboardData } from "./dashboard";
 
-const referenceDate = new Date(2026, 9, 15); // outubro/2026
+const referenceDate = new Date(Date.UTC(2026, 9, 15, 12)); // outubro/2026
 
 beforeEach(() => {
   vi.clearAllMocks();
