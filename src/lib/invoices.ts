@@ -141,6 +141,78 @@ export function sumCardExpensesForMonth(
   }, 0);
 }
 
+/** Compra persistida, com os dados do cartão necessários à competência. */
+export interface CardPurchaseRecord extends InstallmentPlanInput {
+  id: string;
+  description: string;
+  category?: string | null;
+  card: { id: string; name: string; closingDay: number; dueDay: number };
+}
+
+/** Uma parcela de uma compra que cai no mês de referência da fatura. */
+export interface InvoiceLine {
+  purchaseId: string;
+  description: string;
+  category: string | null;
+  cardId: string;
+  cardName: string;
+  installmentNumber: number;
+  installmentsTotal: number;
+  amountCents: number;
+}
+
+export interface InvoiceMonth {
+  monthKey: string;
+  lines: InvoiceLine[];
+  totalCents: number;
+}
+
+/**
+ * Monta a fatura de um mês: uma linha por parcela cuja competência coincide com
+ * `monthKey`, com os metadados da compra, e o total do mês. Compra à vista tem
+ * uma única linha; parcela `k/N` é identificada por `installmentNumber`.
+ *
+ * Ordena por cartão, descrição, compra e número da parcela para uma leitura
+ * estável entre cargas.
+ */
+export function invoiceLinesForMonth(
+  purchases: CardPurchaseRecord[],
+  monthKey: string,
+): InvoiceMonth {
+  const lines = purchases
+    .flatMap((purchase) =>
+      allocateInstallments(
+        purchase,
+        purchase.card.closingDay,
+        purchase.card.dueDay,
+      )
+        .filter((installment) => installment.monthKey === monthKey)
+        .map((installment) => ({
+          purchaseId: purchase.id,
+          description: purchase.description,
+          category: purchase.category ?? null,
+          cardId: purchase.card.id,
+          cardName: purchase.card.name,
+          installmentNumber: installment.installmentNumber,
+          installmentsTotal: purchase.installmentsTotal,
+          amountCents: installment.amountCents,
+        })),
+    )
+    .sort(
+      (a, b) =>
+        a.cardName.localeCompare(b.cardName, "pt-BR") ||
+        a.description.localeCompare(b.description, "pt-BR") ||
+        a.purchaseId.localeCompare(b.purchaseId) ||
+        a.installmentNumber - b.installmentNumber,
+    );
+
+  return {
+    monthKey,
+    lines,
+    totalCents: lines.reduce((total, line) => total + line.amountCents, 0),
+  };
+}
+
 /**
  * Resolve o mês de referência a partir do parâmetro `?mes=YYYY-MM`.
  * Valor ausente ou inválido cai no mês atual (ver SPEC, suposição (h)).
