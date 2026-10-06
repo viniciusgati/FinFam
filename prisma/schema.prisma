@@ -1,0 +1,119 @@
+// FinFam — modelo de dados
+// Valores monetários são armazenados em centavos (Int) para evitar
+// imprecisão de ponto flutuante.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentMethod {
+  CASH
+  DEBIT
+  PIX
+  CREDIT
+}
+
+/// Entrada fixa recorrente (ex.: salário).
+model Income {
+  id          String   @id @default(cuid())
+  name        String
+  amountCents Int
+  receiveDay  Int      @default(1)
+  active      Boolean  @default(true)
+  startMonth  String? // YYYY-MM
+  endMonth    String? // YYYY-MM
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("incomes")
+}
+
+/// Saída fixa recorrente (ex.: aluguel, luz, internet).
+model FixedExpense {
+  id          String   @id @default(cuid())
+  name        String
+  amountCents Int
+  dueDay      Int      @default(1)
+  category    String?
+  active      Boolean  @default(true)
+  startMonth  String? // YYYY-MM
+  endMonth    String? // YYYY-MM
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("fixed_expenses")
+}
+
+/// Cartão de crédito.
+model CreditCard {
+  id         String         @id @default(cuid())
+  name       String
+  limitCents Int?
+  closingDay Int
+  dueDay     Int
+  active     Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  purchases  CardPurchase[]
+  expenses   VariableExpense[]
+
+  @@map("credit_cards")
+}
+
+/// Gasto avulso (pode ter sido pago no cartão).
+model VariableExpense {
+  id            String        @id @default(cuid())
+  description   String
+  amountCents   Int
+  date          DateTime
+  category      String?
+  paymentMethod PaymentMethod @default(CASH)
+  paid          Boolean       @default(false)
+  creditCardId  String?
+  creditCard    CreditCard?   @relation(fields: [creditCardId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([date])
+  @@map("variable_expenses")
+}
+
+/// Compra no cartão de crédito (pode ser parcelada).
+model CardPurchase {
+  id                String     @id @default(cuid())
+  cardId            String
+  card              CreditCard @relation(fields: [cardId], references: [id])
+  description       String
+  amountCents       Int
+  purchaseDate      DateTime
+  category          String?
+  installmentNumber Int        @default(1)
+  installmentsTotal Int        @default(1)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([purchaseDate])
+  @@map("card_purchases")
+}
+
+/// Cache mensal usado para o feedback comparativo (ex.: "melhores que os
+/// últimos 4 meses"). Pode ser recalculado a partir das transações.
+model MonthlySnapshot {
+  id                   String   @id @default(cuid())
+  monthKey             String   @unique // YYYY-MM
+  incomeCents          Int
+  fixedExpensesCents   Int
+  variableExpensesCents Int
+  cardExpensesCents    Int
+  consumedCents        Int
+  consumedPercent      Float
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("monthly_snapshots")
+}
