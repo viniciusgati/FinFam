@@ -2,14 +2,19 @@ import Link from "next/link";
 
 interface PlaceholderPageProps {
   title: string;
+  message?: string;
 }
 
-export default function PlaceholderPage({ title }: PlaceholderPageProps) {
+export default function PlaceholderPage({
+  title,
+  message,
+}: PlaceholderPageProps) {
   return (
     <section className="mx-auto flex max-w-xl flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
       <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
       <p className="text-slate-600">
-        O cadastro desta seção chega em breve. Estamos preparando tudo para você.
+        {message ??
+          "O cadastro desta seção chega em breve. Estamos preparando tudo para você."}
       </p>
       <Link
         href="/"

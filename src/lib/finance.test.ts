@@ -6,6 +6,7 @@ import {
   dashboardView,
   heatColor,
   monthKey,
+  resolveDashboardState,
 } from "./finance";
 
 describe("computeFinanceStatus", () => {
@@ -142,6 +143,20 @@ describe("dashboardView", () => {
       percent: 80,
       feedback: "Estão piores que os últimos 4 meses.",
     });
+  });
+});
+
+describe("resolveDashboardState", () => {
+  it("retorna ready quando há renda cadastrada", () => {
+    expect(resolveDashboardState({ monthlyIncomeCents: 1 })).toBe("ready");
+  });
+
+  it("retorna empty quando a renda é zero", () => {
+    expect(resolveDashboardState({ monthlyIncomeCents: 0 })).toBe("empty");
+  });
+
+  it("retorna empty quando a renda é negativa", () => {
+    expect(resolveDashboardState({ monthlyIncomeCents: -100 })).toBe("empty");
   });
 });
 

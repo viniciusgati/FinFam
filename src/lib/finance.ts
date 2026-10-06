@@ -23,6 +23,8 @@ export interface FinanceInput {
   referenceDate?: Date;
 }
 
+export type DashboardState = "ready" | "empty";
+
 export interface FinanceStatus {
   monthKey: string;
   daysInMonth: number;
@@ -137,6 +139,18 @@ export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
   };
 }
 
+/**
+ * Seleciona o estado de exibição do dashboard a partir da renda mensal.
+ *
+ * Usa a mesma normalização de `computeFinanceStatus`: renda `<= 0` (inclui
+ * zero e negativo) significa que ainda não há dados para calcular percentual.
+ */
+export function resolveDashboardState(input: {
+  monthlyIncomeCents: number;
+}): DashboardState {
+  return input.monthlyIncomeCents <= 0 ? "empty" : "ready";
+}
+
 /** Mensagem comparativa com os meses anteriores (SPEC §4.3). */
 export function compareWithHistory(
   currentPercent: number,
@@ -174,7 +188,11 @@ export type DashboardView =
 
 export function dashboardView(input: DashboardViewInput): DashboardView {
   if (input.dbError) return { state: "error" };
-  if (input.incomeCents <= 0) return { state: "empty" };
+  if (
+    resolveDashboardState({ monthlyIncomeCents: input.incomeCents }) === "empty"
+  ) {
+    return { state: "empty" };
+  }
 
   return {
     state: "ok",
