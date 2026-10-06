@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
 import {
   compareWithHistory,
@@ -19,9 +17,6 @@ function emptyStatus(): FinanceStatus {
 }
 
 export default async function DashboardPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
-
   let status = emptyStatus();
   let feedback = "Ainda não há histórico suficiente.";
   let dbError = false;
@@ -35,8 +30,8 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main
-      className="flex min-h-screen flex-col items-center justify-center gap-6 p-8 text-center text-white transition-colors duration-700"
+    <section
+      className="flex min-h-[60vh] flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center text-white transition-colors duration-700"
       style={{ backgroundColor: status.color }}
     >
       <header className="space-y-1">
@@ -67,15 +62,6 @@ export default async function DashboardPage() {
           as migrations para ver os dados reais.
         </p>
       )}
-
-      <form action="/api/auth/logout" method="post">
-        <button
-          type="submit"
-          className="rounded-full bg-black/20 px-5 py-2 text-sm font-medium transition hover:bg-black/30"
-        >
-          Sair ({session.user})
-        </button>
-      </form>
-    </main>
+    </section>
   );
 }
