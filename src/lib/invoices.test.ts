@@ -1,0 +1,151 @@
+import { describe, expect, it } from "vitest";
+import {
+  allocateInstallments,
+  invoiceDueLabel,
+  purchaseInvoice,
+  resolveReferenceDate,
+  sumCardExpensesForMonth,
+} from "./invoices";
+
+describe("purchaseInvoice", () => {
+  it("coloca a compra antes do fechamento no próprio mês", () => {
+    expect(purchaseInvoice(new Date(2026, 2, 10), 20, 5)).toEqual({
+      cycleMonthKey: "2026-03",
+      dueMonthKey: "2026-04",
+    });
+  });
+
+  it("trata o dia do fechamento como inclusivo", () => {
+    expect(purchaseInvoice(new Date(2026, 2, 20), 20, 5).cycleMonthKey).toBe(
+      "2026-03",
+    );
+  });
+
+  it("empurra a compra após o fechamento para o mês seguinte", () => {
+    expect(purchaseInvoice(new Date(2026, 2, 25), 20, 5).cycleMonthKey).toBe(
+      "2026-04",
+    );
+  });
+
+  it("mantém o ciclo quando dueDay > closingDay", () => {
+    expect(purchaseInvoice(new Date(2026, 2, 10), 20, 25)).toEqual({
+      cycleMonthKey: "2026-03",
+      dueMonthKey: "2026-03",
+    });
+  });
+
+  it("avança a competência quando dueDay <= closingDay", () => {
+    expect(purchaseInvoice(new Date(2026, 2, 10), 20, 5).dueMonthKey).toBe(
+      "2026-04",
+    );
+  });
+
+  it("vira o ano no vencimento", () => {
+    expect(purchaseInvoice(new Date(2026, 11, 10), 20, 5).dueMonthKey).toBe(
+      "2027-01",
+    );
+  });
+
+  it("vira o ano no ciclo", () => {
+    expect(purchaseInvoice(new Date(2026, 11, 28), 20, 5).cycleMonthKey).toBe(
+      "2027-01",
+    );
+  });
+});
+
+describe("allocateInstallments", () => {
+  it("rateia 3x em 10000 cruzando o ano com soma exata", () => {
+    const installments = allocateInstallments(
+      {
+        purchaseDate: new Date(2026, 10, 15), // 15/11/2026
+        amountCents: 10000,
+        installmentsTotal: 3,
+      },
+      20,
+      5,
+    );
+
+    expect(installments.map((item) => item.monthKey)).toEqual([
+      "2026-12",
+      "2027-01",
+      "2027-02",
+    ]);
+    expect(installments.map((item) => item.installmentNumber)).toEqual([
+      1, 2, 3,
+    ]);
+    expect(installments.map((item) => item.amountCents)).toEqual([
+      3334, 3333, 3333,
+    ]);
+    expect(
+      installments.reduce((sum, item) => sum + item.amountCents, 0),
+    ).toBe(10000);
+  });
+
+  it("mantém a soma exata em qualquer rateio inexato", () => {
+    const installments = allocateInstallments(
+      {
+        purchaseDate: new Date(2026, 0, 5),
+        amountCents: 10001,
+        installmentsTotal: 7,
+      },
+      20,
+      5,
+    );
+
+    expect(installments).toHaveLength(7);
+    expect(installments.reduce((sum, item) => sum + item.amountCents, 0)).toBe(
+      10001,
+    );
+  });
+});
+
+describe("sumCardExpensesForMonth", () => {
+  const purchase = {
+    purchaseDate: new Date(2026, 10, 15),
+    amountCents: 300000,
+    installmentsTotal: 3,
+    card: { closingDay: 20, dueDay: 5 },
+  };
+
+  it("soma exatamente uma parcela em cada mês da competência", () => {
+    expect(sumCardExpensesForMonth([purchase], "2026-12")).toBe(100000);
+    expect(sumCardExpensesForMonth([purchase], "2027-01")).toBe(100000);
+    expect(sumCardExpensesForMonth([purchase], "2027-02")).toBe(100000);
+  });
+
+  it("retorna 0 em mês sem parcelas e não conta o valor integral", () => {
+    expect(sumCardExpensesForMonth([purchase], "2026-11")).toBe(0);
+    expect(sumCardExpensesForMonth([purchase], "2027-03")).toBe(0);
+    expect(sumCardExpensesForMonth([], "2026-12")).toBe(0);
+  });
+
+  it("não duplica a parcela entre meses", () => {
+    expect(sumCardExpensesForMonth([purchase], "2026-12")).not.toBe(300000);
+  });
+});
+
+describe("resolveReferenceDate", () => {
+  it("interpreta ?mes válido como o primeiro dia do mês", () => {
+    expect(resolveReferenceDate("2026-12", new Date(2026, 9, 6))).toEqual(
+      new Date(2026, 11, 1),
+    );
+  });
+
+  it("cai no mês atual para valor ausente ou inválido", () => {
+    const now = new Date(2026, 9, 6);
+    expect(resolveReferenceDate(undefined, now)).toBe(now);
+    expect(resolveReferenceDate("2026-13", now)).toBe(now);
+    expect(resolveReferenceDate("abc", now)).toBe(now);
+  });
+});
+
+describe("invoiceDueLabel", () => {
+  it("formata o mês por extenso", () => {
+    expect(invoiceDueLabel(new Date(2026, 11, 1))).toBe(
+      "Fatura com vencimento em dezembro/2026",
+    );
+    expect(invoiceDueLabel(new Date(2027, 0, 1))).toBe(
+      "Fatura com vencimento em janeiro/2027",
+    );
+  });
+});

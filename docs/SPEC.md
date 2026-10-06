@@ -59,13 +59,20 @@ vermelho** conforme a situação dos gastos do mês.
 - Cartão: nome, limite, dia de fechamento, dia de vencimento, ativo.
 - Compra no cartão: descrição, valor, data da compra, categoria, cartão,
   número da parcela / total de parcelas.
-- **Cálculo do mês de competência da fatura**: a compra entra na fatura cujo
-  **fechamento** é imediatamente posterior à data da compra. A fatura impacta o
-  orçamento do **mês do vencimento** dessa fatura.
+- **Cálculo do mês de competência da fatura**: o fechamento é **inclusivo** —
+  se `dia(data da compra) <= closingDay`, a compra entra no ciclo do **mês da
+  compra**; se `dia(data da compra) > closingDay`, entra no ciclo do **mês
+  seguinte**. A fatura impacta o orçamento do **mês do vencimento** dessa
+  fatura (`dueDay <= closingDay` avança o vencimento em 1 mês; senão ele fica
+  no mês do ciclo).
   - Ex.: compra em 10/03 com fechamento dia 20 → fatura que fecha em 20/03;
     vencimento em 05/04 → impacta **abril**.
+  - Ex.: compra em 20/03 (dia do fechamento) com fechamento dia 20 → entra no
+    próprio ciclo de 20/03.
+  - Ex.: compra em 27/03 com fechamento dia 20 → entra no ciclo de 20/04.
 - Cada parcela de uma compra parcelada é alocada à fatura do mês
-  correspondente.
+  correspondente (parcela 1 no ciclo da compra; parcela `k` em `k-1` meses
+  depois).
 
 > Regra central: o mesmo gasto nunca é contado duas vezes. Gasto pago no
 > cartão substitui o gasto avulso correspondente.
