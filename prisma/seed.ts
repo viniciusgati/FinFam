@@ -25,17 +25,13 @@ async function main() {
     ],
   });
 
-  const card = await prisma.creditCard.create({
-    data: { name: "Cartão principal", closingDay: 20, dueDay: 5 },
-  });
-
-  const now = new Date();
+  // Datas fixas (sem `now`) para que a validação manual seja determinística.
   await prisma.variableExpense.createMany({
     data: [
       {
         description: "Mercado",
         amountCents: 45000,
-        date: new Date(now.getFullYear(), now.getMonth(), 3),
+        date: new Date(2026, 11, 3), // 03/12/2026
         category: "Alimentação",
         paymentMethod: PaymentMethod.PIX,
         paid: true,
@@ -43,7 +39,23 @@ async function main() {
       {
         description: "Farmácia",
         amountCents: 8000,
-        date: new Date(now.getFullYear(), now.getMonth(), 6),
+        date: new Date(2026, 11, 6), // 06/12/2026
+        category: "Saúde",
+        paymentMethod: PaymentMethod.DEBIT,
+        paid: true,
+      },
+      {
+        description: "Mercado",
+        amountCents: 45000,
+        date: new Date(2027, 0, 3), // 03/01/2027
+        category: "Alimentação",
+        paymentMethod: PaymentMethod.PIX,
+        paid: true,
+      },
+      {
+        description: "Farmácia",
+        amountCents: 8000,
+        date: new Date(2027, 0, 6), // 06/01/2027
         category: "Saúde",
         paymentMethod: PaymentMethod.DEBIT,
         paid: true,
@@ -51,27 +63,67 @@ async function main() {
     ],
   });
 
+  const cardA = await prisma.creditCard.create({
+    data: {
+      name: "Cartão A",
+      closingDay: 20,
+      dueDay: 5, // dueDay <= closingDay: competência avança 1 mês
+    },
+  });
+
+  await prisma.creditCard.create({
+    data: {
+      name: "Cartão B",
+      closingDay: 20,
+      dueDay: 25, // dueDay > closingDay: competência no mês do ciclo
+    },
+  });
+
+  // Compra parcelada 3x em 15/11/2026 → parcelas em 12/2026, 01/2027 e 02/2027.
   await prisma.cardPurchase.create({
     data: {
-      cardId: card.id,
+      cardId: cardA.id,
+      description: "Notebook",
+      amountCents: 300000,
+      purchaseDate: new Date(2026, 10, 15),
+      category: "Eletrônicos",
+      installmentNumber: 1,
+      installmentsTotal: 3,
+    },
+  });
+
+  // Compra à vista fora dos meses conferidos (não altera 12/2026 nem 01/2027).
+  await prisma.cardPurchase.create({
+    data: {
+      cardId: cardA.id,
       description: "Supermercado",
       amountCents: 60000,
-      purchaseDate: new Date(now.getFullYear(), now.getMonth(), 8),
+      purchaseDate: new Date(2026, 8, 8), // 08/09/2026 → fatura 10/2026
       category: "Alimentação",
     },
   });
 
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  await prisma.monthlySnapshot.create({
-    data: {
-      monthKey,
-      incomeCents: 1470000,
-      fixedExpensesCents: 290000,
-      variableExpensesCents: 53000,
-      cardExpensesCents: 60000,
-      consumedCents: 403000,
-      consumedPercent: (403000 / 1470000) * 100,
-    },
+  await prisma.monthlySnapshot.createMany({
+    data: [
+      {
+        monthKey: "2026-10",
+        incomeCents: 1470000,
+        fixedExpensesCents: 290000,
+        variableExpensesCents: 0,
+        cardExpensesCents: 60000,
+        consumedCents: 350000,
+        consumedPercent: (350000 / 1470000) * 100,
+      },
+      {
+        monthKey: "2026-11",
+        incomeCents: 1470000,
+        fixedExpensesCents: 290000,
+        variableExpensesCents: 0,
+        cardExpensesCents: 0,
+        consumedCents: 290000,
+        consumedPercent: (290000 / 1470000) * 100,
+      },
+    ],
   });
 
   console.log("Seed concluído.");

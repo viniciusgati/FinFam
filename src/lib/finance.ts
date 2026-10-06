@@ -23,6 +23,8 @@ export interface FinanceInput {
   referenceDate?: Date;
 }
 
+export type DashboardState = "ready" | "empty";
+
 export interface FinanceStatus {
   monthKey: string;
   daysInMonth: number;
@@ -32,6 +34,11 @@ export interface FinanceStatus {
   consumedCents: number;
   /** Percentual da renda consumida (0..∞). 0 quando não há renda. */
   consumedPercent: number;
+  /**
+   * Projeção linear do percentual consumido até o fim do mês, no ritmo atual
+   * (SPEC §4.3). 0 quando não há renda cadastrada.
+   */
+  projectedPercent: number;
   /** Fração do mês já decorrida, em percentual (0..100). */
   elapsedPercent: number;
   /** consumedPercent / elapsedPercent — o "ritmo" de gasto. */
@@ -88,6 +95,20 @@ export function levelColor(level: FinanceLevel, ratio: number): string {
   return heatColor(ratio);
 }
 
+/**
+ * Projeção linear do percentual consumido até o fim do mês, mantendo o ritmo
+ * atual. Retorna 0 quando não há renda cadastrada (percentual indefinido).
+ */
+export function projectedPercent(
+  consumedPercentValue: number,
+  totalDays: number,
+  elapsed: number,
+  incomeCents: number,
+): number {
+  if (incomeCents <= 0) return 0;
+  return (consumedPercentValue * totalDays) / Math.max(elapsed, 1);
+}
+
 export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
   const referenceDate = input.referenceDate ?? new Date();
   const totalDays = daysInMonth(referenceDate);
@@ -100,6 +121,7 @@ export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
   const elapsedPercent = (elapsed / totalDays) * 100;
   const ratio = income > 0 ? percent / Math.max(elapsedPercent, 1) : 0;
   const level = classifyLevel(ratio, percent, income);
+  const projected = projectedPercent(percent, totalDays, elapsed, income);
 
   return {
     monthKey: monthKey(referenceDate),
@@ -109,11 +131,24 @@ export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
     incomeCents: income,
     consumedCents: consumed,
     consumedPercent: percent,
+    projectedPercent: projected,
     elapsedPercent,
     ratio,
     level,
     color: levelColor(level, ratio),
   };
+}
+
+/**
+ * Seleciona o estado de exibição do dashboard a partir da renda mensal.
+ *
+ * Usa a mesma normalização de `computeFinanceStatus`: renda `<= 0` (inclui
+ * zero e negativo) significa que ainda não há dados para calcular percentual.
+ */
+export function resolveDashboardState(input: {
+  monthlyIncomeCents: number;
+}): DashboardState {
+  return input.monthlyIncomeCents <= 0 ? "empty" : "ready";
 }
 
 /** Mensagem comparativa com os meses anteriores (SPEC §4.3). */
@@ -124,7 +159,7 @@ export function compareWithHistory(
   if (previousPercents.length === 0) {
     return "Ainda não há histórico suficiente.";
   }
-  const better = previousPercents.filter((p) => currentPercent < p).length;
+  const better = previousPercents.filter((p) => currentPercent <= p).length;
   if (better === previousPercents.length) {
     return `Estão melhores que os últimos ${previousPercents.length} meses.`;
   }
@@ -132,4 +167,36 @@ export function compareWithHistory(
     return `Estão piores que os últimos ${previousPercents.length} meses.`;
   }
   return `Estão melhores que ${better} dos últimos ${previousPercents.length} meses.`;
+}
+
+export interface DashboardViewInput {
+  dbError: boolean;
+  incomeCents: number;
+  consumedPercent: number;
+  projectedPercent: number;
+  previousPercents: number[];
+}
+
+/**
+ * Estados visíveis do dashboard, decididos por uma função pura para poderem
+ * ser testados sem DOM (o projeto não possui test runner de DOM).
+ */
+export type DashboardView =
+  | { state: "error" }
+  | { state: "empty" }
+  | { state: "ok"; percent: number; feedback: string };
+
+export function dashboardView(input: DashboardViewInput): DashboardView {
+  if (input.dbError) return { state: "error" };
+  if (
+    resolveDashboardState({ monthlyIncomeCents: input.incomeCents }) === "empty"
+  ) {
+    return { state: "empty" };
+  }
+
+  return {
+    state: "ok",
+    percent: Math.round(input.consumedPercent),
+    feedback: compareWithHistory(input.projectedPercent, input.previousPercents),
+  };
 }
