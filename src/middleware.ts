@@ -3,6 +3,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/offline",
   "/api/auth/login",
   "/manifest.webmanifest",
   "/sw.js",
