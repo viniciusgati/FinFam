@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   description:
     "Dashboard familiar que mostra quanto da renda do mês já foi consumido.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     title: "FinFam",
@@ -19,7 +22,6 @@ export const viewport: Viewport = {
   themeColor: "#16a34a",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({

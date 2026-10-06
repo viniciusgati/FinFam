@@ -3,6 +3,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/offline",
   "/api/auth/login",
   "/manifest.webmanifest",
   "/sw.js",
@@ -30,7 +31,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   const loginUrl = request.nextUrl.clone();
   loginUrl.pathname = "/login";
-  return NextResponse.redirect(loginUrl);
+  return NextResponse.redirect(loginUrl, 302);
 }
 
 export const config = {
