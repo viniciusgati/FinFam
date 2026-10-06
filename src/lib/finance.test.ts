@@ -10,7 +10,10 @@ import {
   levelColor,
   levelLabel,
   monthKey,
+  monthLabel,
+  previousMonthKeys,
   resolveDashboardState,
+  shiftMonthKey,
   textColorForBackground,
   type FinanceLevel,
 } from "./finance";
@@ -235,6 +238,68 @@ describe("resolveDashboardState", () => {
 describe("monthKey", () => {
   it("formata como YYYY-MM", () => {
     expect(monthKey(new Date(2026, 0, 5))).toBe("2026-01");
+  });
+});
+
+describe("shiftMonthKey", () => {
+  it("volta para o ano anterior na virada de janeiro", () => {
+    expect(shiftMonthKey("2026-01", -1)).toBe("2025-12");
+  });
+
+  it("avança para o ano seguinte na virada de dezembro", () => {
+    expect(shiftMonthKey("2026-12", 1)).toBe("2027-01");
+  });
+
+  it("mantém o mês quando o deslocamento é zero", () => {
+    expect(shiftMonthKey("2026-06", 0)).toBe("2026-06");
+  });
+
+  it("preserva o zero à esquerda do mês", () => {
+    expect(shiftMonthKey("2026-09", 1)).toBe("2026-10");
+    expect(shiftMonthKey("2026-10", -1)).toBe("2026-09");
+  });
+});
+
+describe("monthLabel", () => {
+  it("formata o mês em pt-BR", () => {
+    expect(monthLabel("2026-08")).toBe("agosto de 2026");
+  });
+
+  it("formata os meses de virada de ano", () => {
+    expect(monthLabel("2025-12")).toBe("dezembro de 2025");
+    expect(monthLabel("2027-01")).toBe("janeiro de 2027");
+  });
+});
+
+describe("previousMonthKeys", () => {
+  it("retorna os 4 meses anteriores, do mais recente ao mais antigo", () => {
+    expect(previousMonthKeys(new Date(2026, 9, 6))).toEqual([
+      "2026-09",
+      "2026-08",
+      "2026-07",
+      "2026-06",
+    ]);
+  });
+
+  it("cruza o ano quando a referência está em janeiro", () => {
+    expect(previousMonthKeys(new Date(2026, 0, 2))).toEqual([
+      "2025-12",
+      "2025-11",
+      "2025-10",
+      "2025-09",
+    ]);
+  });
+
+  it("sempre devolve 4 chaves contíguas, sem buracos", () => {
+    const keys = previousMonthKeys(new Date(2026, 2, 31));
+    expect(keys).toHaveLength(4);
+    const months = keys.map((key) => {
+      const [year, month] = key.split("-").map(Number);
+      return year * 12 + month;
+    });
+    expect(months[0] - months[1]).toBe(1);
+    expect(months[1] - months[2]).toBe(1);
+    expect(months[2] - months[3]).toBe(1);
   });
 });
 
