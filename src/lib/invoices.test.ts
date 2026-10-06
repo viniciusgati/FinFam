@@ -124,6 +124,49 @@ describe("sumCardExpensesForMonth", () => {
   });
 });
 
+describe("cenário do seed de validação manual", () => {
+  // Reproduz exatamente prisma/seed.ts: renda 1.470.000, fixas 290.000,
+  // variáveis 53.000/mês em 12/2026 e 01/2027 e "Notebook" 3x em 15/11/2026.
+  const incomeCents = 1470000;
+  const fixedExpensesCents = 290000;
+  const variableCents = 45000 + 8000;
+
+  const purchases = [
+    {
+      purchaseDate: new Date(2026, 10, 15), // 15/11/2026, cartão A
+      amountCents: 300000,
+      installmentsTotal: 3,
+      card: { closingDay: 20, dueDay: 5 },
+    },
+    {
+      purchaseDate: new Date(2026, 8, 8), // 08/09/2026, à vista
+      amountCents: 60000,
+      installmentsTotal: 1,
+      card: { closingDay: 20, dueDay: 5 },
+    },
+  ];
+
+  it.each(["2026-12", "2027-01"])(
+    "conta uma única parcela em %s e fecha em 30%",
+    (monthKey) => {
+      const cardExpensesCents = sumCardExpensesForMonth(purchases, monthKey);
+      expect(cardExpensesCents).toBe(100000);
+
+      const consumed =
+        fixedExpensesCents + variableCents + cardExpensesCents;
+      expect(consumed).toBe(443000);
+      expect(Math.round((consumed / incomeCents) * 100)).toBe(30);
+    },
+  );
+
+  it("não conta o valor integral: a contraprova seria 44%", () => {
+    const integral = fixedExpensesCents + variableCents + 300000;
+    expect(integral).toBe(643000);
+    expect(Math.round((integral / incomeCents) * 100)).toBe(44);
+    expect(sumCardExpensesForMonth(purchases, "2026-12")).not.toBe(300000);
+  });
+});
+
 describe("resolveReferenceDate", () => {
   it("interpreta ?mes válido como o primeiro dia do mês", () => {
     expect(resolveReferenceDate("2026-12", new Date(2026, 9, 6))).toEqual(
