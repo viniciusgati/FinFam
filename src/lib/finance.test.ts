@@ -5,9 +5,18 @@ import {
   computeFinanceStatus,
   dashboardView,
   heatColor,
+  isActiveInMonth,
   monthKey,
   resolveDashboardState,
 } from "./finance";
+import {
+  fixedExpenseCreateSchema,
+  fixedExpenseUpdateSchema,
+  incomeCreateSchema,
+  incomeUpdateSchema,
+  isPeriodValid,
+} from "./validation";
+import { formatCents, parseAmountToCents } from "./money";
 
 describe("computeFinanceStatus", () => {
   it("calcula o percentual consumido e os dias restantes", () => {
@@ -163,5 +172,178 @@ describe("resolveDashboardState", () => {
 describe("monthKey", () => {
   it("formata como YYYY-MM", () => {
     expect(monthKey(new Date(2026, 0, 5))).toBe("2026-01");
+  });
+});
+
+describe("isActiveInMonth", () => {
+  it("ignora itens inativos em qualquer mês", () => {
+    expect(
+      isActiveInMonth({ active: false, startMonth: null, endMonth: null }, "2026-10"),
+    ).toBe(false);
+  });
+
+  it("trata limites nulos como sem limite", () => {
+    expect(isActiveInMonth({ active: true }, "2026-10")).toBe(true);
+    expect(
+      isActiveInMonth({ active: true, startMonth: null, endMonth: null }, "2026-10"),
+    ).toBe(true);
+  });
+
+  it("respeita a vigência de forma inclusiva nas duas pontas", () => {
+    const item = { active: true, startMonth: "2026-03", endMonth: "2026-06" };
+    expect(isActiveInMonth(item, "2026-02")).toBe(false);
+    expect(isActiveInMonth(item, "2026-03")).toBe(true);
+    expect(isActiveInMonth(item, "2026-05")).toBe(true);
+    expect(isActiveInMonth(item, "2026-06")).toBe(true);
+    expect(isActiveInMonth(item, "2026-07")).toBe(false);
+  });
+
+  it("trata startMonth futuro e endMonth passado como fora da vigência", () => {
+    expect(isActiveInMonth({ active: true, startMonth: "2027-01" }, "2026-10")).toBe(
+      false,
+    );
+    expect(isActiveInMonth({ active: true, endMonth: "2026-09" }, "2026-10")).toBe(
+      false,
+    );
+  });
+});
+
+describe("validação de períodos", () => {
+  it("aceita períodos abertos ou ordenados", () => {
+    expect(isPeriodValid(null, null)).toBe(true);
+    expect(isPeriodValid("2026-01", null)).toBe(true);
+    expect(isPeriodValid(null, "2026-12")).toBe(true);
+    expect(isPeriodValid("2026-01", "2026-12")).toBe(true);
+    expect(isPeriodValid("2026-01", "2026-01")).toBe(true);
+  });
+
+  it("rejeita mês final anterior ao inicial", () => {
+    expect(isPeriodValid("2026-05", "2026-03")).toBe(false);
+  });
+});
+
+const validIncome = {
+  name: "Salário",
+  amountCents: 100000,
+  receiveDay: 5,
+};
+
+describe("incomeCreateSchema", () => {
+  it("aceita payload válido e aplica active=true por padrão", () => {
+    const parsed = incomeCreateSchema.safeParse(validIncome);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.active).toBe(true);
+  });
+
+  it("aceita vigência opcional válida", () => {
+    const parsed = incomeCreateSchema.safeParse({
+      ...validIncome,
+      startMonth: "2026-01",
+      endMonth: "2026-12",
+      active: false,
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejeita nome vazio, valor inválido e dia fora de 1–31", () => {
+    expect(incomeCreateSchema.safeParse({ ...validIncome, name: "  " }).success).toBe(
+      false,
+    );
+    expect(
+      incomeCreateSchema.safeParse({ ...validIncome, amountCents: -1 }).success,
+    ).toBe(false);
+    expect(
+      incomeCreateSchema.safeParse({ ...validIncome, amountCents: 10.5 }).success,
+    ).toBe(false);
+    expect(incomeCreateSchema.safeParse({ ...validIncome, receiveDay: 0 }).success).toBe(
+      false,
+    );
+    expect(
+      incomeCreateSchema.safeParse({ ...validIncome, receiveDay: 32 }).success,
+    ).toBe(false);
+  });
+
+  it("rejeita mês malformado e período invertido", () => {
+    expect(
+      incomeCreateSchema.safeParse({ ...validIncome, startMonth: "2026-13" }).success,
+    ).toBe(false);
+    expect(
+      incomeCreateSchema.safeParse({ ...validIncome, startMonth: "26-01" }).success,
+    ).toBe(false);
+    expect(
+      incomeCreateSchema.safeParse({
+        ...validIncome,
+        startMonth: "2026-05",
+        endMonth: "2026-03",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("incomeUpdateSchema", () => {
+  it("aceita edição parcial de active", () => {
+    const parsed = incomeUpdateSchema.safeParse({ active: false });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejeita valores inválidos e período invertido", () => {
+    expect(incomeUpdateSchema.safeParse({ amountCents: 0 }).success).toBe(false);
+    expect(incomeUpdateSchema.safeParse({ receiveDay: 40 }).success).toBe(false);
+    expect(
+      incomeUpdateSchema.safeParse({ startMonth: "2026-05", endMonth: "2026-01" })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("fixedExpense schemas", () => {
+  const validExpense = {
+    name: "Aluguel",
+    amountCents: 250000,
+    dueDay: 10,
+  };
+
+  it("aceita categoria opcional e dia válido", () => {
+    const parsed = fixedExpenseCreateSchema.safeParse({
+      ...validExpense,
+      category: "Moradia",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.category).toBe("Moradia");
+      expect(parsed.data.active).toBe(true);
+    }
+  });
+
+  it("rejeita categoria não-string e dueDay fora de 1–31", () => {
+    expect(
+      fixedExpenseCreateSchema.safeParse({ ...validExpense, category: 123 }).success,
+    ).toBe(false);
+    expect(fixedExpenseCreateSchema.safeParse({ ...validExpense, dueDay: 0 }).success).toBe(
+      false,
+    );
+    expect(
+      fixedExpenseCreateSchema.safeParse({ ...validExpense, dueDay: 32 }).success,
+    ).toBe(false);
+  });
+
+  it("permite edição parcial", () => {
+    expect(fixedExpenseUpdateSchema.safeParse({ active: false }).success).toBe(true);
+    expect(fixedExpenseUpdateSchema.safeParse({ category: null }).success).toBe(true);
+  });
+});
+
+describe("conversão de valores", () => {
+  it("converte reais pt-BR para centavos", () => {
+    expect(parseAmountToCents("1.234,56")).toBe(123456);
+    expect(parseAmountToCents("1000")).toBe(100000);
+    expect(parseAmountToCents("R$ 2.500,00")).toBe(null);
+    expect(parseAmountToCents("")).toBe(null);
+    expect(parseAmountToCents("0")).toBe(null);
+    expect(parseAmountToCents("abc")).toBe(null);
+  });
+
+  it("formata centavos como moeda brasileira", () => {
+    expect(formatCents(123456).replace(/\u00a0/g, " ")).toBe("R$ 1.234,56");
   });
 });
