@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "PaymentMethod" AS ENUM ('CASH', 'DEBIT', 'PIX', 'CREDIT');
 
@@ -108,3 +111,4 @@ ALTER TABLE "variable_expenses" ADD CONSTRAINT "variable_expenses_creditCardId_f
 
 -- AddForeignKey
 ALTER TABLE "card_purchases" ADD CONSTRAINT "card_purchases_cardId_fkey" FOREIGN KEY ("cardId") REFERENCES "credit_cards"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+

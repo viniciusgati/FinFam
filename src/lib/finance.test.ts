@@ -8,6 +8,7 @@ import {
   isActiveInMonth,
   monthKey,
   monthLabel,
+  previousMonthKeys,
   resolveDashboardState,
   shiftMonthKey,
 } from "./finance";
@@ -204,6 +205,38 @@ describe("monthLabel", () => {
   it("formata os meses de virada de ano", () => {
     expect(monthLabel("2025-12")).toBe("dezembro de 2025");
     expect(monthLabel("2027-01")).toBe("janeiro de 2027");
+  });
+});
+
+describe("previousMonthKeys", () => {
+  it("retorna os 4 meses anteriores, do mais recente ao mais antigo", () => {
+    expect(previousMonthKeys(new Date(2026, 9, 6))).toEqual([
+      "2026-09",
+      "2026-08",
+      "2026-07",
+      "2026-06",
+    ]);
+  });
+
+  it("cruza o ano quando a referência está em janeiro", () => {
+    expect(previousMonthKeys(new Date(2026, 0, 2))).toEqual([
+      "2025-12",
+      "2025-11",
+      "2025-10",
+      "2025-09",
+    ]);
+  });
+
+  it("sempre devolve 4 chaves contíguas, sem buracos", () => {
+    const keys = previousMonthKeys(new Date(2026, 2, 31));
+    expect(keys).toHaveLength(4);
+    const months = keys.map((key) => {
+      const [year, month] = key.split("-").map(Number);
+      return year * 12 + month;
+    });
+    expect(months[0] - months[1]).toBe(1);
+    expect(months[1] - months[2]).toBe(1);
+    expect(months[2] - months[3]).toBe(1);
   });
 });
 
