@@ -53,6 +53,39 @@ export function monthKey(date: Date): string {
   return `${year}-${month}`;
 }
 
+const MONTH_LABELS = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+/**
+ * Desloca `monthKey` (YYYY-MM) em `delta` meses por aritmética inteira de
+ * ano/mês, sem usar `Date` — logo, imune a fusos e ao tamanho dos meses.
+ */
+export function shiftMonthKey(monthKey: string, delta: number): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const total = year * 12 + (month - 1) + delta;
+  const nextYear = Math.floor(total / 12);
+  const nextMonth = total - nextYear * 12;
+  return `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}`;
+}
+
+/** Rótulo pt-BR de um mês `YYYY-MM` (ex.: "agosto de 2026"). */
+export function monthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  return `${MONTH_LABELS[month - 1]} de ${year}`;
+}
+
 /**
  * Os 4 `monthKey` (YYYY-MM) imediatamente anteriores ao mês de `reference`,
  * do mais recente para o mais antigo. Cruza o ano natural (jan/2026 →

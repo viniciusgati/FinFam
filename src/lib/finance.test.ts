@@ -7,8 +7,10 @@ import {
   heatColor,
   isActiveInMonth,
   monthKey,
+  monthLabel,
   previousMonthKeys,
   resolveDashboardState,
+  shiftMonthKey,
 } from "./finance";
 import {
   fixedExpenseCreateSchema,
@@ -173,6 +175,36 @@ describe("resolveDashboardState", () => {
 describe("monthKey", () => {
   it("formata como YYYY-MM", () => {
     expect(monthKey(new Date(2026, 0, 5))).toBe("2026-01");
+  });
+});
+
+describe("shiftMonthKey", () => {
+  it("volta para o ano anterior na virada de janeiro", () => {
+    expect(shiftMonthKey("2026-01", -1)).toBe("2025-12");
+  });
+
+  it("avança para o ano seguinte na virada de dezembro", () => {
+    expect(shiftMonthKey("2026-12", 1)).toBe("2027-01");
+  });
+
+  it("mantém o mês quando o deslocamento é zero", () => {
+    expect(shiftMonthKey("2026-06", 0)).toBe("2026-06");
+  });
+
+  it("preserva o zero à esquerda do mês", () => {
+    expect(shiftMonthKey("2026-09", 1)).toBe("2026-10");
+    expect(shiftMonthKey("2026-10", -1)).toBe("2026-09");
+  });
+});
+
+describe("monthLabel", () => {
+  it("formata o mês em pt-BR", () => {
+    expect(monthLabel("2026-08")).toBe("agosto de 2026");
+  });
+
+  it("formata os meses de virada de ano", () => {
+    expect(monthLabel("2025-12")).toBe("dezembro de 2025");
+    expect(monthLabel("2027-01")).toBe("janeiro de 2027");
   });
 });
 
