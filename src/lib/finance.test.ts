@@ -5,6 +5,7 @@ import {
   computeFinanceStatus,
   heatColor,
   monthKey,
+  resolveDashboardState,
 } from "./finance";
 
 describe("computeFinanceStatus", () => {
@@ -84,6 +85,20 @@ describe("compareWithHistory", () => {
     expect(compareWithHistory(50, [])).toBe(
       "Ainda não há histórico suficiente.",
     );
+  });
+});
+
+describe("resolveDashboardState", () => {
+  it("retorna ready quando há renda cadastrada", () => {
+    expect(resolveDashboardState({ monthlyIncomeCents: 1 })).toBe("ready");
+  });
+
+  it("retorna empty quando a renda é zero", () => {
+    expect(resolveDashboardState({ monthlyIncomeCents: 0 })).toBe("empty");
+  });
+
+  it("retorna empty quando a renda é negativa", () => {
+    expect(resolveDashboardState({ monthlyIncomeCents: -100 })).toBe("empty");
   });
 });
 
