@@ -132,3 +132,134 @@ $ curl -X POST -d '{"user":"familia","pass":"..."}' .../api/auth/login -w " [%{h
 Chave de leitura: sem `DATABASE_URL` a página **não** falha de forma explícita —
 mostra `0%` cinza com aviso discreto. Esse é o estado vazio/erro padrão que a família
 veria hoje.
+
+---
+
+# Rodada 2 — Fundação de dados (task #207)
+
+> Fase 2 (auditor-ux) da task #207. Escopo: usabilidade do **onboarding de banco**
+> (migrations/seed/README) e dos **estados do dashboard que dependem de dados**
+> (vazio / erro / sem histórico / com histórico). Verificado em execução real
+> (`npm test`, `typecheck`, `build`, `next start` + `curl`). Não há
+> `prisma/migrations` nem `DATABASE_URL` no ambiente desta fase, então o ciclo
+> `db:migrate`/`db:seed` não pôde ser executado ponta a ponta (registrado em
+> Evidência).
+
+## Fluxos do usuário
+
+- **Onboarding do operador (provisionar do zero)** — `npm install`, `typecheck`,
+  `test` e `build` funcionam; `db:migrate` não tem migration versionada para
+  aplicar. O README manda `cp .env.example .env` → `npm run db:migrate` →
+  `npm run db:seed` (`README.md:40-51`), mas `prisma/migrations/` não existe:
+  `npm run db:deploy` (produção) não provisiona nada e `db:seed` falharia com
+  "table does not exist". O operador não sabe se deu certo nem o que observar.
+- **Dashboard com banco ausente/indisponível** — `/` autenticado exibe `0%`,
+  fundo cinza `hsl(0 0% 45%)`, dias restantes e "Ainda não há histórico
+  suficiente.", com aviso `text-sm` no rodapé sobre `DATABASE_URL`. O usuário vê
+  um dashboard plausível ("0% gasto") em vez de perceber que não há dados.
+- **Dashboard com dados reais, mas sem `MonthlySnapshot`** — `loadDashboardData`
+  devolve `previousPercents: []` (`src/lib/dashboard.ts:46-52`) e a página mostra
+  "Ainda não há histórico suficiente." mesmo havendo transações. É exatamente o
+  critério de aceite que a task quer eliminar, e hoje é o comportamento padrão do
+  seed, que só cria o mês corrente (`prisma/seed.ts:64-75`).
+- **Dashboard com 4 meses de snapshot (após a entrega)** — espera-se
+  "Estão melhores/piores que os últimos 4 meses". Depende de o seed gravar 4
+  snapshots fechados com `monthKey` contíguo e **coerente com o `%` calculado**
+  das transações.
+- **Reexecutar o seed** — `prisma/seed.ts:6-11` faz `deleteMany()` em todas as
+  tabelas antes de recriar: reexecutar não duplica, mas **apaga** dados reais da
+  família. É "idempotente" no papel, destrutivo na prática.
+
+## Problemas de usabilidade
+
+- **Sem migrations versionadas → onboarding não reproduzível** — `README.md:44-46`
+  e `docs/ARCHITECTURE.md:98-100` prometem `prisma/migrations`, mas a pasta não
+  existe; `db:deploy` não provisiona banco do zero. O operador fica sem caminho.
+- **`db:seed` destrutivo** — `prisma/seed.ts:6-11` limpa todas as tabelas; quem
+  roda o comando no banco da família perde os dados sem confirmação.
+- **Histórico nunca aparece** — o seed cria só o mês corrente (`seed.ts:64-75`)
+  enquanto o dashboard busca meses anteriores (`dashboard.ts:46-52`); a frase
+  prometida no README/SPEC fica invisível e a tela trava em "Ainda não há
+  histórico suficiente.".
+- **Erro de banco disfarçado de leitura** — `src/app/page.tsx:25-35,64-69`: com
+  `dbError` o `%`, os dias e o feedback continuam na tela; o usuário não distingue
+  "não gastei nada" de "não há banco".
+- **Estado "sem renda" sem orientação** — a SPEC §5.6 pede orientar o cadastro de
+  entradas; a UI mostra `0%` cinza sem CTA/explicação.
+- **Snapshots podem divergir do cálculo real** — se o seed gravar percentuais
+  "no braço" e as transações mudarem, o `%` do mês e a frase comparativa podem se
+  contradizer, minando a confiança no número (o alvo do produto).
+- **README sem verificação e desatualizado** — não diz o que deve ser observado
+  após `db:migrate`/`db:seed` nem que o seed é destrutivo; "Status: Projeto
+  iniciado (Fase 0)" (`README.md:75-80`) já é falso.
+- **Erros crus do Prisma** — env ausente/tabela inexistente retornam P1001/P2021
+  em inglês, sem passo de correção.
+
+## Recomendações priorizadas
+
+- **P0 — versionar `prisma/migrations/0001_init`** e validar `db:migrate` +
+  `db:seed` num Postgres limpo (garantir que `db:deploy` provisione do zero).
+  Benefício: onboarding reproduzível; sem isso nada mais é demonstrável.
+- **P0 — seed idempotente e não destrutivo** — `upsert` por chave natural (ou
+  limpeza só atrás de flag `--reset`). Benefício: reexecutar é seguro.
+- **P0 — seed cria 4 meses fechados + mês corrente de `MonthlySnapshot`**,
+  idealmente **derivados das transações** (mesma fonte que o dashboard).
+  Benefício: cumpre o critério de aceite e a promessa do README.
+- **P0 — estados explícitos de vazio/erro/sem-histórico no dashboard** — em
+  `dbError`, esconder o `%` e mostrar erro acionável; sem renda, orientar cadastro.
+  Benefício: elimina leitura enganosa.
+- **P1 — comando `db:snapshots` de backfill** que recalcula snapshots
+  idempotentemente a partir das transações (consistência `%` × histórico).
+- **P1 — README: passo a passo completo + verificação + aviso do seed** e
+  corrigir o "Status". Benefício: o operador sabe se deu certo e o risco.
+- **P2 — erros de migration/seed acionáveis** (traduzir P1001/P2021 em
+  "defina DATABASE_URL"/"rode as migrations"). Benefício: menos suporte.
+
+## Evidência
+
+Executado nesta fase (nenhum arquivo de código alterado; working tree limpo antes
+e depois, exceto este documento):
+
+```
+$ git branch --show-current
+autoia/task-207
+$ git status
+nothing to commit, working tree clean
+
+$ ls prisma/
+schema.prisma  seed.ts          # NÃO existe prisma/migrations/
+$ git ls-files prisma
+prisma/schema.prisma
+prisma/seed.ts
+
+$ npm test
+ ✓ src/lib/finance.test.ts (9 tests) 4ms
+ Test Files  1 passed (1) / Tests  9 passed (9)
+$ npm run typecheck   # (sem erros)
+$ npm run build
+ ✓ Compiled successfully ... Route (app) ƒ / ○ /login ƒ /api/auth/login ƒ /api/auth/logout
+
+$ DATABASE_URL=<unset>; AUTOIA_HOST_SERVICES_BASE=http://127.0.0.1
+$ pg_isready -h 127.0.0.1 -p 5432
+127.0.0.1:5432 - accepting connections
+$ PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -tAc "select 1"
+FATAL: password authentication failed for user "postgres"
+# → sem DATABASE_URL válida, migrations/seed reais não são validáveis neste sandbox.
+
+$ FINFAM_USER=familia FINFAM_PASS=... FINFAM_SESSION_SECRET=... PORT=3101 npm start
+$ curl -o /dev/null -w "%{http_code}" http://127.0.0.1:3101/          # sem sessão
+307
+$ curl -X POST -d '{"user":"familia","pass":"..."}' .../api/auth/login
+{"ok":true} [200]
+$ curl -b cookie http://127.0.0.1:3101/  → 200, contém:
+0%
+Ainda não há histórico suficiente
+Banco de dados não configurado. Defina DATABASE_URL ... e rode as migrations ...
+Sair (familia)
+background-color:hsl(0 0% 45%)
+```
+
+Chave de leitura desta rodada: a task entrega infraestrutura, mas o efeito de
+**onboarding/estado vazio** ainda é o mesmo da rodada anterior — o produto segue
+sem caminho reproduzível para provisionar o banco e o dashboard continua mostrando
+`0%`/"Ainda não há histórico suficiente." quando falta dado ou banco.
