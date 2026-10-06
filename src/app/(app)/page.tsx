@@ -1,38 +1,43 @@
 import { loadDashboardData } from "@/lib/dashboard";
 import {
-  compareWithHistory,
   computeFinanceStatus,
-  type FinanceStatus,
+  dashboardView,
+  type DashboardView,
 } from "@/lib/finance";
 
 export const dynamic = "force-dynamic";
 
-function emptyStatus(): FinanceStatus {
-  return computeFinanceStatus({
-    monthlyIncomeCents: 0,
-    fixedExpensesCents: 0,
-    variableExpensesCents: 0,
-    cardExpensesCents: 0,
-  });
-}
-
 export default async function DashboardPage() {
-  let status = emptyStatus();
-  let feedback = "Ainda não há histórico suficiente.";
-  let dbError = false;
+  let view: DashboardView = { state: "error" };
+  let backgroundColor = "hsl(0 0% 45%)";
+  let daysRemaining = 0;
 
   try {
     const data = await loadDashboardData();
-    status = computeFinanceStatus(data);
-    feedback = compareWithHistory(status.consumedPercent, data.previousPercents);
+    const status = computeFinanceStatus(data);
+    backgroundColor = status.color;
+    daysRemaining = status.daysRemaining;
+    view = dashboardView({
+      dbError: false,
+      incomeCents: status.incomeCents,
+      consumedPercent: status.consumedPercent,
+      projectedPercent: status.projectedPercent,
+      previousPercents: data.previousPercents,
+    });
   } catch {
-    dbError = true;
+    view = dashboardView({
+      dbError: true,
+      incomeCents: 0,
+      consumedPercent: 0,
+      projectedPercent: 0,
+      previousPercents: [],
+    });
   }
 
   return (
     <section
       className="flex min-h-[60vh] flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center text-white transition-colors duration-700"
-      style={{ backgroundColor: status.color }}
+      style={{ backgroundColor }}
     >
       <header className="space-y-1">
         <p className="text-sm font-medium uppercase tracking-widest opacity-80">
@@ -43,23 +48,37 @@ export default async function DashboardPage() {
         </h1>
       </header>
 
-      <p className="text-7xl font-black tabular-nums sm:text-9xl">
-        {Math.round(status.consumedPercent)}
-        <span className="text-4xl align-top sm:text-6xl">%</span>
-      </p>
+      {view.state === "ok" && (
+        <>
+          <p className="text-7xl font-black tabular-nums sm:text-9xl">
+            {view.percent}
+            <span className="text-4xl align-top sm:text-6xl">%</span>
+          </p>
 
-      <p className="text-2xl font-medium opacity-95">
-        {status.daysRemaining} dias para o fim do mês
-      </p>
+          <p className="text-2xl font-medium opacity-95">
+            {daysRemaining} dias para o fim do mês
+          </p>
 
-      <p className="max-w-xl rounded-full bg-black/20 px-6 py-3 text-lg">
-        {feedback}
-      </p>
+          <p className="max-w-xl rounded-full bg-black/20 px-6 py-3 text-lg">
+            {view.feedback}
+          </p>
+        </>
+      )}
 
-      {dbError && (
-        <p className="max-w-xl text-sm opacity-80">
-          Banco de dados não configurado. Defina <code>DATABASE_URL</code> e rode
-          as migrations para ver os dados reais.
+      {view.state === "empty" && (
+        <p className="max-w-xl rounded-full bg-black/20 px-6 py-3 text-lg">
+          Ainda não há renda cadastrada. Cadastre suas entradas para acompanhar
+          quanto do mês já foi consumido.
+        </p>
+      )}
+
+      {view.state === "error" && (
+        <p
+          role="alert"
+          className="max-w-xl rounded-full bg-black/20 px-6 py-3 text-lg"
+        >
+          Não foi possível carregar seus dados. Verifique DATABASE_URL e rode as
+          migrations.
         </p>
       )}
     </section>
