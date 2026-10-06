@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import type { FinanceInput } from "./finance";
 import { isActiveInMonth, monthKey } from "./finance";
+import { sumCardExpensesForMonth } from "./invoices";
 
 export interface DashboardData extends FinanceInput {
   previousPercents: number[];
@@ -16,9 +17,10 @@ function sumByAmount(items: { amountCents: number }[]): number {
  * As entradas e saídas fixas respeitam a vigência (startMonth/endMonth) além
  * do flag `active`.
  *
- * TODO (próximas fases):
- * - Alocar compras de cartão pela regra de fechamento/vencimento (SPEC §3.4)
- *   em vez de usar apenas o mês da compra.
+ * As compras de cartão são alocadas pela regra de fechamento/vencimento
+ * (SPEC §3.4, `sumCardExpensesForMonth`), de modo que cada mês de referência
+ * recebe apenas as parcelas cuja competência cai nele — inclusive parcelas de
+ * compras feitas em meses anteriores.
  */
 export async function loadDashboardData(
   referenceDate: Date = new Date(),
@@ -43,7 +45,8 @@ export async function loadDashboardData(
         },
       }),
       prisma.cardPurchase.findMany({
-        where: { purchaseDate: { gte: start, lt: end } },
+        where: { purchaseDate: { lt: end } },
+        include: { card: true },
       }),
       prisma.monthlySnapshot.findMany({
         where: {
@@ -54,6 +57,12 @@ export async function loadDashboardData(
       }),
     ]);
 
+  // Suposição (g): a relação CardPurchase → CreditCard é obrigatória; uma
+  // compra órfã indica corrupção de dados e deve falhar o carregamento.
+  if (cardPurchases.some((purchase) => !purchase.card)) {
+    throw new Error("Compra de cartão sem cartão relacionado.");
+  }
+
   return {
     monthlyIncomeCents: sumByAmount(
       incomes.filter((item) => isActiveInMonth(item, currentMonthKey)),
@@ -62,7 +71,10 @@ export async function loadDashboardData(
       fixedExpenses.filter((item) => isActiveInMonth(item, currentMonthKey)),
     ),
     variableExpensesCents: sumByAmount(variableExpenses),
-    cardExpensesCents: sumByAmount(cardPurchases),
+    cardExpensesCents: sumCardExpensesForMonth(
+      cardPurchases,
+      currentMonthKey,
+    ),
     previousPercents: snapshots.map((snapshot) => snapshot.consumedPercent),
     referenceDate,
   };
