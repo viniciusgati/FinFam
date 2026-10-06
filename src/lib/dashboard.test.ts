@@ -14,7 +14,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import { loadDashboardData } from "./dashboard";
 
-const referenceDate = new Date(2026, 9, 15); // outubro/2026
+const referenceDate = new Date(Date.UTC(2026, 9, 15, 12)); // outubro/2026
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -122,5 +122,49 @@ describe("loadDashboardData — gastos avulsos", () => {
 
     const [args] = prismaMock.variableExpense.findMany.mock.calls[0];
     expect(args.where.paymentMethod.in).toEqual(["CASH", "DEBIT", "PIX"]);
+  });
+});
+
+describe("loadDashboardData — calendário no fuso do Brasil", () => {
+  it("consulta outubro quando em Brasília ainda é 31/10 (TZ=UTC)", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+
+    await loadDashboardData(new Date("2026-11-01T02:30:00Z"));
+
+    const [variableArgs] = prismaMock.variableExpense.findMany.mock.calls[0];
+    expect(variableArgs.where.date.gte.toISOString()).toBe(
+      "2026-10-01T03:00:00.000Z",
+    );
+    expect(variableArgs.where.date.lt.toISOString()).toBe(
+      "2026-11-01T03:00:00.000Z",
+    );
+
+    const [snapshotArgs] = prismaMock.monthlySnapshot.findMany.mock.calls[0];
+    expect(snapshotArgs.where.monthKey).toEqual({
+      gte: "2026-06",
+      lt: "2026-10",
+    });
+  });
+
+  it("vira o mês na meia-noite de Brasília (TZ=UTC)", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+
+    await loadDashboardData(new Date("2026-11-01T03:00:00Z"));
+
+    const [variableArgs] = prismaMock.variableExpense.findMany.mock.calls[0];
+    expect(variableArgs.where.date.gte.toISOString()).toBe(
+      "2026-11-01T03:00:00.000Z",
+    );
+    expect(variableArgs.where.date.lt.toISOString()).toBe(
+      "2026-12-01T03:00:00.000Z",
+    );
+
+    const [snapshotArgs] = prismaMock.monthlySnapshot.findMany.mock.calls[0];
+    expect(snapshotArgs.where.monthKey).toEqual({
+      gte: "2026-07",
+      lt: "2026-11",
+    });
   });
 });

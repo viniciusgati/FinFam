@@ -18,6 +18,8 @@
  *   (`%`) soma-se à 1ª parcela, garantindo soma exata = `amountCents`.
  */
 
+import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
+
 export interface PurchaseInvoice {
   /** Mês do ciclo de fechamento em que a compra entrou (YYYY-MM). */
   cycleMonthKey: string;
@@ -223,13 +225,13 @@ export function resolveReferenceDate(
 ): Date {
   if (mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) {
     const [year, month] = mes.split("-").map(Number);
-    return new Date(year, month - 1, 1);
+    return zonedTimeToUtc(year, month, 1, resolveTimeZone());
   }
   return now;
 }
 
 /** Rótulo textual da competência exibida no dashboard. */
 export function invoiceDueLabel(referenceDate: Date): string {
-  const month = MONTH_NAMES[referenceDate.getMonth()];
-  return `Fatura com vencimento em ${month}/${referenceDate.getFullYear()}`;
+  const { year, month } = zonedDateParts(referenceDate, resolveTimeZone());
+  return `Fatura com vencimento em ${MONTH_NAMES[month - 1]}/${year}`;
 }

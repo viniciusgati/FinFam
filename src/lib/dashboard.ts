@@ -1,7 +1,8 @@
 import { prisma } from "./db";
 import type { FinanceInput } from "./finance";
-import { isActiveInMonth, monthKey } from "./finance";
+import { isActiveInMonth, monthKey, shiftMonthKey } from "./finance";
 import { sumCardExpensesForMonth } from "./invoices";
+import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
 
 /** Formas de pagamento de gasto avulso que entram no orçamento (SPEC §3.3). */
@@ -29,14 +30,13 @@ function sumByAmount(items: { amountCents: number }[]): number {
 export async function loadDashboardData(
   referenceDate: Date = new Date(),
 ): Promise<DashboardData> {
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth();
-  const start = new Date(year, month, 1);
-  const end = new Date(year, month + 1, 1);
+  const timeZone = resolveTimeZone();
+  const { year, month } = zonedDateParts(referenceDate, timeZone);
+  const start = zonedTimeToUtc(year, month, 1, timeZone);
+  const end = zonedTimeToUtc(year, month + 1, 1, timeZone);
 
   const currentMonthKey = monthKey(referenceDate);
-  const rawStartMonth = new Date(year, month - 4, 1);
-  const startMonthKey = monthKey(rawStartMonth);
+  const startMonthKey = shiftMonthKey(currentMonthKey, -4);
 
   const [incomes, fixedExpenses, variableExpenses, cardPurchases, snapshots] =
     await Promise.all([

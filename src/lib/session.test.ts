@@ -57,10 +57,14 @@ describe("signSession / verifySession", () => {
   it("retorna null quando a assinatura é alterada", async () => {
     process.env.FINFAM_SESSION_SECRET = SECRET;
     const token = await signSession("familia");
-    const lastChar = token.at(-1);
-    const trocado = lastChar === "a" ? "b" : "a";
+    const [header, payload, signature] = token.split(".");
+    const primeiroChar = signature[0];
+    const trocado = primeiroChar === "A" ? "B" : "A";
+    const assinaturaAlterada = trocado + signature.slice(1);
 
-    expect(await verifySession(`${token.slice(0, -1)}${trocado}`)).toBeNull();
+    expect(
+      await verifySession(`${header}.${payload}.${assinaturaAlterada}`),
+    ).toBeNull();
   });
 
   it("retorna null para token ausente ou vazio", async () => {

@@ -33,7 +33,7 @@ describe("computeFinanceStatus", () => {
       fixedExpensesCents: 40000,
       variableExpensesCents: 20000,
       cardExpensesCents: 20000,
-      referenceDate: new Date(2026, 9, 10), // 10/out/2026, mês com 31 dias
+      referenceDate: new Date(Date.UTC(2026, 9, 10, 12)), // 10/out/2026, mês com 31 dias
     });
 
     expect(status.monthKey).toBe("2026-10");
@@ -50,7 +50,7 @@ describe("computeFinanceStatus", () => {
       fixedExpensesCents: 5000,
       variableExpensesCents: 0,
       cardExpensesCents: 0,
-      referenceDate: new Date(2026, 9, 10),
+      referenceDate: new Date(Date.UTC(2026, 9, 10, 12)),
     });
 
     expect(status.level).toBe("neutral");
@@ -64,10 +64,40 @@ describe("computeFinanceStatus", () => {
       fixedExpensesCents: 100000,
       variableExpensesCents: 0,
       cardExpensesCents: 0,
-      referenceDate: new Date(2026, 9, 1),
+      referenceDate: new Date(Date.UTC(2026, 9, 1, 12)),
     });
 
     expect(status.level).toBe("red");
+  });
+
+  it("segue o calendário do Brasil na virada do mês (23:30 de 31/10)", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 0,
+      variableExpensesCents: 0,
+      cardExpensesCents: 0,
+      referenceDate: new Date("2026-11-01T02:30:00Z"),
+    });
+
+    expect(status.monthKey).toBe("2026-10");
+    expect(status.daysInMonth).toBe(31);
+    expect(status.daysElapsed).toBe(31);
+    expect(status.daysRemaining).toBe(0);
+  });
+
+  it("vira para novembro à meia-noite do Brasil (00:00 de 01/11)", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 0,
+      variableExpensesCents: 0,
+      cardExpensesCents: 0,
+      referenceDate: new Date("2026-11-01T03:00:00Z"),
+    });
+
+    expect(status.monthKey).toBe("2026-11");
+    expect(status.daysInMonth).toBe(30);
+    expect(status.daysElapsed).toBe(1);
+    expect(status.daysRemaining).toBe(29);
   });
 });
 
@@ -237,7 +267,11 @@ describe("resolveDashboardState", () => {
 
 describe("monthKey", () => {
   it("formata como YYYY-MM", () => {
-    expect(monthKey(new Date(2026, 0, 5))).toBe("2026-01");
+    expect(monthKey(new Date(Date.UTC(2026, 0, 5, 12)))).toBe("2026-01");
+  });
+
+  it("usa o fuso do Brasil: 23:30 de 31/10 ainda é outubro", () => {
+    expect(monthKey(new Date("2026-11-01T02:30:00Z"))).toBe("2026-10");
   });
 });
 
@@ -273,7 +307,7 @@ describe("monthLabel", () => {
 
 describe("previousMonthKeys", () => {
   it("retorna os 4 meses anteriores, do mais recente ao mais antigo", () => {
-    expect(previousMonthKeys(new Date(2026, 9, 6))).toEqual([
+    expect(previousMonthKeys(new Date(Date.UTC(2026, 9, 6, 12)))).toEqual([
       "2026-09",
       "2026-08",
       "2026-07",
@@ -282,7 +316,7 @@ describe("previousMonthKeys", () => {
   });
 
   it("cruza o ano quando a referência está em janeiro", () => {
-    expect(previousMonthKeys(new Date(2026, 0, 2))).toEqual([
+    expect(previousMonthKeys(new Date(Date.UTC(2026, 0, 2, 12)))).toEqual([
       "2025-12",
       "2025-11",
       "2025-10",
@@ -291,7 +325,7 @@ describe("previousMonthKeys", () => {
   });
 
   it("sempre devolve 4 chaves contíguas, sem buracos", () => {
-    const keys = previousMonthKeys(new Date(2026, 2, 31));
+    const keys = previousMonthKeys(new Date(Date.UTC(2026, 2, 31, 12)));
     expect(keys).toHaveLength(4);
     const months = keys.map((key) => {
       const [year, month] = key.split("-").map(Number);
