@@ -126,8 +126,10 @@ describe("sumCardExpensesForMonth", () => {
 });
 
 describe("cenário do seed de validação manual", () => {
-  // Reproduz exatamente prisma/seed.ts: renda 1.470.000, fixas 290.000,
-  // variáveis 53.000/mês em 12/2026 e 01/2027 e "Notebook" 3x em 15/11/2026.
+  // Cenário travado na task #208 com fixtures inline (o teste não lê o seed):
+  // renda 1.470.000, fixas 290.000, variáveis 53.000/mês e "Notebook" 3x em
+  // 15/11/2026. O prisma/seed.ts atual grava outro cenário, ancorado no mês
+  // corrente (ver README — dados de exemplo idempotentes).
   const incomeCents = 1470000;
   const fixedExpensesCents = 290000;
   const variableCents = 45000 + 8000;
