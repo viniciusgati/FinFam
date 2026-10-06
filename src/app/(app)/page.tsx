@@ -5,16 +5,26 @@ import {
   dashboardView,
   type DashboardView,
 } from "@/lib/finance";
+import { invoiceDueLabel, resolveReferenceDate } from "@/lib/invoices";
+import RetryButton from "@/components/RetryButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const mes = Array.isArray(params.mes) ? params.mes[0] : params.mes;
+  const referenceDate = resolveReferenceDate(mes);
+
   let view: DashboardView = { state: "error" };
   let backgroundColor = "hsl(0 0% 45%)";
   let daysRemaining = 0;
 
   try {
-    const data = await loadDashboardData();
+    const data = await loadDashboardData(referenceDate);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
     daysRemaining = status.daysRemaining;
@@ -46,14 +56,11 @@ export default async function DashboardPage() {
             FinFam
           </p>
           <h1 className="text-3xl font-bold text-slate-900">
-            Não foi possível carregar seus dados
+            Não foi possível carregar seus dados. Tente novamente.
           </h1>
         </header>
 
-        <p className="text-lg text-slate-600">
-          Tente novamente em instantes. Se o problema continuar, saia e entre de
-          novo.
-        </p>
+        <RetryButton />
       </section>
     );
   }
@@ -69,7 +76,7 @@ export default async function DashboardPage() {
         </header>
 
         <p className="text-lg text-slate-600">
-          Cadastre sua renda para ver quanto do mês já foi consumido.
+          Cadastre suas entradas fixas para ver o percentual de renda consumida.
         </p>
 
         <Link
@@ -99,6 +106,10 @@ export default async function DashboardPage() {
       <p className="text-7xl font-black tabular-nums sm:text-9xl">
         {view.percent}
         <span className="text-4xl align-top sm:text-6xl">%</span>
+      </p>
+
+      <p className="text-sm font-medium uppercase tracking-wide opacity-80">
+        {invoiceDueLabel(referenceDate)}
       </p>
 
       <p className="text-2xl font-medium opacity-95">
