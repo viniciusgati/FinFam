@@ -33,6 +33,8 @@ Detalhes de arquitetura e regras em [`docs/`](./docs):
 
 Pré-requisitos: Node.js 20+ e um PostgreSQL acessível.
 
+Do zero, em 5 comandos:
+
 ```bash
 # 1. instalar dependências
 npm install
@@ -41,14 +43,42 @@ npm install
 cp .env.example .env
 # edite .env com DATABASE_URL e credenciais FINFAM_*
 
-# 3. aplicar migrations e (opcional) popular dados de exemplo
+# 3. criar o schema (6 tabelas + enum PaymentMethod)
 npm run db:migrate
+
+# 4. popular dados de exemplo (5 snapshots: 4 meses fechados + mês corrente)
 npm run db:seed
 
-# 4. desenvolvimento
+# 5. desenvolvimento
 npm run dev
-# abra http://localhost:3000
+# abra http://localhost:3000 e autentique com FINFAM_USER / FINFAM_PASS
 ```
+
+**O que observar após cada comando:**
+
+| Comando | O que confere |
+| --- | --- |
+| `npm install` | termina com exit 0, sem erro de resolução de pacotes |
+| `npm run db:migrate` | exit 0; `SELECT to_regclass('public.monthly_snapshots')` retorna valor não nulo e as 6 tabelas (`incomes`, `fixed_expenses`, `credit_cards`, `variable_expenses`, `card_purchases`, `monthly_snapshots`) existem — reexecutar é seguro: com tudo aplicado também termina exit 0 sem alterar o banco |
+| `npm run db:seed` | exit 0 e a saída termina com **`Seed concluído.`**; `SELECT count(*) FROM monthly_snapshots` = **5** (mês corrente + os 4 anteriores contíguos, sem buracos), com `incomes` = 2, `fixed_expenses` = 3, `credit_cards` = 1, `variable_expenses` = 2, `card_purchases` = 1 |
+| `npm run dev` | a tela `/` autenticada mostra **"Estão melhores que os últimos 4 meses."** na faixa de feedback, com o `%` do mês e o fundo colorido — em vez de "Ainda não há histórico suficiente." |
+
+> **Dados de exemplo:** o seed popula rendas, contas, cartão e gastos de
+> exemplo. Ele é **idempotente no mesmo mês** — reexecutar não duplica nem
+> apaga nada (cada linha é atualizada pela sua chave natural). Para **apagar
+> tudo** e recomeçar use `npm run db:seed -- --reset`, que é o único caminho
+> destrutivo e imprime `Banco reiniciado com dados de exemplo. Seed concluído.`
+
+## Se algo falhar
+
+| Erro (código do Prisma) | O que fazer |
+| --- | --- |
+| `P1001` — *Can't reach database server* | o PostgreSQL não respondeu: confira o servidor e a `DATABASE_URL` no `.env` (host, porta, banco) e rode o comando de novo |
+| `P2021` — *The table ... does not exist* | as migrations ainda não foram aplicadas: rode `npm run db:migrate` e repita `npm run db:seed` |
+| `db:seed` antes do `db:migrate` | a saída **não** contém `Seed concluído.` e o exit é ≠ 0 — rode `npm run db:migrate` e repita o seed |
+
+`npm run db:deploy` aplica as mesmas migrations em produção (`prisma migrate
+deploy`), sem o passo interativo do `db:migrate`.
 
 ## Scripts
 
@@ -59,9 +89,10 @@ npm run dev
 | `npm run start` | inicia o build de produção |
 | `npm run typecheck` | checagem de tipos (`tsc --noEmit`) |
 | `npm test` | testes unitários (Vitest) |
-| `npm run db:migrate` | cria/aplica migrations em dev |
+| `npm run db:migrate` | cria/aplica migrations em dev (`prisma/migrations/`) |
 | `npm run db:deploy` | aplica migrations em produção |
-| `npm run db:seed` | popula o banco com dados de exemplo |
+| `npm run db:seed` | popula o banco com dados de exemplo (idempotente no mesmo mês) |
+| `npm run db:seed -- --reset` | **apaga tudo** e recria os dados de exemplo |
 | `npm run db:studio` | Prisma Studio |
 
 ## Variáveis de ambiente
@@ -74,7 +105,9 @@ Veja [`.env.example`](./.env.example). Principais:
 
 ## Status
 
-Projeto **iniciado** (Fase 0). Esqueleto de aplicação, modelo de dados,
-especificação e infraestrutura de testes prontos. A lógica de negócio completa
-do dashboard e as telas de cadastro/lançamento ainda serão implementadas nas
-próximas fases — ver `docs/SPEC.md`.
+Fundação de dados pronta: `prisma/migrations/` versionada (6 tabelas + enum
+`PaymentMethod`), seed idempotente com histórico de 5 meses contíguos (4
+fechados + mês corrente) e o dashboard já exibe o feedback comparativo
+("Estão melhores que os últimos 4 meses."). Especificação e infraestrutura de
+testes prontas. As telas de cadastro/lançamento e a navegação/shell ainda
+serão implementadas nas próximas fases — ver `docs/SPEC.md`.

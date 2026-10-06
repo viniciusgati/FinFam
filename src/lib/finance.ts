@@ -46,6 +46,20 @@ export function monthKey(date: Date): string {
   return `${year}-${month}`;
 }
 
+/**
+ * Os 4 `monthKey` (YYYY-MM) imediatamente anteriores ao mês de `reference`,
+ * do mais recente para o mais antigo. Cruza o ano natural (jan/2026 →
+ * dez/2025, nov/2025, ...). Reutilizado pelo seed (prisma/seed.ts) para
+ * montar o histórico de meses fechados do dashboard.
+ */
+export function previousMonthKeys(reference: Date): string[] {
+  const keys: string[] = [];
+  for (let offset = 1; offset <= 4; offset++) {
+    keys.push(monthKey(new Date(reference.getFullYear(), reference.getMonth() - offset, 1)));
+  }
+  return keys;
+}
+
 export function daysInMonth(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
