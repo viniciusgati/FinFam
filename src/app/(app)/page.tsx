@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
 import { loadDashboardData } from "@/lib/dashboard";
 import {
   computeFinanceStatus,
@@ -10,9 +8,6 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const session = await getSession();
-  if (!session) redirect("/login");
-
   let view: DashboardView = { state: "error" };
   let backgroundColor = "hsl(0 0% 45%)";
   let daysRemaining = 0;
@@ -40,8 +35,8 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main
-      className="flex min-h-screen flex-col items-center justify-center gap-6 p-8 text-center text-white transition-colors duration-700"
+    <section
+      className="flex min-h-[60vh] flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center text-white transition-colors duration-700"
       style={{ backgroundColor }}
     >
       <header className="space-y-1">
@@ -86,15 +81,6 @@ export default async function DashboardPage() {
           migrations.
         </p>
       )}
-
-      <form action="/api/auth/logout" method="post">
-        <button
-          type="submit"
-          className="rounded-full bg-black/20 px-5 py-2 text-sm font-medium transition hover:bg-black/30"
-        >
-          Sair ({session.user})
-        </button>
-      </form>
-    </main>
+    </section>
   );
 }
