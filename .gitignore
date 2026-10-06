@@ -40,3 +40,5 @@ yarn-error.log*
 autoia_handoff.md
 autoia_blocked.json
 autoia_decision.json
+autoia_logs/
+autoia_screenshots/
