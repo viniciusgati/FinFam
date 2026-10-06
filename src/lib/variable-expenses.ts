@@ -57,6 +57,28 @@ export function currentMonthParam(referenceDate: Date = new Date()): string {
   return `${year}-${month}`;
 }
 
+const MONTH_NAMES = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+/** Rótulo legível de um mês `YYYY-MM` (ex.: `outubro de 2026`). */
+export function monthLabel(mes: string): string {
+  const match = MONTH_PATTERN.exec(mes);
+  if (!match) return mes;
+  return `${MONTH_NAMES[Number(match[2]) - 1]} de ${match[1]}`;
+}
+
 export const createVariableExpenseSchema = z.object({
   description: z.string().trim().min(1),
   amountCents: z.number().int().nonnegative(),

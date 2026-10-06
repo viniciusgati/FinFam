@@ -4,6 +4,7 @@ import {
   currentMonthParam,
   isCountedInBudget,
   isValidMonthParam,
+  monthLabel,
   monthRange,
   updateVariableExpenseSchema,
 } from "./variable-expenses";
@@ -63,6 +64,13 @@ describe("currentMonthParam", () => {
     expect(currentMonthParam(new Date("2026-10-15T12:00:00.000Z"))).toBe(
       "2026-10",
     );
+  });
+});
+
+describe("monthLabel", () => {
+  it("descreve o mês em português", () => {
+    expect(monthLabel("2026-10")).toBe("outubro de 2026");
+    expect(monthLabel("2026-01")).toBe("janeiro de 2026");
   });
 });
 
