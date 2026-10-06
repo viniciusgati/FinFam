@@ -3,8 +3,6 @@
 // Mantém apenas o básico para permitir a instalação como PWA.
 // TODO: adicionar cache offline do app shell em fase futura.
 
-const CACHE_NAME = "finfam-v1";
-
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
