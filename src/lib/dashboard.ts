@@ -2,6 +2,10 @@ import { prisma } from "./db";
 import type { FinanceInput } from "./finance";
 import { isActiveInMonth, monthKey } from "./finance";
 import { sumCardExpensesForMonth } from "./invoices";
+import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
+
+/** Formas de pagamento de gasto avulso que entram no orçamento (SPEC §3.3). */
+const budgetPaymentMethods = PAYMENT_METHODS.filter(isCountedInBudget);
 
 export interface DashboardData extends FinanceInput {
   previousPercents: number[];
@@ -41,7 +45,7 @@ export async function loadDashboardData(
       prisma.variableExpense.findMany({
         where: {
           date: { gte: start, lt: end },
-          paymentMethod: { not: "CREDIT" },
+          paymentMethod: { in: budgetPaymentMethods },
         },
       }),
       prisma.cardPurchase.findMany({

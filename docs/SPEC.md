@@ -53,6 +53,11 @@ vermelho** conforme a situação dos gastos do mês.
 - Campos: descrição, valor, data, categoria, forma de pagamento, pago (sim/não).
 - Gastos pagos com **cartão de crédito** entram pela **fatura** (§5.2), e não
   diretamente pelo gasto avulso.
+- **Fonte de verdade da despesa de crédito:** a compra no cartão
+  (`CardPurchase`) é a fonte de verdade da despesa de crédito; um gasto avulso
+  (`VariableExpense`) com `paymentMethod = CREDIT` é apenas registro/anotação e
+  **não** conta diretamente no orçamento — evitando dupla contagem com a fatura
+  (§3.4).
 
 ### 3.4 Cartões e faturas
 
@@ -75,7 +80,8 @@ vermelho** conforme a situação dos gastos do mês.
   depois).
 
 > Regra central: o mesmo gasto nunca é contado duas vezes. Gasto pago no
-> cartão substitui o gasto avulso correspondente.
+> cartão substitui o gasto avulso correspondente — por isso um gasto avulso
+> com forma de pagamento **crédito** não conta diretamente (§3.3).
 
 ## 4. Dashboard
 

@@ -84,3 +84,43 @@ describe("loadDashboardData — vigência", () => {
     expect(data.fixedExpensesCents).toBe(30000);
   });
 });
+
+interface Row {
+  amountCents: number;
+  paymentMethod: string;
+}
+
+describe("loadDashboardData — gastos avulsos", () => {
+  it("não conta CREDIT e conta CASH/DEBIT/PIX (SPEC §3.3)", async () => {
+    const rows: Row[] = [
+      { amountCents: 5000, paymentMethod: "CREDIT" },
+      { amountCents: 1000, paymentMethod: "PIX" },
+      { amountCents: 200, paymentMethod: "DEBIT" },
+      { amountCents: 50, paymentMethod: "CASH" },
+    ];
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableExpense.findMany.mockImplementation(
+      async ({ where }: { where?: { paymentMethod?: { in?: string[] } } }) => {
+        const allowed = where?.paymentMethod?.in;
+        return rows.filter(
+          (row) => !allowed || allowed.includes(row.paymentMethod),
+        );
+      },
+    );
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.variableExpensesCents).toBe(1250);
+  });
+
+  it("exclui CREDIT do filtro enviado ao banco", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+
+    await loadDashboardData(referenceDate);
+
+    const [args] = prismaMock.variableExpense.findMany.mock.calls[0];
+    expect(args.where.paymentMethod.in).toEqual(["CASH", "DEBIT", "PIX"]);
+  });
+});
