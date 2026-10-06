@@ -132,3 +132,119 @@ $ curl -X POST -d '{"user":"familia","pass":"..."}' .../api/auth/login -w " [%{h
 Chave de leitura: sem `DATABASE_URL` a página **não** falha de forma explícita —
 mostra `0%` cinza com aviso discreto. Esse é o estado vazio/erro padrão que a família
 veria hoje.
+
+---
+
+# Auditoria complementar — competência da fatura e rateio de parcelas (task #208)
+
+> Foco: o impacto **para quem usa** do bug de competência de fatura
+> (`src/lib/dashboard.ts:43-45` e `:59`) e das decisões em aberto (SPEC §3.4/§5.5).
+> Nenhum código de produção foi alterado nesta fase; a leitura abaixo deriva do
+> código, da SPEC e do estado real do build/testes.
+
+## Fluxos do usuário (estado atual)
+
+- **Abrir o dashboard (`/`)** — o número gigante `% da renda consumida`
+  (`src/app/page.tsx:51-54`) é somado em `loadDashboardData` a partir de
+  `cardPurchase` filtrado por `purchaseDate` no mês corrente e do `amountCents`
+  integral (`src/lib/dashboard.ts:43-45,59`). Uma compra de 10/03 com fechamento 20
+  deveria aparecer em abril (SPEC §3.4), mas aparece em março. O usuário vê um
+  percentual plausível, porém deslocado ~1 mês, sem qualquer aviso.
+- **Compra parcelada** — não há tela para cadastrá-la hoje (ver `/cartoes` em
+  SPEC §6, inexistente), mas o modelo já suporta `installmentNumber`/
+  `installmentsTotal` (`prisma/schema.prisma:95-96`). Quando existir, a compra 12x
+  entrará **100% no mês da compra** e 0% nos 11 seguintes: a tela pode saltar de
+  verde para vermelho no mês da compra e ficar artificialmente leve depois.
+- **Compra no dia do fechamento / virada de ano** — o comportamento `>=` vs `>`
+  não está fixado (SPEC diz "fechamento imediatamente posterior"): o usuário não
+  consegue prever em que mês a compra vai cair.
+- **Conferir a conta** — não existe tela de fatura/detalhe de compra nem seletor
+  de mês (`/cartoes` e `/historico` planejados, inexistentes). O usuário não tem
+  como explicar por que o número mudou ou a que fatura uma compra pertence.
+- **Sem banco/sem dados** — a página mantém o `%` e só mostra o aviso discreto
+  (`src/app/page.tsx:64-69`), como já apontado na auditoria anterior.
+
+## Problemas de usabilidade
+
+- **Número protagonista pode estar errado e é apresentado sem ressalva** — o rótulo
+  é "Renda do mês consumida" (`src/app/page.tsx:46-48`) sem indicar a competência
+  (mês de vencimento da fatura). O erro de ~1 mês se disfarça de leitura correta e
+  leva a decisões de gasto equivocadas.
+- **Parcelamento distorce o orçamento do mês da compra** — somar `amountCents`
+  integralmente (`dashboard.ts:59`) ignora as parcelas; o usuário vê um pico falso
+  e cores que não correspondem à realidade dos meses seguintes.
+- **Regra de fechamento/vencimento é invisível na UI** — não há rótulo do tipo
+  "fatura com vencimento em abril" nem indicação de parcela (x/12). O usuário não
+  aprende nem confia na regra.
+- **Impossível auditar ou corrigir a alocação** — sem `/cartoes`, não se vê
+  fechamento, vencimento, parcela atual/total nem a fatura de destino; o bug fica
+  invisível e não contestável pelo usuário.
+- **Seed não reproduz o cenário** — `prisma/seed.ts:54-62` cria 1 compra à vista;
+  não há parcelamento cruzando o ano nem cartão com `dueDay > closingDay`, logo a
+  verificação manual no dashboard não evidencia a correção (nem o bug).
+- **Estado vazio/erro enganoso (herdado)** — `0%` cinza e aviso de rodapé
+  (`page.tsx:25-35,64-69`) podem ser lidos como "não gastou"; agrava um número já
+  suscetível ao erro de competência.
+- **Cor continua sendo o único sinal de estado** — um mês calculado errado muda a
+  cor sem rótulo textual (ok/atenção/crítico), tornando o engano mais difícil de
+  perceber por quem não distingue cores.
+
+## Recomendações priorizadas
+
+- **P0 — corrigir a competência e o rateio e, na mesma entrega, rotular a
+  competência no dashboard** — exibir o mês de vencimento da fatura junto ao número
+  (ex.: "fatura com vencimento em abril"). Torna a regra verificável e devolve
+  confiança ao número protagonista.
+- **P0 — travar o comportamento por testes (Vitest)** — parcelas, dia do
+  fechamento, virada de ano: sem isso o usuário volta a ver mês errado a cada
+  refatoração; é o critério de aceite da tarefa.
+- **P1 — tela `/cartoes` com compras, parcela atual/total e fatura de destino** —
+  permite entender e corrigir a alocação; transforma um cálculo opaco em dado
+  auditável.
+- **P1 — enriquecer o seed** com uma compra parcelada que cruze o ano e um cartão
+  `dueDay > closingDay` — viabiliza validação manual real no dashboard.
+- **P1 — estado vazio/erro explícito** (esconder o `%` e mostrar CTA de cadastro
+  quando não há dados/DB) — elimina o falso positivo `0%` que hoje convive com o
+  erro de competência.
+- **P2 — `/historico` com seletor de mês e visão de parcelas futuras** — o usuário
+  enxerga o impacto parcelado ao longo dos meses, hoje invisível.
+- **P2 — rótulo textual do nível (ok/atenção/crítico) ao lado da cor** — reduz a
+  dependência exclusiva da cor para perceber um cálculo errado.
+
+## Evidência
+
+Comandos e saídas reais desta fase (nenhum código de produção alterado; apenas
+documentação):
+
+```
+$ git branch --show-current
+autoia/task-208
+
+$ git log --oneline -3
+8cdde10 autoia: merge autoia/task-206
+65c7a00 autoia: auditoria de usabilidade do FinFam (fase 2)
+cf88b4f autoia: inicia projeto FinFam (estrutura Next.js, specs e testes)
+
+$ npm test
+ ✓ src/lib/finance.test.ts (9 tests) 4ms
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+
+$ npm run typecheck
+> tsc --noEmit
+(sem erros)
+
+$ npm run build
+ ✓ Compiled successfully
+Route (app) ...
+┌ ƒ /           131 B   103 kB
+├ ○ /login     1.05 kB  104 kB
+└ ƒ /api/auth/{login,logout}
+ƒ Middleware   39.7 kB
+```
+
+Leituras-chave: `src/lib/dashboard.ts:43-45` (filtro `purchaseDate` no mês) e
+`:59` (soma `amountCents` integral); `src/app/page.tsx:46-54` (número e rótulo sem
+competência); `prisma/seed.ts:54-62` (compra única à vista); `docs/SPEC.md:57-71`
+(§3.4) e `:133-141` (§5); `docs/SPEC.md:146-159` (§6 — telas `/cartoes` e
+`/historico` ainda inexistentes).
