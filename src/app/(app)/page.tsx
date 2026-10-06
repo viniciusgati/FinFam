@@ -3,7 +3,10 @@ import { loadDashboardData } from "@/lib/dashboard";
 import {
   computeFinanceStatus,
   dashboardView,
+  levelLabel,
+  textColorForBackground,
   type DashboardView,
+  type FinanceLevel,
 } from "@/lib/finance";
 import { invoiceDueLabel, resolveReferenceDate } from "@/lib/invoices";
 import RetryButton from "@/components/RetryButton";
@@ -22,12 +25,14 @@ export default async function DashboardPage({
   let view: DashboardView = { state: "error" };
   let backgroundColor = "hsl(0 0% 45%)";
   let daysRemaining = 0;
+  let level: FinanceLevel = "neutral";
 
   try {
     const data = await loadDashboardData(referenceDate);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
     daysRemaining = status.daysRemaining;
+    level = status.level;
     view = dashboardView({
       dbError: false,
       incomeCents: status.incomeCents,
@@ -49,6 +54,7 @@ export default async function DashboardPage({
     return (
       <section
         role="alert"
+        aria-live="assertive"
         className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center"
       >
         <header className="space-y-1">
@@ -91,8 +97,8 @@ export default async function DashboardPage({
 
   return (
     <section
-      className="flex min-h-[60vh] flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center text-white transition-colors duration-700"
-      style={{ backgroundColor }}
+      className="flex min-h-[60vh] flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center transition-colors duration-700"
+      style={{ backgroundColor, color: textColorForBackground(backgroundColor) }}
     >
       <header className="space-y-1">
         <p className="text-sm font-medium uppercase tracking-widest opacity-80">
@@ -108,6 +114,8 @@ export default async function DashboardPage({
         <span className="text-4xl align-top sm:text-6xl">%</span>
       </p>
 
+      <p className="text-2xl font-semibold">{levelLabel(level)}</p>
+
       <p className="text-sm font-medium uppercase tracking-wide opacity-80">
         {invoiceDueLabel(referenceDate)}
       </p>
@@ -116,7 +124,11 @@ export default async function DashboardPage({
         {daysRemaining} dias para o fim do mês
       </p>
 
-      <p className="max-w-xl rounded-full bg-black/20 px-6 py-3 text-lg">
+      <p
+        role="status"
+        aria-live="polite"
+        className="max-w-xl rounded-full px-6 py-3 text-lg"
+      >
         {view.feedback}
       </p>
     </section>

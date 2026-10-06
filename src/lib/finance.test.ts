@@ -3,14 +3,19 @@ import {
   classifyLevel,
   compareWithHistory,
   computeFinanceStatus,
+  contrastRatio,
   dashboardView,
   heatColor,
   isActiveInMonth,
+  levelColor,
+  levelLabel,
   monthKey,
   monthLabel,
   previousMonthKeys,
   resolveDashboardState,
   shiftMonthKey,
+  textColorForBackground,
+  type FinanceLevel,
 } from "./finance";
 import {
   fixedExpenseCreateSchema,
@@ -80,6 +85,64 @@ describe("heatColor", () => {
   it("vai do verde ao vermelho", () => {
     expect(heatColor(0)).toBe("hsl(120 65% 42%)");
     expect(heatColor(2)).toBe("hsl(0 65% 42%)");
+  });
+});
+
+describe("levelLabel", () => {
+  it("mapeia todos os níveis para rótulos legíveis", () => {
+    const expected: Record<FinanceLevel, string> = {
+      neutral: "Sem renda cadastrada",
+      green: "Ok",
+      lime: "Atenção",
+      yellow: "Cuidado",
+      orange: "Alerta",
+      red: "Crítico",
+    };
+
+    for (const [level, label] of Object.entries(expected)) {
+      expect(levelLabel(level as FinanceLevel)).toBe(label);
+    }
+  });
+
+  it("usa o rótulo de crítico para red e de renda ausente para neutral", () => {
+    expect(levelLabel("red")).toBe("Crítico");
+    expect(levelLabel("neutral")).toBe("Sem renda cadastrada");
+  });
+});
+
+describe("contraste de texto sobre a cor de fundo", () => {
+  it("escolhe preto sobre laranja e branco sobre tom escuro", () => {
+    expect(textColorForBackground("hsl(30 65% 42%)")).toBe("#000000");
+    expect(textColorForBackground("hsl(0 0% 30%)")).toBe("#ffffff");
+  });
+
+  it("mantém contraste ≥ 4.5:1 sobre toda a paleta de heatColor", () => {
+    let worst = Infinity;
+
+    for (let r = 0; r <= 2; r += 0.01) {
+      const background = heatColor(r);
+      const text = textColorForBackground(background);
+      const ratio = contrastRatio(text, background);
+      worst = Math.min(worst, ratio);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    }
+
+    expect(worst).toBeGreaterThanOrEqual(4.63);
+  });
+
+  it("mantém contraste ≥ 4.5:1 sobre o cinza do nível neutral", () => {
+    const background = levelColor("neutral", 0);
+    const text = textColorForBackground(background);
+    const ratio = contrastRatio(text, background);
+
+    expect(text).toBe("#ffffff");
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("evita o cinza #111827, que reprova em parte da paleta", () => {
+    const background = "hsl(30 65% 42%)";
+    expect(contrastRatio("#111827", background)).toBeLessThan(4.5);
+    expect(contrastRatio("#000000", background)).toBeGreaterThanOrEqual(4.5);
   });
 });
 
