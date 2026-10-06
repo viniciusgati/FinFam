@@ -53,10 +53,7 @@ export default async function DashboardPage() {
 
   if (dbError) {
     return (
-      <main
-        className="flex min-h-screen flex-col items-center justify-center gap-6 p-8 text-center text-white transition-colors duration-700"
-        style={{ backgroundColor: status.color }}
-      >
+      <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-800 p-8 text-center text-white">
         <div role="alert" className="max-w-xl space-y-3">
           <h1 className="text-3xl font-bold">
             Não foi possível carregar seus dados
@@ -74,10 +71,7 @@ export default async function DashboardPage() {
 
   if (resolveDashboardState({ monthlyIncomeCents }) === "empty") {
     return (
-      <main
-        className="flex min-h-screen flex-col items-center justify-center gap-6 p-8 text-center text-white transition-colors duration-700"
-        style={{ backgroundColor: status.color }}
-      >
+      <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-500 p-8 text-center text-white">
         <header className="space-y-1">
           <p className="text-sm font-medium uppercase tracking-widest opacity-80">
             FinFam
