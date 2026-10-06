@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   allocateInstallments,
   invoiceDueLabel,
+  invoiceLinesForMonth,
   purchaseInvoice,
   resolveReferenceDate,
   sumCardExpensesForMonth,
@@ -164,6 +165,64 @@ describe("cenário do seed de validação manual", () => {
     expect(integral).toBe(643000);
     expect(Math.round((integral / incomeCents) * 100)).toBe(44);
     expect(sumCardExpensesForMonth(purchases, "2026-12")).not.toBe(300000);
+  });
+});
+
+describe("invoiceLinesForMonth", () => {
+  const purchase = {
+    id: "p1",
+    description: "Notebook",
+    category: "Eletrônicos",
+    purchaseDate: new Date(2026, 10, 15), // 15/11/2026
+    amountCents: 30000,
+    installmentsTotal: 3,
+    card: { id: "c1", name: "Nubank", closingDay: 20, dueDay: 5 },
+  };
+
+  it("retorna a parcela 2/3 em 2027-01 com os metadados da compra", () => {
+    const invoice = invoiceLinesForMonth([purchase], "2027-01");
+
+    expect(invoice.monthKey).toBe("2027-01");
+    expect(invoice.totalCents).toBe(10000);
+    expect(invoice.lines).toEqual([
+      {
+        purchaseId: "p1",
+        description: "Notebook",
+        category: "Eletrônicos",
+        cardId: "c1",
+        cardName: "Nubank",
+        installmentNumber: 2,
+        installmentsTotal: 3,
+        amountCents: 10000,
+      },
+    ]);
+  });
+
+  it("retorna lista vazia e total 0 em mês sem parcelas", () => {
+    const invoice = invoiceLinesForMonth([purchase], "2026-11");
+    expect(invoice.lines).toEqual([]);
+    expect(invoice.totalCents).toBe(0);
+  });
+
+  it("soma exatamente o valor total ao longo dos meses, com rateio e resto", () => {
+    const withRemainder = {
+      ...purchase,
+      amountCents: 10000,
+    };
+
+    const total = ["2026-12", "2027-01", "2027-02"].reduce(
+      (sum, monthKey) =>
+        sum + invoiceLinesForMonth([withRemainder], monthKey).totalCents,
+      0,
+    );
+
+    expect(total).toBe(10000);
+    expect(
+      invoiceLinesForMonth([withRemainder], "2026-12").lines[0].amountCents,
+    ).toBe(3334);
+    expect(
+      invoiceLinesForMonth([withRemainder], "2027-01").lines[0].amountCents,
+    ).toBe(3333);
   });
 });
 

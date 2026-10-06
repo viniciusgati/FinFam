@@ -1,6 +1,7 @@
 /**
- * Schemas zod das APIs de entradas fixas (`/api/incomes`) e saídas fixas
- * (`/api/fixed-expenses`).
+ * Schemas zod das APIs de entradas fixas (`/api/incomes`), saídas fixas
+ * (`/api/fixed-expenses`), cartões (`/api/credit-cards`) e compras no cartão
+ * (`/api/card-purchases`).
  *
  * Valores monetários trafegam como inteiro positivo em centavos; a vigência usa
  * o formato `YYYY-MM` e é inclusiva nas duas pontas (ver docs/SPEC.md e as
@@ -82,10 +83,78 @@ export const fixedExpenseUpdateSchema = fixedExpenseFields
   .partial()
   .superRefine(refinePeriod);
 
+const creditCardFields = z.object({
+  name: nameSchema,
+  limitCents: amountCentsSchema.nullish(),
+  closingDay: daySchema,
+  dueDay: daySchema,
+  active: z.boolean(),
+});
+
+export const creditCardCreateSchema = creditCardFields.extend({
+  active: z.boolean().optional().default(true),
+});
+
+export const creditCardUpdateSchema = creditCardFields.partial();
+
+const installmentNumberSchema = z
+  .number()
+  .int("Número da parcela deve ser um inteiro")
+  .min(1, "O número da parcela deve ser pelo menos 1");
+
+const installmentsTotalSchema = z
+  .number()
+  .int("Total de parcelas deve ser um inteiro")
+  .min(1, "O total de parcelas deve ser pelo menos 1");
+
+/**
+ * `installmentNumber` é apenas metadado: `amountCents` é o valor total da
+ * compra e o rateio é derivado em `invoices.ts` (premissa (a)). Ainda assim a
+ * parcela não pode ultrapassar o total.
+ */
+function refineInstallments(
+  data: { installmentNumber?: number; installmentsTotal?: number },
+  ctx: z.RefinementCtx,
+): void {
+  if (
+    data.installmentNumber !== undefined &&
+    data.installmentsTotal !== undefined &&
+    data.installmentNumber > data.installmentsTotal
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["installmentNumber"],
+      message: "A parcela não pode ser maior que o total de parcelas",
+    });
+  }
+}
+
+const cardPurchaseFields = z.object({
+  cardId: z.string().trim().min(1, "Selecione um cartão"),
+  description: z.string().trim().min(1, "Informe uma descrição"),
+  amountCents: amountCentsSchema,
+  purchaseDate: z.coerce.date({
+    errorMap: () => ({ message: "Informe a data da compra" }),
+  }),
+  category: categorySchema,
+  installmentNumber: installmentNumberSchema,
+  installmentsTotal: installmentsTotalSchema,
+});
+
+export const cardPurchaseCreateSchema =
+  cardPurchaseFields.superRefine(refineInstallments);
+
+export const cardPurchaseUpdateSchema =
+  cardPurchaseFields.partial().superRefine(refineInstallments);
+
 export type IncomeCreateInput = z.infer<typeof incomeCreateSchema>;
 export type IncomeUpdateInput = z.infer<typeof incomeUpdateSchema>;
 export type FixedExpenseCreateInput = z.infer<typeof fixedExpenseCreateSchema>;
 export type FixedExpenseUpdateInput = z.infer<typeof fixedExpenseUpdateSchema>;
+export type CreditCardCreateInput = z.infer<typeof creditCardCreateSchema>;
+export type CreditCardUpdateInput = z.infer<typeof creditCardUpdateSchema>;
+export type CardPurchaseCreateInput = z.infer<typeof cardPurchaseCreateSchema>;
+export type CardPurchaseUpdateInput = z.infer<typeof cardPurchaseUpdateSchema>;
 
 /** Primeira mensagem de erro do zod, usada nas respostas `{ error }`. */
 export function firstErrorMessage(error: z.ZodError): string {
