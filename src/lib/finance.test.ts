@@ -3,6 +3,7 @@ import {
   classifyLevel,
   compareWithHistory,
   computeFinanceStatus,
+  dashboardView,
   heatColor,
   monthKey,
 } from "./finance";
@@ -22,6 +23,7 @@ describe("computeFinanceStatus", () => {
     expect(status.daysRemaining).toBe(21);
     expect(status.consumedCents).toBe(80000);
     expect(status.consumedPercent).toBeCloseTo(80);
+    expect(status.projectedPercent).toBeCloseTo(248);
   });
 
   it("retorna nível neutro quando não há renda cadastrada", () => {
@@ -35,6 +37,7 @@ describe("computeFinanceStatus", () => {
 
     expect(status.level).toBe("neutral");
     expect(status.consumedPercent).toBe(0);
+    expect(status.projectedPercent).toBe(0);
   });
 
   it("marca crítico quando o consumo alcança 100% da renda", () => {
@@ -80,10 +83,65 @@ describe("compareWithHistory", () => {
     );
   });
 
+  it("informa melhora parcial", () => {
+    expect(compareWithHistory(65, [60, 70, 80, 90])).toBe(
+      "Estão melhores que 3 dos últimos 4 meses.",
+    );
+  });
+
   it("informa quando não há histórico", () => {
     expect(compareWithHistory(50, [])).toBe(
       "Ainda não há histórico suficiente.",
     );
+  });
+
+  it("trata empate como favorável, nunca como piora", () => {
+    const message = compareWithHistory(50, [50, 60, 70, 80]);
+
+    expect(message).toBe("Estão melhores que os últimos 4 meses.");
+    expect(message).not.toContain("piores");
+  });
+});
+
+describe("dashboardView", () => {
+  it("decide erro de banco sem expor percentual", () => {
+    expect(
+      dashboardView({
+        dbError: true,
+        incomeCents: 100000,
+        consumedPercent: 80,
+        projectedPercent: 248,
+        previousPercents: [60, 70, 80, 90],
+      }),
+    ).toEqual({ state: "error" });
+  });
+
+  it("decide estado vazio quando não há renda", () => {
+    expect(
+      dashboardView({
+        dbError: false,
+        incomeCents: 0,
+        consumedPercent: 0,
+        projectedPercent: 0,
+        previousPercents: [],
+      }),
+    ).toEqual({ state: "empty" });
+  });
+
+  it("usa a projeção na comparação e mantém o percentual parcial", () => {
+    expect(
+      dashboardView({
+        dbError: false,
+        incomeCents: 100000,
+        consumedPercent: 80,
+        projectedPercent: 248,
+        previousPercents: [60, 70, 80, 90],
+      }),
+    ).toEqual({
+      state: "ok",
+      percent: 80,
+      feedback: "Estão piores que os últimos 4 meses.",
+    });
   });
 });
 
