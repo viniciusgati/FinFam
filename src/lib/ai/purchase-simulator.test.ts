@@ -39,6 +39,21 @@ describe("simulatePurchase — faixas", () => {
     });
     expect(result.verdict).toBe("nao");
   });
+
+  it("ok exatamente na metade do saldo restante", () => {
+    const result = simulatePurchase({ ...base, purchaseCents: 40000 });
+    expect(result.verdict).toBe("ok");
+  });
+
+  it("cuidado exatamente no limite do saldo restante", () => {
+    const result = simulatePurchase({ ...base, purchaseCents: 80000 });
+    expect(result.verdict).toBe("cuidado");
+  });
+
+  it("nao um centavo acima do saldo restante", () => {
+    const result = simulatePurchase({ ...base, purchaseCents: 80001 });
+    expect(result.verdict).toBe("nao");
+  });
 });
 
 describe("simulatePurchase — justificativa", () => {
