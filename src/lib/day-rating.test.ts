@@ -8,6 +8,16 @@ describe("rateDay", () => {
     ).toEqual({ level: "neutral", label: "Sem renda cadastrada" });
   });
 
+  it("com renda mas orçamento diário não positivo retorna neutral", () => {
+    expect(
+      rateDay({
+        dailyBudgetCents: 0,
+        todayExpensesCents: 100,
+        incomeCents: 310000,
+      }),
+    ).toEqual({ level: "neutral", label: "Sem renda cadastrada" });
+  });
+
   it("dentro do orçamento diário retorna green / Ok", () => {
     expect(
       rateDay({
