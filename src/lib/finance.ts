@@ -37,13 +37,19 @@ export interface FinanceStatus {
   /** Percentual da renda consumida (0..∞). 0 quando não há renda. */
   consumedPercent: number;
   /**
-   * Projeção linear do percentual consumido até o fim do mês, no ritmo atual
-   * (SPEC §4.3). 0 quando não há renda cadastrada.
+   * Projeção do percentual da renda comprometido até o fim do mês, somando as
+   * obrigações conhecidas ao gasto avulso no ritmo diário atual (SPEC §4.3).
+   * 0 quando não há renda cadastrada.
    */
   projectedPercent: number;
   /** Fração do mês já decorrida, em percentual (0..100). */
   elapsedPercent: number;
-  /** consumedPercent / elapsedPercent — o "ritmo" de gasto. */
+  /**
+   * Coeficiente de situação: gasto_avulso_diario / diaria_disponivel, ou seja,
+   * o quanto do orçamento diário livre já está sendo consumido por gasto
+   * avulso. Quando não há diária disponível (obrigações ≥ renda), cai no
+   * fallback projeção / renda (SPEC §4.2).
+   */
   ratio: number;
   level: FinanceLevel;
   color: string;
@@ -277,17 +283,15 @@ export function textColorForBackground(
 }
 
 /**
- * Projeção linear do percentual consumido até o fim do mês, mantendo o ritmo
- * atual. Retorna 0 quando não há renda cadastrada (percentual indefinido).
+ * Converte a projeção monetária do mês em percentual da renda. Retorna 0
+ * quando não há renda cadastrada (percentual indefinido).
  */
 export function projectedPercent(
-  consumedPercentValue: number,
-  totalDays: number,
-  elapsed: number,
+  projectedCents: number,
   incomeCents: number,
 ): number {
   if (incomeCents <= 0) return 0;
-  return (consumedPercentValue * totalDays) / Math.max(elapsed, 1);
+  return (projectedCents / incomeCents) * 100;
 }
 
 export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
@@ -301,9 +305,25 @@ export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
 
   const percent = income > 0 ? (consumed / income) * 100 : 0;
   const elapsedPercent = (elapsed / totalDays) * 100;
-  const ratio = income > 0 ? percent / Math.max(elapsedPercent, 1) : 0;
+
+  // Obrigações já comprometidas no mês (saídas fixas + faturas de cartão) não
+  // entram no ritmo: só o gasto avulso é medido contra o orçamento diário livre.
+  const obligations =
+    Math.max(input.fixedExpensesCents, 0) + Math.max(input.cardExpensesCents, 0);
+  const freeBudget = Math.max(income - obligations, 0);
+  const dailyAvailable = totalDays > 0 ? freeBudget / totalDays : 0;
+  const variable = Math.max(input.variableExpensesCents, 0);
+  const dailySpend = variable / Math.max(elapsed, 1);
+  const projectedCents = obligations + dailySpend * totalDays;
+
+  const ratio =
+    dailyAvailable > 0
+      ? dailySpend / dailyAvailable
+      : income > 0
+        ? projectedCents / income
+        : 0;
   const level = classifyLevel(ratio, percent, income);
-  const projected = projectedPercent(percent, totalDays, elapsed, income);
+  const projected = projectedPercent(projectedCents, income);
 
   return {
     monthKey: currentMonth,

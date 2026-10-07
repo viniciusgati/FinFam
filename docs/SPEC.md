@@ -106,14 +106,28 @@ percentual_consumido = consumido_mes / renda_mensal * 100
 ### 4.2 Regra de situação (cor)
 
 Percentual cru não basta: gastar 80% com 2 dias para o fim do mês é diferente
-de gastar 80% com 20 dias. Usamos o **ritmo esperado**:
+de gastar 80% com 20 dias. Além disso, as saídas fixas e as faturas de cartão
+já valem 100% logo no dia 1 (SPEC §5.2), então não podem inflar o ritmo: elas
+são **obrigações conhecidas** e o ritmo mede apenas o **gasto avulso** contra o
+orçamento diário disponível.
 
 ```
-fração_do_mes_decorrida = dias_decorridos / dias_no_mes
-ritmo = percentual_consumido / max(fração_do_mes_decorrida, epsilon)
+obrigacoes       = saidas_fixas_ativas + faturas_de_cartao_do_mes
+orcamento_livre  = max(renda_mensal - obrigacoes, 0)
+diaria_disponivel = orcamento_livre / dias_no_mes
+
+gasto_diario = gastos_avulsos_do_mes / max(dias_decorridos, 1)
+coeficiente  = gasto_diario / diaria_disponivel
 ```
 
-Faixas de `ritmo` → nível e intenção de cor:
+Quando `diaria_disponivel == 0` (obrigações ≥ renda), o coeficiente cai no
+fallback `projecao_mes / renda_mensal`, em que:
+
+```
+projecao_mes = obrigacoes + gasto_diario * dias_no_mes
+```
+
+Faixas do coeficiente → nível e intenção de cor:
 
 | Ritmo | Nível | Cor |
 | --- | --- | --- |
@@ -124,11 +138,11 @@ Faixas de `ritmo` → nível e intenção de cor:
 | `> 1,60` | crítico | vermelho |
 
 Regra adicional: se `percentual_consumido >= 100`, o nível é **crítico**
-(vermelho), independentemente do ritmo.
+(vermelho), independentemente do coeficiente.
 
 A cor final é interpolada continuamente (matiz de 120° → 0°) em função do
-ritmo, produzindo o degradê verde→vermelho. A implementação de referência está
-em `src/lib/finance.ts`.
+coeficiente, produzindo o degradê verde→vermelho. A implementação de referência
+está em `src/lib/finance.ts`.
 
 ### 4.3 Feedback comparativo
 
