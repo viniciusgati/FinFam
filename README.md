@@ -169,6 +169,20 @@ npm ci
 NODE_ENV=production npm run build   # deve terminar com exit 0 e gerar .next/
 ```
 
+Evidência do build verde (branch `autoia/task-222`, Linux x64):
+
+```text
+$ NODE_ENV=production npm run build
+   ▲ Next.js 15.5.27
+ ✓ Compiled successfully in 1476ms
+ ✓ Generating static pages (12/12)
+...
+$ echo $?
+0
+$ cat .next/BUILD_ID
+cTXYzw-qcy8vrbONpx4ME
+```
+
 ### Passo a passo
 
 1. **Criar o projeto** — `railway login` e depois `railway init` (ou
