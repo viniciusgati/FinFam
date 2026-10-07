@@ -41,7 +41,78 @@ describe("computeFinanceStatus", () => {
     expect(status.daysRemaining).toBe(21);
     expect(status.consumedCents).toBe(80000);
     expect(status.consumedPercent).toBeCloseTo(80);
-    expect(status.projectedPercent).toBeCloseTo(248);
+    // projeção = obrigações 60000 + (20000/10)*31
+    expect(status.projectedPercent).toBeCloseTo(122);
+  });
+
+  it("não fica vermelho no início do mês só por causa dos fixos", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 50000,
+      variableExpensesCents: 0,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 3, 2, 12)), // dia 2 de um mês de 30 dias
+    });
+
+    expect(status.level).toBe("green");
+    expect(status.ratio).toBeLessThanOrEqual(0.8);
+  });
+
+  it("mede o ritmo do gasto avulso contra a diária disponível", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 50000,
+      variableExpensesCents: 15000,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 3, 10, 12)), // dia 10 de um mês de 30 dias
+    });
+
+    // diária = 50000/30 ≈ 1666,67; gasto diário = 15000/10 = 1500
+    expect(status.ratio).toBeCloseTo(0.9);
+    expect(status.level).toBe("lime");
+    expect(status.projectedPercent).toBeCloseTo(95);
+  });
+
+  it("classifica como alerta com gasto avulso acelerado", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 50000,
+      variableExpensesCents: 25000,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 3, 10, 12)), // dia 10 de um mês de 30 dias
+    });
+
+    expect(status.ratio).toBeCloseTo(1.5);
+    expect(status.level).toBe("orange");
+  });
+
+  it("classifica como cuidado quando o gasto avulso passa levemente do ritmo", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 50000,
+      variableExpensesCents: 18500,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 3, 10, 12)), // dia 10 de um mês de 30 dias
+    });
+
+    // diária = 50000/30 ≈ 1666,67; gasto diário = 18500/10 = 1850 → coef ≈ 1,11
+    expect(status.ratio).toBeCloseTo(1.11, 2);
+    expect(status.level).toBe("yellow");
+  });
+
+  it("classifica como crítico quando o gasto avulso estoura o orçamento diário", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 50000,
+      variableExpensesCents: 30000,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 3, 10, 12)), // dia 10 de um mês de 30 dias
+    });
+
+    // diária = 50000/30 ≈ 1666,67; gasto diário = 30000/10 = 3000 → coef = 1,80
+    expect(status.ratio).toBeCloseTo(1.8);
+    expect(status.consumedPercent).toBeCloseTo(80);
+    expect(status.level).toBe("red");
   });
 
   it("retorna nível neutro quando não há renda cadastrada", () => {
@@ -67,6 +138,7 @@ describe("computeFinanceStatus", () => {
       referenceDate: new Date(Date.UTC(2026, 9, 1, 12)),
     });
 
+    expect(status.consumedPercent).toBeGreaterThanOrEqual(100);
     expect(status.level).toBe("red");
   });
 
