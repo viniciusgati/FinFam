@@ -136,6 +136,34 @@ aplicadas **no momento do start**, encadeadas em
 release). A porta vem do próprio Railway (`PORT`) e o `next start` do
 Next 15 respeita `process.env.PORT`.
 
+O `startCommand` é executado dentro de um shell (`/bin/sh -c "..."`) porque
+o serviço é construído a partir de uma imagem (Nixpacks): sem o shell o
+Railway roda o comando em forma de `exec`, que não interpreta `&&`. Envolver
+o encadeamento no `sh -c` garante que a migration rode **antes** de subir o
+`next start` e mantém o processo vivo.
+
+### Banco de dados no Railway (`DATABASE_URL`)
+
+A aplicação fala com o PostgreSQL **exclusivamente** por `DATABASE_URL`:
+
+- `prisma/schema.prisma` declara `datasource db { url = env("DATABASE_URL") }`.
+- `src/lib/db.ts` instancia o `PrismaClient` sem URL própria em produção, então
+  o cliente lê `DATABASE_URL` do ambiente.
+- Não existe host/porta/senha embutidos no código; `localhost:5432` aparece
+  apenas no `.env.example`, para desenvolvimento local.
+
+A rede privada do Railway (`*.railway.internal`) **não existe durante o
+build** — só em runtime. Por isso o build (`npm run build` → `next build`)
+não pode e não deve abrir conexão com o banco: as páginas que leem dados usam
+`export const dynamic = "force-dynamic"` e as migrations acontecem no start.
+Se algum passo de build tentar conectar no Postgres, o sintoma típico é
+`Error: P1001: Can't reach database server at postgres.railway.internal:5432`.
+
+Para o serviço web enxergar o banco, a variável precisa ser **vinculada** na
+aba *Variables* do serviço da aplicação (passo 3 abaixo):
+`DATABASE_URL=${{Postgres.DATABASE_URL}}`. Sem essa referência o Prisma
+aborta com `Environment variable not found: DATABASE_URL`.
+
 ### Correção do build de produção (Tailwind v4)
 
 O build no Railway quebrava em duas camadas encadeadas:
@@ -161,6 +189,11 @@ Correções aplicadas:
   das devDependencies de tipo/lint).
 - O `command` redundante (duplicando `buildCommand`) foi removido do
   `railway.json`.
+- O `startCommand` foi envolvido em `/bin/sh -c "..."` para que o
+  encadeamento `prisma migrate deploy && next start` seja interpretado por um
+  shell (serviços Nixpacks/imagem rodam o comando em forma de `exec`) e o
+  campo inválido `restartPolicy` (o correto é `restartPolicyType`) foi
+  removido.
 
 Verificação local do build de produção (mesmo caminho do Railway):
 
@@ -192,8 +225,9 @@ cTXYzw-qcy8vrbONpx4ME
    cria a variável `DATABASE_URL` no serviço do banco.
 3. **Vincular `DATABASE_URL` ao serviço da aplicação** — na aba "Variables"
    do serviço web, use "Add Variable" → "Reference" (ou cadastre
-   `DATABASE_URL=${{servico-do-banco.DATABASE_URL}}`) para importar a
-   variável do serviço PostgreSQL.
+   `DATABASE_URL=${{Postgres.DATABASE_URL}}`, trocando `Postgres` pelo nome do
+   serviço de banco) para importar a variável do serviço PostgreSQL. A
+   aplicação não usa `POSTGRES_URL`/`PGHOST`: o Prisma lê **só** `DATABASE_URL`.
 4. **Definir as variáveis da tabela abaixo** — pela aba "Variables" da UI ou
    `railway variables --set FINFAM_USER=... --set FINFAM_PASS=... --set FINFAM_SESSION_SECRET=... --set NODE_ENV=production`.
 5. **Deploy** — `railway up` (ou "Deploy" na UI). O build executa
@@ -224,6 +258,14 @@ Observações:
 - **Seed opcional:** `npm run db:seed` popula dados de exemplo; em produção
   pode ser pulado (`railway run npm run db:seed` quando quiser).
 - **`PORT`** é definida pelo próprio Railway; não é preciso configurar.
+
+#### Troubleshooting de banco (`DATABASE_URL`)
+
+| Erro no log | Causa | Correção |
+| --- | --- | --- |
+| `Environment variable not found: DATABASE_URL` | o serviço web não recebeu a variável | referencie `DATABASE_URL=${{Postgres.DATABASE_URL}}` na aba *Variables* do serviço web |
+| `P1001: Can't reach database server at ...` | o host é privado (`*.railway.internal`) e não está acessível (ex.: banco em outro ambiente/projeto, ou alguma etapa de build tentando conectar) | mantenha as migrations no start (nunca no build) e confirme que banco e app estão no mesmo projeto/ambiente |
+| `P1001` com `localhost:5432` | alguém colou o valor do `.env.example` (dev local) como `DATABASE_URL` no Railway | use a referência ao serviço PostgreSQL, não o `localhost` |
 
 ## Status
 
