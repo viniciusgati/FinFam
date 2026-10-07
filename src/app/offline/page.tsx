@@ -32,11 +32,11 @@ export default function OfflinePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-900 p-6 text-slate-100">
-      <section className="w-full max-w-md space-y-6 rounded-2xl bg-slate-800/70 p-8 text-center shadow-xl">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas p-6 text-foreground">
+      <section className="w-full max-w-md space-y-6 rounded-2xl border border-border bg-surface-raised p-8 text-center shadow-xl">
         <header className="space-y-2">
           <h1 className="text-2xl font-bold">Você está offline</h1>
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-foreground-muted">
             Não foi possível conectar. Verifique sua internet e tente novamente.
           </p>
         </header>
@@ -57,7 +57,7 @@ export default function OfflinePage() {
           onClick={handleRetry}
           aria-disabled={checking}
           aria-busy={checking}
-          className="rounded-lg bg-emerald-600 px-6 py-3 text-lg font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+          className="rounded-lg bg-emerald-600 px-6 py-3 text-lg font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
         >
           {checking ? "Verificando conexão…" : "Tentar novamente"}
         </button>

@@ -14,12 +14,13 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "FinFam",
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#16a34a",
+  themeColor: "#020617",
+  colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
 };
@@ -30,8 +31,8 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body>
+    <html lang="pt-BR" className="dark">
+      <body className="bg-canvas text-foreground">
         {children}
         <ServiceWorkerRegister />
       </body>

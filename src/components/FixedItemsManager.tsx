@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import MaskedInput from "@/components/MaskedInput";
 import { formatCents, parseAmountToCents } from "@/lib/money";
 
 export interface FixedItem {
@@ -252,7 +253,7 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
       {success && (
         <div
           role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+          className="rounded-xl border border-emerald-800 bg-emerald-950 px-4 py-3 text-sm font-medium text-emerald-200"
         >
           {success}
         </div>
@@ -260,7 +261,7 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{title}</h1>
           {items.length > 0 && (
             <button
               type="button"
@@ -273,8 +274,8 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
         </div>
 
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-            <p className="text-slate-600">{emptyMessage}</p>
+          <div className="rounded-2xl border border-dashed border-border-strong bg-surface-raised px-6 py-10 text-center">
+            <p className="text-foreground-muted">{emptyMessage}</p>
             <button
               type="button"
               onClick={focusForm}
@@ -288,24 +289,24 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
             {items.map((item) => (
               <li
                 key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm"
               >
                 <div className="min-w-0 space-y-0.5">
-                  <p className="flex items-center gap-2 font-medium text-slate-900">
+                  <p className="flex items-center gap-2 font-medium text-foreground">
                     <span className="truncate">{item.name}</span>
                     {!item.active && (
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-foreground-muted">
                         inativa
                       </span>
                     )}
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-subtle">
                     {formatCents(item.amountCents)} · {dayVerb} dia{" "}
                     {daysOf(item, dayField)}
                     {showCategory && item.category ? ` · ${item.category}` : ""}
                   </p>
                   {(item.startMonth || item.endMonth) && (
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-subtle">
                       Vigência: {item.startMonth ?? "início"} →{" "}
                       {item.endMonth ?? "sem fim"}
                     </p>
@@ -316,7 +317,7 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                     type="button"
                     onClick={() => startEdit(item)}
                     disabled={disabled}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                    className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised disabled:opacity-60"
                   >
                     Editar
                   </button>
@@ -326,8 +327,8 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                     disabled={disabled}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
                       item.active
-                        ? "border border-red-200 text-red-700 hover:bg-red-50"
-                        : "border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        ? "border border-red-800 text-red-300 hover:bg-red-950"
+                        : "border border-emerald-800 text-emerald-300 hover:bg-emerald-950"
                     }`}
                   >
                     {busyId === item.id
@@ -345,15 +346,15 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">
+      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">
           {editingId ? "Editar item" : ctaLabel}
         </h2>
 
         {error && (
           <p
             role="alert"
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="mb-4 rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200"
           >
             {error}
           </p>
@@ -361,25 +362,25 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate>
           <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">Nome</span>
+            <span className="text-sm font-medium text-foreground-muted">Nome</span>
             <input
               ref={nameInputRef}
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
               disabled={disabled}
-              className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                fieldErrors.name ? "border-red-500" : "border-slate-300"
+              className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                fieldErrors.name ? "border-red-500" : "border-border-strong"
               }`}
             />
             {fieldErrors.name && (
-              <span className="text-sm text-red-600">{fieldErrors.name}</span>
+              <span className="text-sm text-red-400">{fieldErrors.name}</span>
             )}
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Valor (R$)
               </span>
               <input
@@ -389,17 +390,17 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  fieldErrors.amount ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  fieldErrors.amount ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {fieldErrors.amount && (
-                <span className="text-sm text-red-600">{fieldErrors.amount}</span>
+                <span className="text-sm text-red-400">{fieldErrors.amount}</span>
               )}
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 {dayLabel}
               </span>
               <input
@@ -409,19 +410,19 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 value={day}
                 onChange={(event) => setDay(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  fieldErrors.day ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  fieldErrors.day ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {fieldErrors.day && (
-                <span className="text-sm text-red-600">{fieldErrors.day}</span>
+                <span className="text-sm text-red-400">{fieldErrors.day}</span>
               )}
             </label>
           </div>
 
           {showCategory && (
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Categoria (opcional)
               </span>
               <input
@@ -429,49 +430,49 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
                 disabled={disabled}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50"
+                className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong"
               />
             </label>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Início da vigência (opcional)
               </span>
-              <input
-                type="text"
+              <MaskedInput
+                mask="month"
                 placeholder="AAAA-MM"
                 value={startMonth}
-                onChange={(event) => setStartMonth(event.target.value)}
+                onChange={setStartMonth}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  fieldErrors.startMonth ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  fieldErrors.startMonth ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {fieldErrors.startMonth && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {fieldErrors.startMonth}
                 </span>
               )}
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Fim da vigência (opcional)
               </span>
-              <input
-                type="text"
+              <MaskedInput
+                mask="month"
                 placeholder="AAAA-MM"
                 value={endMonth}
-                onChange={(event) => setEndMonth(event.target.value)}
+                onChange={setEndMonth}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  fieldErrors.endMonth ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  fieldErrors.endMonth ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {fieldErrors.endMonth && (
-                <span className="text-sm text-red-600">{fieldErrors.endMonth}</span>
+                <span className="text-sm text-red-400">{fieldErrors.endMonth}</span>
               )}
             </label>
           </div>
@@ -489,7 +490,7 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 type="button"
                 onClick={resetForm}
                 disabled={disabled}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                className="rounded-lg border border-border-strong px-4 py-2 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised disabled:opacity-60"
               >
                 Cancelar
               </button>

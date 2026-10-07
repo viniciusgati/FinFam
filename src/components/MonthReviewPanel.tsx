@@ -60,38 +60,42 @@ export default function MonthReviewPanel({
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm">
+    <section className="space-y-3 rounded-2xl border border-border bg-surface p-6 text-left shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Avaliação do mês fechado
         </h2>
         <button
           type="button"
           onClick={handleReview}
           disabled={!eligible || status === "loading"}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {status === "loading" ? "Avaliando…" : "Avaliar mês fechado"}
         </button>
       </div>
 
       {!eligible && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-subtle">
           O mês atual ainda está em andamento.
         </p>
       )}
 
       {status === "loading" && (
-        <p role="status" aria-live="polite" className="text-sm text-slate-600">
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-sm text-foreground-muted"
+        >
           Gerando avaliação do mês…
         </p>
       )}
 
       {status === "done" && summary && (
         <div role="status" aria-live="polite" className="space-y-1">
-          <p className="text-slate-800">{summary}</p>
+          <p className="text-foreground">{summary}</p>
           {cached && (
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-medium uppercase tracking-wide text-subtle">
               conteúdo em cache
             </p>
           )}
@@ -100,10 +104,10 @@ export default function MonthReviewPanel({
 
       {status === "fallback" && (
         <div role="status" aria-live="polite" className="space-y-1">
-          <p className="text-sm font-medium text-slate-600">
+          <p className="text-sm font-medium text-foreground-muted">
             Avaliação por IA indisponível no momento
           </p>
-          <p className="text-slate-800">{localSummary}</p>
+          <p className="text-foreground">{localSummary}</p>
         </div>
       )}
     </section>

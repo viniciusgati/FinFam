@@ -6,6 +6,8 @@ import {
   type CardPurchaseRecord,
 } from "@/lib/invoices";
 import { formatCents, parseAmountToCents } from "@/lib/money";
+import MaskedInput from "@/components/MaskedInput";
+import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
 
 export interface CreditCardData {
   id: string;
@@ -401,7 +403,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
     focusCardForm();
   }
 
-  function validatePurchaseForm(): {
+  function validatePurchaseForm(isoDate: string | null): {
     errors: Record<string, string>;
     cents: number | null;
   } {
@@ -413,7 +415,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
     const cents = parseAmountToCents(amount);
     if (cents === null) errors.amount = "Informe um valor maior que zero";
 
-    if (!purchaseDate) errors.purchaseDate = "Informe a data da compra";
+    if (isoDate === null) errors.purchaseDate = "Informe a data da compra";
 
     const number = Number(installmentNumber);
     if (!Number.isInteger(number) || number < 1) {
@@ -438,8 +440,9 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
   async function handlePurchaseSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const { errors, cents } = validatePurchaseForm();
-    if (Object.keys(errors).length > 0) {
+    const isoDate = dateMaskToIso(purchaseDate);
+    const { errors, cents } = validatePurchaseForm(isoDate);
+    if (isoDate === null || Object.keys(errors).length > 0) {
       setPurchaseErrors(errors);
       return;
     }
@@ -452,7 +455,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
       cardId: purchaseCardId,
       description: description.trim(),
       amountCents: cents,
-      purchaseDate: `${purchaseDate}T00:00:00`,
+      purchaseDate: `${isoDate}T00:00:00`,
       category: category.trim() || null,
       installmentNumber: Number(installmentNumber),
       installmentsTotal: Number(installmentsTotal),
@@ -507,7 +510,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
     setPurchaseCardId(purchase.cardId);
     setDescription(purchase.description);
     setAmount((purchase.amountCents / 100).toFixed(2).replace(".", ","));
-    setPurchaseDate(toDateInput(purchase.purchaseDate));
+    setPurchaseDate(isoToDateMask(toDateInput(purchase.purchaseDate)));
     setCategory(purchase.category ?? "");
     setInstallmentNumber(String(purchase.installmentNumber));
     setInstallmentsTotal(String(purchase.installmentsTotal));
@@ -632,7 +635,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
       {success && (
         <div
           role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+          className="rounded-xl border border-emerald-800 bg-emerald-950 px-4 py-3 text-sm font-medium text-emerald-200"
         >
           {success}
         </div>
@@ -641,29 +644,29 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="rounded-xl border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-300"
         >
           {error}
         </p>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-900">
+          <h2 className="text-lg font-semibold text-foreground">
             Fatura de {referenceLabel}
           </h2>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => navigateMonth(-1)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised"
             >
               Mês anterior
             </button>
             <button
               type="button"
               onClick={() => navigateMonth(1)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised"
             >
               Próximo mês
             </button>
@@ -671,9 +674,9 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
         </div>
 
         {loading ? (
-          <p className="mt-4 text-sm text-slate-400">Carregando…</p>
+          <p className="mt-4 text-sm text-subtle">Carregando…</p>
         ) : invoice.lines.length === 0 ? (
-          <p className="mt-4 text-slate-600">
+          <p className="mt-4 text-foreground-muted">
             Nenhuma parcela cai em {referenceLabel}
           </p>
         ) : (
@@ -681,19 +684,19 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             {invoice.lines.map((line) => (
               <li
                 key={`${line.purchaseId}-${line.installmentNumber}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface-raised px-4 py-3"
               >
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-900">
+                  <p className="font-medium text-foreground">
                     {line.description}
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-subtle">
                     parcela {line.installmentNumber}/{line.installmentsTotal} ·{" "}
                     {line.cardName}
                     {line.category ? ` · ${line.category}` : ""}
                   </p>
                 </div>
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-foreground">
                   {formatCents(line.amountCents)}
                 </span>
               </li>
@@ -701,9 +704,9 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
           </ul>
         )}
 
-        <p className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4 text-base">
-          <span className="font-medium text-slate-600">Total do mês</span>
-          <span className="text-xl font-bold text-slate-900">
+        <p className="mt-4 flex items-center justify-between border-t border-border pt-4 text-base">
+          <span className="font-medium text-foreground-muted">Total do mês</span>
+          <span className="text-xl font-bold text-foreground">
             {formatCents(invoice.totalCents)}
           </span>
         </p>
@@ -816,7 +819,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
       {loadError && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-300"
         >
           <span>{loadError}</span>
           <button
@@ -832,7 +835,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-900">Cartões</h2>
+          <h2 className="text-lg font-semibold text-foreground">Cartões</h2>
           {cards.length > 0 && (
             <button
               type="button"
@@ -846,13 +849,13 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
         </div>
 
         {loading ? (
-          <p className="text-sm text-slate-400">Carregando…</p>
+          <p className="text-sm text-subtle">Carregando…</p>
         ) : cards.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-            <p className="font-medium text-slate-700">
+          <div className="rounded-2xl border border-dashed border-border-strong bg-surface-raised px-6 py-10 text-center">
+            <p className="font-medium text-foreground-muted">
               Nenhum cartão cadastrado ainda
             </p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-subtle">
               Cadastre um cartão para lançar compras e ver a fatura
             </p>
             <button
@@ -869,18 +872,18 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             {cards.map((card) => (
               <li
                 key={card.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm"
               >
                 <div className="min-w-0 space-y-0.5">
-                  <p className="flex items-center gap-2 font-medium text-slate-900">
+                  <p className="flex items-center gap-2 font-medium text-foreground">
                     <span className="truncate">{card.name}</span>
                     {!card.active && (
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      <span className="rounded-full bg-surface-strong px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-foreground-muted">
                         inativo
                       </span>
                     )}
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-subtle">
                     Fechamento dia {card.closingDay} · Vencimento dia{" "}
                     {card.dueDay}
                     {card.limitCents !== null
@@ -893,7 +896,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                     type="button"
                     onClick={() => startEditCard(card)}
                     disabled={disabled}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                    className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised disabled:opacity-60"
                   >
                     Editar
                   </button>
@@ -903,8 +906,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                     disabled={disabled}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:opacity-60 ${
                       card.active
-                        ? "border border-red-200 text-red-700 hover:bg-red-50"
-                        : "border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        ? "border border-red-800 text-red-300 hover:bg-red-950"
+                        : "border border-emerald-800 text-emerald-300 hover:bg-emerald-950"
                     }`}
                   >
                     {busyId === card.id
@@ -922,15 +925,15 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-lg font-semibold text-slate-900">
+      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-semibold text-foreground">
           {editingCardId ? "Editar cartão" : "Cadastrar cartão"}
         </h3>
 
         {cardError && (
           <p
             role="alert"
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="mb-4 rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-300"
           >
             {cardError}
           </p>
@@ -944,24 +947,24 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">Nome</span>
+              <span className="text-sm font-medium text-foreground-muted">Nome</span>
               <input
                 ref={cardNameInputRef}
                 type="text"
                 value={cardName}
                 onChange={(event) => setCardName(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  cardErrors.name ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  cardErrors.name ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {cardErrors.name && (
-                <span className="text-sm text-red-600">{cardErrors.name}</span>
+                <span className="text-sm text-red-400">{cardErrors.name}</span>
               )}
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Limite (R$, opcional)
               </span>
               <input
@@ -971,19 +974,19 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 value={cardLimit}
                 onChange={(event) => setCardLimit(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  cardErrors.limit ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  cardErrors.limit ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {cardErrors.limit && (
-                <span className="text-sm text-red-600">{cardErrors.limit}</span>
+                <span className="text-sm text-red-400">{cardErrors.limit}</span>
               )}
             </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Dia de fechamento
               </span>
               <input
@@ -993,19 +996,19 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 value={closingDay}
                 onChange={(event) => setClosingDay(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  cardErrors.closingDay ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  cardErrors.closingDay ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {cardErrors.closingDay && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {cardErrors.closingDay}
                 </span>
               )}
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Dia de vencimento
               </span>
               <input
@@ -1015,12 +1018,12 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 value={dueDay}
                 onChange={(event) => setDueDay(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  cardErrors.dueDay ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  cardErrors.dueDay ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {cardErrors.dueDay && (
-                <span className="text-sm text-red-600">{cardErrors.dueDay}</span>
+                <span className="text-sm text-red-400">{cardErrors.dueDay}</span>
               )}
             </label>
           </div>
@@ -1042,7 +1045,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 type="button"
                 onClick={resetCardForm}
                 disabled={disabled}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                className="rounded-lg border border-border-strong px-4 py-2 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised disabled:opacity-60"
               >
                 Cancelar
               </button>
@@ -1052,13 +1055,13 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-slate-900">Compras</h2>
+        <h2 className="text-lg font-semibold text-foreground">Compras</h2>
 
         {loading ? (
-          <p className="text-sm text-slate-400">Carregando…</p>
+          <p className="text-sm text-subtle">Carregando…</p>
         ) : purchases.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-            <p className="font-medium text-slate-700">Nenhuma compra lançada</p>
+          <div className="rounded-2xl border border-dashed border-border-strong bg-surface-raised px-6 py-10 text-center">
+            <p className="font-medium text-foreground-muted">Nenhuma compra lançada</p>
             <button
               type="button"
               onClick={focusPurchaseForm}
@@ -1075,13 +1078,13 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
               return (
                 <li
                   key={purchase.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm"
                 >
                   <div className="min-w-0 space-y-0.5">
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-foreground">
                       {purchase.description}
                     </p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-subtle">
                       {formatCents(purchase.amountCents)} ·{" "}
                       {toDateInput(purchase.purchaseDate)} ·{" "}
                       parcela {purchase.installmentNumber}/
@@ -1095,7 +1098,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                       type="button"
                       onClick={() => startEditPurchase(purchase)}
                       disabled={disabled}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                      className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised disabled:opacity-60"
                     >
                       Editar
                     </button>
@@ -1103,7 +1106,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                       type="button"
                       onClick={() => deletePurchase(purchase)}
                       disabled={disabled}
-                      className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+                      className="rounded-lg border border-red-800 px-3 py-1.5 text-sm font-medium text-red-300 transition hover:bg-red-950 disabled:opacity-60"
                     >
                       {busyId === purchase.id ? "Excluindo…" : "Excluir"}
                     </button>
@@ -1115,15 +1118,15 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-lg font-semibold text-slate-900">
+      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-semibold text-foreground">
           {editingPurchaseId ? "Editar compra" : "Lançar compra"}
         </h3>
 
         {purchaseError && (
           <p
             role="alert"
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="mb-4 rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-300"
           >
             {purchaseError}
           </p>
@@ -1137,13 +1140,13 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">Cartão</span>
+              <span className="text-sm font-medium text-foreground-muted">Cartão</span>
               <select
                 value={purchaseCardId}
                 onChange={(event) => setPurchaseCardId(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  purchaseErrors.cardId ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  purchaseErrors.cardId ? "border-red-500" : "border-border-strong"
                 }`}
               >
                 <option value="">Selecione um cartão</option>
@@ -1155,14 +1158,14 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 ))}
               </select>
               {purchaseErrors.cardId && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {purchaseErrors.cardId}
                 </span>
               )}
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Descrição
               </span>
               <input
@@ -1171,14 +1174,14 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
                   purchaseErrors.description
                     ? "border-red-500"
-                    : "border-slate-300"
+                    : "border-border-strong"
                 }`}
               />
               {purchaseErrors.description && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {purchaseErrors.description}
                 </span>
               )}
@@ -1187,7 +1190,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Valor total (R$)
               </span>
               <input
@@ -1197,32 +1200,32 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  purchaseErrors.amount ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  purchaseErrors.amount ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {purchaseErrors.amount && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {purchaseErrors.amount}
                 </span>
               )}
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">Data</span>
-              <input
-                type="date"
+              <span className="text-sm font-medium text-foreground-muted">Data</span>
+              <MaskedInput
+                mask="date"
                 value={purchaseDate}
-                onChange={(event) => setPurchaseDate(event.target.value)}
+                onChange={setPurchaseDate}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
                   purchaseErrors.purchaseDate
                     ? "border-red-500"
-                    : "border-slate-300"
+                    : "border-border-strong"
                 }`}
               />
               {purchaseErrors.purchaseDate && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {purchaseErrors.purchaseDate}
                 </span>
               )}
@@ -1231,7 +1234,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
 
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Parcela (nº)
               </span>
               <input
@@ -1240,21 +1243,21 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 value={installmentNumber}
                 onChange={(event) => setInstallmentNumber(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
                   purchaseErrors.installmentNumber
                     ? "border-red-500"
-                    : "border-slate-300"
+                    : "border-border-strong"
                 }`}
               />
               {purchaseErrors.installmentNumber && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {purchaseErrors.installmentNumber}
                 </span>
               )}
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Total de parcelas
               </span>
               <input
@@ -1263,21 +1266,21 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 value={installmentsTotal}
                 onChange={(event) => setInstallmentsTotal(event.target.value)}
                 disabled={disabled}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
                   purchaseErrors.installmentsTotal
                     ? "border-red-500"
-                    : "border-slate-300"
+                    : "border-border-strong"
                 }`}
               />
               {purchaseErrors.installmentsTotal && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {purchaseErrors.installmentsTotal}
                 </span>
               )}
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Categoria (opcional)
               </span>
               <input
@@ -1285,7 +1288,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
                 disabled={disabled}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50"
+                className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong"
               />
             </label>
           </div>
@@ -1307,7 +1310,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 type="button"
                 onClick={resetPurchaseForm}
                 disabled={disabled}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                className="rounded-lg border border-border-strong px-4 py-2 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised disabled:opacity-60"
               >
                 Cancelar
               </button>

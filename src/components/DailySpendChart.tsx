@@ -64,7 +64,7 @@ export default function DailySpendChart({
 
   return (
     <figure className="space-y-2">
-      <figcaption className="text-sm font-semibold text-slate-700">
+      <figcaption className="text-sm font-semibold text-foreground-muted">
         Dia a dia
       </figcaption>
 
@@ -99,7 +99,7 @@ export default function DailySpendChart({
           <polyline
             points={linePoints}
             fill="none"
-            stroke="#1e3a8a"
+            stroke="#60a5fa"
             strokeWidth={0.8}
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -108,9 +108,9 @@ export default function DailySpendChart({
       </svg>
 
       {totalCents === 0 ? (
-        <p className="text-sm text-slate-500">Sem gastos neste mês</p>
+        <p className="text-sm text-subtle">Sem gastos neste mês</p>
       ) : (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-subtle">
           Total até agora: {formatCents(cumulativeExpensesCents.at(-1) ?? 0)}
         </p>
       )}
