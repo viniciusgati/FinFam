@@ -126,6 +126,57 @@ Veja [`.env.example`](./.env.example). Principais:
 - `FINFAM_USER` / `FINFAM_PASS` — credenciais de acesso da família.
 - `FINFAM_SESSION_SECRET` — segredo para assinar o cookie de sessão.
 
+## Deploy no Railway
+
+O deploy usa o **Nixpacks padrão** do Railway, configurado pelo
+[`railway.json`](./railway.json) versionado na raiz — não há Dockerfile. As
+migrations do Prisma são aplicadas **no momento do start**, encadeadas em
+`npx prisma migrate deploy && npm run start` (o Nixpacks não tem fase de
+release). A porta vem do próprio Railway (`PORT`) e o `next start` do
+Next 15 respeita `process.env.PORT`.
+
+### Passo a passo
+
+1. **Criar o projeto** — `railway login` e depois `railway init` (ou
+   "New Project" na UI do Railway, apontando para este repositório).
+2. **Adicionar o PostgreSQL** — `railway add --database postgres` (ou
+   "New" → "Database" → "PostgreSQL" na UI). O Railway provisiona o banco e
+   cria a variável `DATABASE_URL` no serviço do banco.
+3. **Vincular `DATABASE_URL` ao serviço da aplicação** — na aba "Variables"
+   do serviço web, use "Add Variable" → "Reference" (ou cadastre
+   `DATABASE_URL=${{servico-do-banco.DATABASE_URL}}`) para importar a
+   variável do serviço PostgreSQL.
+4. **Definir as variáveis da tabela abaixo** — pela aba "Variables" da UI ou
+   `railway variables --set FINFAM_USER=... --set FINFAM_PASS=... --set FINFAM_SESSION_SECRET=... --set NODE_ENV=production`.
+5. **Deploy** — `railway up` (ou "Deploy" na UI). O build executa
+   `npm run build`; o start aplica as migrations e sobe o Next. Acesse
+   `https://finfam.example.up.railway.app` — responde em HTTP em até 30s
+   (sem sessão, `/` redireciona para `/login` com **302**; com sessão
+   válida, `/` responde **200**).
+6. **Seed (opcional)** — `railway run npm run db:seed` ou `npm run db:seed`
+   local; a família também pode começar com o estado vazio.
+
+### Variáveis de ambiente no Railway
+
+| Variável | Obrigatória | Valor sugerido / placeholder |
+| --- | --- | --- |
+| `DATABASE_URL` | Obrigatória | injetada automaticamente pela vinculação do serviço PostgreSQL do Railway |
+| `FINFAM_USER` | Obrigatória | `familia` |
+| `FINFAM_PASS` | Obrigatória | `sua-senha` |
+| `FINFAM_SESSION_SECRET` | Obrigatória | `gere-um-segredo-longo-e-aleatorio` (ex.: `openssl rand -hex 64`) |
+| `NODE_ENV` | Obrigatória em produção | `production` |
+| `FINFAM_TIME_ZONE` | Opcional | `America/Sao_Paulo` (default quando ausente/inválida) |
+| `TEST_DATABASE_URL` | Não usar em produção | `postgresql://user:pass@host:5432/finfam_test?schema=public` — apenas para `npm run test:integration` local |
+
+Observações:
+
+- **Migrations no start:** cada deploy/restart roda
+  `npx prisma migrate deploy` antes de `npm run start`; é idempotente (sem
+  pendência imprime `No pending migrations to apply.` e termina exit 0).
+- **Seed opcional:** `npm run db:seed` popula dados de exemplo; em produção
+  pode ser pulado (`railway run npm run db:seed` quando quiser).
+- **`PORT`** é definida pelo próprio Railway; não é preciso configurar.
+
 ## Status
 
 Fundação de dados pronta: `prisma/migrations/` versionada (6 tabelas + enum
