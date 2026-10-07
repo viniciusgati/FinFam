@@ -13,6 +13,7 @@ const { prismaMock } = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import { loadDashboardData } from "./dashboard";
+import { computeFinanceStatus } from "./finance";
 
 const referenceDate = new Date(Date.UTC(2026, 9, 15, 12)); // outubro/2026
 
@@ -74,9 +75,9 @@ describe("loadDashboardData — vigência", () => {
   it("aplica a mesma vigência às saídas fixas", async () => {
     prismaMock.income.findMany.mockResolvedValue([]);
     prismaMock.fixedExpense.findMany.mockResolvedValue([
-      { id: "a", amountCents: 30000, active: true, startMonth: "2026-10", endMonth: null },
-      { id: "b", amountCents: 80000, active: true, startMonth: "2026-11", endMonth: null },
-      { id: "c", amountCents: 10000, active: false, startMonth: null, endMonth: null },
+      { id: "a", amountCents: 30000, dueDay: 10, active: true, startMonth: "2026-10", endMonth: null },
+      { id: "b", amountCents: 80000, dueDay: 5, active: true, startMonth: "2026-11", endMonth: null },
+      { id: "c", amountCents: 10000, dueDay: 1, active: false, startMonth: null, endMonth: null },
     ]);
 
     const data = await loadDashboardData(referenceDate);
@@ -88,15 +89,17 @@ describe("loadDashboardData — vigência", () => {
 interface Row {
   amountCents: number;
   paymentMethod: string;
+  date: Date;
 }
 
 describe("loadDashboardData — gastos avulsos", () => {
   it("não conta CREDIT e conta CASH/DEBIT/PIX (SPEC §3.3)", async () => {
+    const date = new Date(Date.UTC(2026, 9, 5, 12));
     const rows: Row[] = [
-      { amountCents: 5000, paymentMethod: "CREDIT" },
-      { amountCents: 1000, paymentMethod: "PIX" },
-      { amountCents: 200, paymentMethod: "DEBIT" },
-      { amountCents: 50, paymentMethod: "CASH" },
+      { amountCents: 5000, paymentMethod: "CREDIT", date },
+      { amountCents: 1000, paymentMethod: "PIX", date },
+      { amountCents: 200, paymentMethod: "DEBIT", date },
+      { amountCents: 50, paymentMethod: "CASH", date },
     ];
     prismaMock.income.findMany.mockResolvedValue([]);
     prismaMock.fixedExpense.findMany.mockResolvedValue([]);
@@ -166,5 +169,32 @@ describe("loadDashboardData — calendário no fuso do Brasil", () => {
       gte: "2026-07",
       lt: "2026-11",
     });
+  });
+});
+
+describe("loadDashboardData — série diária", () => {
+  it("monta a série com um valor por dia e soma igual ao consumido", async () => {
+    const date = new Date(Date.UTC(2026, 9, 5, 12));
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "1", amountCents: 310000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      { id: "f", amountCents: 10000, dueDay: 10, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      { amountCents: 5000, paymentMethod: "PIX", date },
+    ]);
+
+    const data = await loadDashboardData(new Date(Date.UTC(2026, 9, 15, 12)));
+
+    expect(data.series.dailyExpensesCents).toHaveLength(31);
+    expect(data.series.dailyExpensesCents[4]).toBe(5000);
+    expect(data.series.dailyExpensesCents[9]).toBe(10000);
+    const seriesSum = data.series.dailyExpensesCents.reduce(
+      (total, value) => total + value,
+      0,
+    );
+    expect(seriesSum).toBe(computeFinanceStatus(data).consumedCents);
+    expect(data.series.totalExpensesCents).toBe(seriesSum);
   });
 });

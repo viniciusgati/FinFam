@@ -7,6 +7,8 @@ import { monthLabel, shiftMonthKey } from "@/lib/finance";
 interface MonthSelectorProps {
   monthKey: string;
   isCurrentMonth: boolean;
+  /** Rota base da navegação; padrão `/historico` (dashboard usa `/`). */
+  basePath?: string;
 }
 
 const buttonClass =
@@ -15,6 +17,7 @@ const buttonClass =
 export default function MonthSelector({
   monthKey,
   isCurrentMonth,
+  basePath = "/historico",
 }: MonthSelectorProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -25,7 +28,7 @@ export default function MonthSelector({
   function navigate(target: string) {
     if (!target || target === monthKey) return;
     startTransition(() => {
-      router.push(`/historico?mes=${target}`);
+      router.push(`${basePath}?mes=${target}`);
     });
   }
 
