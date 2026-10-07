@@ -48,7 +48,7 @@ export default function PurchaseSimulator({
 
   const cents = parseAmountToCents(value);
   const invalid = cents === null;
-  const showValidation = value.trim() !== "" && invalid;
+  const showValidation = invalid;
 
   function buildLocalResult(purchaseCents: number): SimulationResult {
     const simulation = simulatePurchase({

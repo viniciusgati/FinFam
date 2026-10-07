@@ -212,12 +212,14 @@ export default async function DashboardPage({
           </section>
 
           <MonthReviewPanel
+            key={referenceMonthKey}
             monthKey={referenceMonthKey}
             eligible={isClosedMonth}
             localSummary={localMonthSummary}
           />
 
           <PurchaseSimulator
+            key={referenceMonthKey}
             incomeCents={incomeCents}
             spentCents={series.totalExpensesCents}
             elapsedDay={series.elapsedDay}
