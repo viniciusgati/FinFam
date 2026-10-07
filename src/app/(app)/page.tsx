@@ -25,6 +25,7 @@ import DailySpendChart from "@/components/DailySpendChart";
 import IncomeVsExpenseChart from "@/components/IncomeVsExpenseChart";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
 import PurchaseSimulator from "@/components/PurchaseSimulator";
+import QuickExpenseCard from "@/components/QuickExpenseCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
 
 export const dynamic = "force-dynamic";
@@ -189,6 +190,8 @@ export default async function DashboardPage({
               {view.feedback}
             </p>
           </section>
+
+          {isCalendarMonth && <QuickExpenseCard />}
 
           {allowance !== null && (
             <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />

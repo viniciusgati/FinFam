@@ -9,6 +9,8 @@ import {
   type FormEvent,
 } from "react";
 import type { PaymentMethod } from "@/lib/variable-expenses";
+import MaskedInput from "@/components/MaskedInput";
+import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
 
 export interface ExpenseDTO {
   id: string;
@@ -59,7 +61,7 @@ function emptyForm(today: string): FormState {
   return {
     description: "",
     amount: "",
-    date: today,
+    date: isoToDateMask(today),
     category: "",
     paymentMethod: "PIX",
     paid: true,
@@ -153,12 +155,12 @@ export default function GastosManager({
     });
   }
 
-  function validate(): FieldErrors {
+  function validate(isoDate: string | null): FieldErrors {
     const next: FieldErrors = {};
     if (!form.description.trim()) next.description = "Informe uma descrição.";
     if (parseAmountInput(form.amount) === null)
       next.amount = "Informe um valor válido (ex.: 12,34).";
-    if (!form.date) next.date = "Informe uma data válida.";
+    if (isoDate === null) next.date = "Informe uma data válida.";
     return next;
   }
 
@@ -175,9 +177,10 @@ export default function GastosManager({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const editing = editingId !== null;
-    const validation = validate();
+    const isoDate = dateMaskToIso(form.date);
+    const validation = validate(isoDate);
     setErrors(validation);
-    if (Object.keys(validation).length > 0) {
+    if (isoDate === null || Object.keys(validation).length > 0) {
       setFeedback({
         type: "error",
         message: editing
@@ -190,7 +193,7 @@ export default function GastosManager({
     const payload = {
       description: form.description.trim(),
       amountCents: parseAmountInput(form.amount),
-      date: form.date,
+      date: isoDate,
       category: form.category.trim() ? form.category.trim() : undefined,
       paymentMethod: form.paymentMethod,
       paid: form.paid,
@@ -268,7 +271,7 @@ export default function GastosManager({
     setForm({
       description: expense.description,
       amount: formatAmountInput(expense.amountCents),
-      date: expense.date.slice(0, 10),
+      date: isoToDateMask(expense.date),
       category: expense.category ?? "",
       paymentMethod: expense.paymentMethod,
       paid: expense.paid,
@@ -414,10 +417,10 @@ export default function GastosManager({
 
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
-            <input
-              type="date"
+            <MaskedInput
+              mask="date"
               value={form.date}
-              onChange={(event) => updateField("date", event.target.value)}
+              onChange={(value) => updateField("date", value)}
               aria-invalid={Boolean(errors.date)}
               aria-describedby={errors.date ? "erro-date" : undefined}
               className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"

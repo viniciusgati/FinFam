@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import MaskedInput from "@/components/MaskedInput";
 import { formatCents, parseAmountToCents } from "@/lib/money";
 
 export interface FixedItem {
@@ -439,11 +440,11 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
               <span className="text-sm font-medium text-foreground-muted">
                 Início da vigência (opcional)
               </span>
-              <input
-                type="text"
+              <MaskedInput
+                mask="month"
                 placeholder="AAAA-MM"
                 value={startMonth}
-                onChange={(event) => setStartMonth(event.target.value)}
+                onChange={setStartMonth}
                 disabled={disabled}
                 className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
                   fieldErrors.startMonth ? "border-red-500" : "border-border-strong"
@@ -460,11 +461,11 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
               <span className="text-sm font-medium text-foreground-muted">
                 Fim da vigência (opcional)
               </span>
-              <input
-                type="text"
+              <MaskedInput
+                mask="month"
                 placeholder="AAAA-MM"
                 value={endMonth}
-                onChange={(event) => setEndMonth(event.target.value)}
+                onChange={setEndMonth}
                 disabled={disabled}
                 className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
                   fieldErrors.endMonth ? "border-red-500" : "border-border-strong"
