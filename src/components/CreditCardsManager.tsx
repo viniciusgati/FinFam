@@ -6,6 +6,8 @@ import {
   type CardPurchaseRecord,
 } from "@/lib/invoices";
 import { formatCents, parseAmountToCents } from "@/lib/money";
+import MaskedInput from "@/components/MaskedInput";
+import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
 
 export interface CreditCardData {
   id: string;
@@ -372,7 +374,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
     focusCardForm();
   }
 
-  function validatePurchaseForm(): {
+  function validatePurchaseForm(isoDate: string | null): {
     errors: Record<string, string>;
     cents: number | null;
   } {
@@ -384,7 +386,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
     const cents = parseAmountToCents(amount);
     if (cents === null) errors.amount = "Informe um valor maior que zero";
 
-    if (!purchaseDate) errors.purchaseDate = "Informe a data da compra";
+    if (isoDate === null) errors.purchaseDate = "Informe a data da compra";
 
     const number = Number(installmentNumber);
     if (!Number.isInteger(number) || number < 1) {
@@ -409,8 +411,9 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
   async function handlePurchaseSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const { errors, cents } = validatePurchaseForm();
-    if (Object.keys(errors).length > 0) {
+    const isoDate = dateMaskToIso(purchaseDate);
+    const { errors, cents } = validatePurchaseForm(isoDate);
+    if (isoDate === null || Object.keys(errors).length > 0) {
       setPurchaseErrors(errors);
       return;
     }
@@ -423,7 +426,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
       cardId: purchaseCardId,
       description: description.trim(),
       amountCents: cents,
-      purchaseDate: `${purchaseDate}T00:00:00`,
+      purchaseDate: `${isoDate}T00:00:00`,
       category: category.trim() || null,
       installmentNumber: Number(installmentNumber),
       installmentsTotal: Number(installmentsTotal),
@@ -478,7 +481,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
     setPurchaseCardId(purchase.cardId);
     setDescription(purchase.description);
     setAmount((purchase.amountCents / 100).toFixed(2).replace(".", ","));
-    setPurchaseDate(toDateInput(purchase.purchaseDate));
+    setPurchaseDate(isoToDateMask(toDateInput(purchase.purchaseDate)));
     setCategory(purchase.category ?? "");
     setInstallmentNumber(String(purchase.installmentNumber));
     setInstallmentsTotal(String(purchase.installmentsTotal));
@@ -1012,10 +1015,10 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
 
             <label className="block space-y-1">
               <span className="text-sm font-medium text-slate-700">Data</span>
-              <input
-                type="date"
+              <MaskedInput
+                mask="date"
                 value={purchaseDate}
-                onChange={(event) => setPurchaseDate(event.target.value)}
+                onChange={setPurchaseDate}
                 disabled={disabled}
                 className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
                   purchaseErrors.purchaseDate
