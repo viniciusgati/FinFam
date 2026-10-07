@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
 export default defineConfig({
+  // Componentes JSX usam o runtime automático do React (igual ao Next.js).
+  esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
     // `npm test` roda apenas testes unitários: o glob `!(...)` mantém os
