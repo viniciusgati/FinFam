@@ -117,3 +117,15 @@ model MonthlySnapshot {
 
   @@map("monthly_snapshots")
 }
+
+/// Avaliação de um mês fechado gerada por IA, cacheada por `monthKey` para não
+/// repetir a chamada à DeepSeek. `summary` é o texto exibido no dashboard.
+model MonthlyReview {
+  id        String   @id @default(cuid())
+  monthKey  String   @unique // YYYY-MM
+  summary   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("monthly_reviews")
+}

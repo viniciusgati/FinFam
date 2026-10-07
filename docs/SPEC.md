@@ -157,6 +157,33 @@ está em `src/lib/finance.ts`.
   meses comparados. A fase de implementação pode refinar com projeção do mês
   (percentual projetado até o fim do mês).
 
+### 4.4 Ampliação do dashboard (história #224)
+
+Esta seção **supersede** restrições anteriores desta SPEC onde houver conflito.
+
+- Valores monetários passam a ser exibidos em **R$ (`pt-BR`)**, além do
+  percentual (supera o "sem valores monetários" do §7).
+- Gráficos em **SVG/CSS puro** (`role="img"` + `aria-label`), sem biblioteca de
+  charts: "Entradas vs Saídas" e "Dia a dia" (uma barra por dia + linha do
+  acumulado; dia de hoje destacado; dias futuros atenuados).
+- **Séries diárias** (`src/lib/dashboard-series.ts`, função pura): avulsos no
+  orçamento na `date`; fixas ativas no `dueDay` (limitado ao tamanho do mês);
+  faturas no `dueDay` do cartão pela competência (`invoices.ts`). Avulsos
+  `CREDIT` não entram (evita dupla contagem, §3.3). A soma da série coincide com
+  `consumedCents`. Mês corrente acumula até hoje; mês passado cobre o mês todo.
+- **Avaliação do dia**: heurística determinística (`src/lib/day-rating.ts`),
+  reutilizando `classifyLevel`/`levelLabel` (`<=` orçamento diário → "Ok";
+  acima → no mínimo "Cuidado"; sem renda → "Sem renda cadastrada").
+- **Avaliação de mês fechado por IA** (DeepSeek, opcional via
+  `DEEPSEEK_API_KEY`): supervisor `src/lib/ai/deepseek.ts`. Somente agregados
+  **numéricos** são enviados; o veredito e o fallback são locais. Cache em
+  `MonthlyReview` (PostgreSQL) por `monthKey`. Sem chave →
+  `503 { "error": "ai_unavailable" }` + fallback local.
+- **Simulador "posso comprar?"**: veredito local determinístico
+  (`ok`/`cuidado`/`nao`); a IA apenas redige a justificativa; a rota sempre
+  responde `200` com fallback local.
+- O seletor de mês do dashboard navega para `/?mes=YYYY-MM` (prop `basePath`).
+
 ## 5. Regras de negócio relevantes
 
 1. **Renda mensal** = soma das entradas fixas ativas no mês.
@@ -189,14 +216,18 @@ são entregas seguintes.
 
 - **PWA**: instalável, com manifest e service worker.
 - **Responsivo**: prioridade para tablet (paisagem) e desktop.
-- **Sem exibir valores monetários no dashboard** nesta versão; apenas %.
-- **Privacidade**: sem envio para terceiros; tudo no PostgreSQL próprio.
-- **Acessibilidade**: contraste adequado mesmo com fundo colorido.
+- **Valores monetários em R$ no dashboard** (história #224 supersede o "apenas
+  %" anterior); o percentual continua sendo o protagonista.
+- **Privacidade**: por padrão sem envio para terceiros; tudo no PostgreSQL
+  próprio. Exceção restrita aos recursos de IA (avaliação de mês fechado e
+  simulador), que enviam **somente agregados numéricos** à DeepSeek — nunca
+  nomes, descrições, categorias ou texto do usuário.
+- **Acessibilidade**: contraste adequado mesmo com fundo colorido; gráficos e
+  estados usam `role`/`aria-label`/`aria-live` e rótulos textuais.
 
 ## 8. Fora de escopo (por agora)
 
 - Múltiplos usuários/perfis e permissões.
-- Valores em reais no dashboard.
 - Open Finance / importação bancária.
 - Notificações push.
 - Aplicativo nativo.
