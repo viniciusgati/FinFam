@@ -129,11 +129,45 @@ Veja [`.env.example`](./.env.example). Principais:
 ## Deploy no Railway
 
 O deploy usa o **Nixpacks padrão** do Railway, configurado pelo
-[`railway.json`](./railway.json) versionado na raiz — não há Dockerfile. As
-migrations do Prisma são aplicadas **no momento do start**, encadeadas em
+[`railway.json`](./railway.json) e pelo [`nixpacks.toml`](./nixpacks.toml)
+versionados na raiz — não há Dockerfile. As migrations do Prisma são
+aplicadas **no momento do start**, encadeadas em
 `npx prisma migrate deploy && npm run start` (o Nixpacks não tem fase de
 release). A porta vem do próprio Railway (`PORT`) e o `next start` do
 Next 15 respeita `process.env.PORT`.
+
+### Correção do build de produção (Tailwind v4)
+
+O build no Railway quebrava em duas camadas encadeadas:
+
+1. `Cannot find module '@tailwindcss/postcss'` — o `postcss.config.mjs`
+   referencia esse plugin, que estava em `devDependencies`; o install de
+   produção (`NODE_ENV=production`) não instala devDependencies.
+2. `Cannot find native binding` de `@tailwindcss/oxide` — bug do npm com
+   dependências opcionais por plataforma
+   ([npm/cli#4828](https://github.com/npm/cli/issues/4828)): o binário
+   `@tailwindcss/oxide-linux-x64-gnu` não era materializado no `node_modules`
+   do container.
+
+Correções aplicadas:
+
+- `tailwindcss` e `@tailwindcss/postcss` foram movidos para
+  `dependencies`, ficando disponíveis mesmo num install só de produção.
+- `@tailwindcss/oxide-linux-x64-gnu` foi declarado explicitamente em
+  `optionalDependencies`, contornando o bug de optional deps e garantindo o
+  binário nativo no Linux x64 (glibc).
+- `nixpacks.toml` fixa o Node 22 (o oxide exige `node >= 20`) e o install
+  determinístico com `npm ci --include=dev` (o `next build` também precisa
+  das devDependencies de tipo/lint).
+- O `command` redundante (duplicando `buildCommand`) foi removido do
+  `railway.json`.
+
+Verificação local do build de produção (mesmo caminho do Railway):
+
+```bash
+npm ci
+NODE_ENV=production npm run build   # deve terminar com exit 0 e gerar .next/
+```
 
 ### Passo a passo
 

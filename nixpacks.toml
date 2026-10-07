@@ -1,0 +1,12 @@
+# Configuração determinística do build no Railway (Nixpacks).
+# - Fixa o Node em 22 (o @tailwindcss/oxide exige node >= 20).
+# - Instala com devDependencies explicitamente: o `next build` precisa de
+#   `typescript`/`eslint-config-next`, e o Nixpacks roda o install sem elas
+#   quando NODE_ENV=production. As deps de build do Tailwind já vivem em
+#   `dependencies` (ver package.json), então também estão garantidas num
+#   install só de produção.
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm ci --include=dev"]
