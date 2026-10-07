@@ -86,6 +86,35 @@ describe("computeFinanceStatus", () => {
     expect(status.level).toBe("orange");
   });
 
+  it("classifica como cuidado quando o gasto avulso passa levemente do ritmo", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 50000,
+      variableExpensesCents: 18500,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 3, 10, 12)), // dia 10 de um mês de 30 dias
+    });
+
+    // diária = 50000/30 ≈ 1666,67; gasto diário = 18500/10 = 1850 → coef ≈ 1,11
+    expect(status.ratio).toBeCloseTo(1.11, 2);
+    expect(status.level).toBe("yellow");
+  });
+
+  it("classifica como crítico quando o gasto avulso estoura o orçamento diário", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 50000,
+      variableExpensesCents: 30000,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 3, 10, 12)), // dia 10 de um mês de 30 dias
+    });
+
+    // diária = 50000/30 ≈ 1666,67; gasto diário = 30000/10 = 3000 → coef = 1,80
+    expect(status.ratio).toBeCloseTo(1.8);
+    expect(status.consumedPercent).toBeCloseTo(80);
+    expect(status.level).toBe("red");
+  });
+
   it("retorna nível neutro quando não há renda cadastrada", () => {
     const status = computeFinanceStatus({
       monthlyIncomeCents: 0,
