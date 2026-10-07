@@ -116,6 +116,19 @@ describe("dailyAllowanceCents", () => {
 
     expect(allowance.hasData).toBe(false);
   });
+
+  it("renda 10.000, obrigações 5.000 e avulso 200 (52% consumido) → diária > 0", () => {
+    const allowance = dailyAllowanceCents({
+      incomeCents: 1000000,
+      obligationsCents: 500000,
+      variableSpentCents: 20000,
+      cycleStartDay: 1,
+      now: NOW,
+    });
+
+    expect(allowance.freeBudgetCents).toBe(480000);
+    expect(allowance.dailyCents).toBeGreaterThan(0);
+  });
 });
 
 describe("dailyAllowanceCard", () => {

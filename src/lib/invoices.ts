@@ -62,7 +62,7 @@ function cycleTotal(purchaseDate: Date, closingDay: number): number {
 }
 
 /** Deslocamento de vencimento da regra (c). */
-function dueOffset(closingDay: number, dueDay: number): number {
+export function dueOffset(closingDay: number, dueDay: number): number {
   return dueDay <= closingDay ? 1 : 0;
 }
 

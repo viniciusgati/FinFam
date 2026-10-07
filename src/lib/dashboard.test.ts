@@ -7,12 +7,13 @@ const { prismaMock } = vi.hoisted(() => ({
     variableExpense: { findMany: vi.fn() },
     cardPurchase: { findMany: vi.fn() },
     monthlySnapshot: { findMany: vi.fn() },
+    appSettings: { findUnique: vi.fn() },
   },
 }));
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-import { loadDashboardData } from "./dashboard";
+import { loadCycleAllowance, loadDashboardData } from "./dashboard";
 import { computeFinanceStatus } from "./finance";
 
 const referenceDate = new Date(Date.UTC(2026, 9, 15, 12)); // outubro/2026
@@ -196,5 +197,88 @@ describe("loadDashboardData — série diária", () => {
     );
     expect(seriesSum).toBe(computeFinanceStatus(data).consumedCents);
     expect(data.series.totalExpensesCents).toBe(seriesSum);
+  });
+});
+
+describe("loadCycleAllowance — diária restante (regressão #231)", () => {
+  const card = { id: "c1", name: "Nubank", closingDay: 20, dueDay: 5 };
+
+  it("não zera a diária quando as obrigações de cartão são do mês calendário, mesmo com ciclo ≠ mês", async () => {
+    // cycleStartDay = 20 e hoje 05/03/2026 → o ciclo começou em 20/02
+    // (cycleKey "2026-02"), mas o percentual do dashboard é do mês calendário
+    // (março). Antes a fatura de fevereiro (R$ 10.000) zerava a diária mesmo
+    // com o mês corrente longe de 100%.
+    prismaMock.appSettings.findUnique.mockResolvedValue({
+      id: "singleton",
+      cycleStartDay: 20,
+    });
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "i", amountCents: 1000000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      { amountCents: 20000, paymentMethod: "PIX", date: new Date("2026-03-03T12:00:00.000Z") },
+    ]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([
+      {
+        id: "p-fev",
+        description: "Fatura de fevereiro",
+        amountCents: 1000000,
+        purchaseDate: new Date("2026-01-10T12:00:00.000Z"),
+        category: null,
+        installmentNumber: 1,
+        installmentsTotal: 1,
+        card,
+      },
+      {
+        id: "p-mar",
+        description: "Fatura de março",
+        amountCents: 220000,
+        purchaseDate: new Date("2026-02-10T12:00:00.000Z"),
+        category: null,
+        installmentNumber: 1,
+        installmentsTotal: 1,
+        card,
+      },
+    ]);
+
+    const allowance = await loadCycleAllowance(
+      new Date("2026-03-05T15:00:00.000Z"),
+    );
+
+    // Obrigações do mês calendário (março): fatura de R$ 2.200,00.
+    expect(allowance.freeBudgetCents).toBe(760000);
+    expect(allowance.dailyCents).toBeGreaterThan(0);
+  });
+
+  it("mantém diária 0 quando o orçamento do ciclo realmente esgota", async () => {
+    prismaMock.appSettings.findUnique.mockResolvedValue({
+      id: "singleton",
+      cycleStartDay: 1,
+    });
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "i", amountCents: 500000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([
+      {
+        id: "p",
+        description: "Fatura",
+        amountCents: 500000,
+        purchaseDate: new Date("2026-02-10T12:00:00.000Z"),
+        category: null,
+        installmentNumber: 1,
+        installmentsTotal: 1,
+        card,
+      },
+    ]);
+
+    const allowance = await loadCycleAllowance(
+      new Date("2026-03-25T15:00:00.000Z"),
+    );
+
+    expect(allowance.freeBudgetCents).toBe(0);
+    expect(allowance.dailyCents).toBe(0);
   });
 });

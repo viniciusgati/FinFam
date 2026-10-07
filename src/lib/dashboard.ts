@@ -144,9 +144,11 @@ export async function loadDashboardData(
  * Agrega os dados do **ciclo financeiro** atual para o card "Pode gastar por
  * dia" (história #225).
  *
- * - Renda e obrigações seguem o mês de início do ciclo (`cycleKey`): rendas e
- *   saídas fixas ativas (`isActiveInMonth`) + parcelas de fatura com competência
- *   no `cycleKey`.
+ * - Renda e obrigações seguem o **mês calendário corrente** (`monthKey(now)`),
+ *   o mesmo mês usado pelo percentual consumido do dashboard (invariante #231:
+ *   mês com percentual < 100% ⇒ diária > R$ 0,00). Antes seguiam o mês de
+ *   início do ciclo (`cycleKey`), o que desalinhava as obrigações de cartão em
+ *   `cycleStartDay ≠ 1` e zerava a diária mesmo com orçamento livre.
  * - Gastos avulsos contam por `date` dentro de `[início do ciclo, hoje]`, apenas
  *   nas formas de pagamento do orçamento (mesma regra de `loadDashboardData`).
  */
@@ -156,7 +158,7 @@ export async function loadCycleAllowance(
   const timeZone = resolveTimeZone();
   const { cycleStartDay } = await getSettings();
   const window = cycleWindow(now, cycleStartDay, timeZone);
-  const cycleKey = window.cycleKey;
+  const currentMonthKey = monthKey(now);
 
   // Limite superior dos gastos avulsos: fim de hoje, sem ultrapassar o ciclo.
   const today = zonedDateParts(now, timeZone);
@@ -181,12 +183,12 @@ export async function loadCycleAllowance(
     ]);
 
   const incomeCents = sumByAmount(
-    incomes.filter((item) => isActiveInMonth(item, cycleKey)),
+    incomes.filter((item) => isActiveInMonth(item, currentMonthKey)),
   );
   const fixedCents = sumByAmount(
-    fixedExpenses.filter((item) => isActiveInMonth(item, cycleKey)),
+    fixedExpenses.filter((item) => isActiveInMonth(item, currentMonthKey)),
   );
-  const cardCents = sumCardExpensesForMonth(cardPurchases, cycleKey);
+  const cardCents = sumCardExpensesForMonth(cardPurchases, currentMonthKey);
   const variableSpentCents = sumByAmount(variableExpenses);
 
   return dailyAllowanceCents({
