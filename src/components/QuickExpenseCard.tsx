@@ -71,7 +71,7 @@ export default function QuickExpenseCard() {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+    <section className="h-full rounded-2xl border border-border bg-surface p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">
         Lançamento rápido
       </h2>
@@ -80,7 +80,7 @@ export default function QuickExpenseCard() {
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
             <input

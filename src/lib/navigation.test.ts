@@ -23,10 +23,25 @@ describe("NAV_ITEMS", () => {
     ]);
   });
 
+  it("define um ícone para cada rota, sem repetições", () => {
+    const icons = NAV_ITEMS.map((item) => item.icon);
+    expect(icons).toEqual([
+      "dashboard",
+      "entradas",
+      "saidas",
+      "gastos",
+      "cartoes",
+      "historico",
+      "configuracoes",
+    ]);
+    expect(new Set(icons).size).toBe(NAV_ITEMS.length);
+  });
+
   it("inclui a rota de configurações", () => {
     expect(NAV_ITEMS).toContainEqual({
       href: "/configuracoes",
       label: "Configurações",
+      icon: "configuracoes",
     });
     expect(isActivePath("/configuracoes", "/configuracoes")).toBe(true);
   });
