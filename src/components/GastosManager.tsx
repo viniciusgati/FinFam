@@ -321,21 +321,21 @@ export default function GastosManager({
   return (
     <section className="mx-auto max-w-3xl space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-slate-900">Gastos avulsos</h1>
-        <p className="text-slate-600">
+        <h1 className="text-2xl font-bold text-foreground">Gastos avulsos</h1>
+        <p className="text-foreground-muted">
           Lance um gasto em poucos segundos e veja o total do mês.
         </p>
       </header>
 
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+        <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
           Mês
           <select
             value={mes}
             onChange={(event) => handleMonthChange(event.target.value)}
             disabled={isPending}
             aria-busy={isPending}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
+            className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
           >
             {monthOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -348,7 +348,7 @@ export default function GastosManager({
           role="status"
           aria-live="polite"
           aria-busy={isPending}
-          className="pb-2 text-sm text-slate-600"
+          className="pb-2 text-sm text-foreground-muted"
         >
           {isPending ? "Carregando…" : ""}
         </span>
@@ -356,14 +356,14 @@ export default function GastosManager({
 
       <div aria-live="assertive" role="alert" className="min-h-5">
         {feedback?.type === "error" ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+          <p className="rounded-lg bg-red-950 px-3 py-2 text-sm font-medium text-red-200">
             {feedback.message}
           </p>
         ) : null}
       </div>
       <div aria-live="polite" role="status" className="min-h-5">
         {feedback?.type === "success" ? (
-          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+          <p className="rounded-lg bg-emerald-950 px-3 py-2 text-sm font-medium text-emerald-200">
             {feedback.message}
           </p>
         ) : null}
@@ -372,10 +372,10 @@ export default function GastosManager({
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4"
+        className="space-y-4 rounded-2xl border border-border bg-surface p-4"
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 sm:col-span-2">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted sm:col-span-2">
             Descrição
             <input
               type="text"
@@ -383,17 +383,17 @@ export default function GastosManager({
               onChange={(event) => updateField("description", event.target.value)}
               aria-invalid={Boolean(errors.description)}
               aria-describedby={errors.description ? "erro-description" : undefined}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
               placeholder="Ex.: Mercado do mês"
             />
             {errors.description ? (
-              <span id="erro-description" className="text-xs font-normal text-red-600">
+              <span id="erro-description" className="text-xs font-normal text-red-400">
                 {errors.description}
               </span>
             ) : null}
           </label>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Valor (R$)
             <input
               type="text"
@@ -402,17 +402,17 @@ export default function GastosManager({
               onChange={(event) => updateField("amount", event.target.value)}
               aria-invalid={Boolean(errors.amount)}
               aria-describedby={errors.amount ? "erro-amount" : undefined}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
               placeholder="12,34"
             />
             {errors.amount ? (
-              <span id="erro-amount" className="text-xs font-normal text-red-600">
+              <span id="erro-amount" className="text-xs font-normal text-red-400">
                 {errors.amount}
               </span>
             ) : null}
           </label>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
             <input
               type="date"
@@ -420,34 +420,34 @@ export default function GastosManager({
               onChange={(event) => updateField("date", event.target.value)}
               aria-invalid={Boolean(errors.date)}
               aria-describedby={errors.date ? "erro-date" : undefined}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
             />
             {errors.date ? (
-              <span id="erro-date" className="text-xs font-normal text-red-600">
+              <span id="erro-date" className="text-xs font-normal text-red-400">
                 {errors.date}
               </span>
             ) : null}
           </label>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Categoria (opcional)
             <input
               type="text"
               value={form.category}
               onChange={(event) => updateField("category", event.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
               placeholder="Ex.: Alimentação"
             />
           </label>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Forma de pagamento
             <select
               value={form.paymentMethod}
               onChange={(event) =>
                 updateField("paymentMethod", event.target.value as PaymentMethod)
               }
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
             >
               {(Object.keys(PAYMENT_LABELS) as PaymentMethod[]).map((method) => (
                 <option key={method} value={method}>
@@ -457,12 +457,12 @@ export default function GastosManager({
             </select>
           </label>
 
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground-muted">
             <input
               type="checkbox"
               checked={form.paid}
               onChange={(event) => updateField("paid", event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              className="h-4 w-4 rounded border-border-strong text-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
             />
             Pago
           </label>
@@ -482,34 +482,34 @@ export default function GastosManager({
               type="button"
               onClick={handleCancelEdit}
               disabled={submitting}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
+              className="rounded-lg border border-border-strong px-4 py-2 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
             >
               Cancelar
             </button>
           ) : null}
           {editing ? (
-            <span className="text-sm text-slate-500">Editando um gasto…</span>
+            <span className="text-sm text-subtle">Editando um gasto…</span>
           ) : null}
         </div>
       </form>
 
-      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-900">Gastos do mês</h2>
-          <p className="text-sm text-slate-700">
+          <h2 className="text-lg font-semibold text-foreground">Gastos do mês</h2>
+          <p className="text-sm text-foreground-muted">
             Total do mês:{" "}
-            <strong className="text-base font-bold tabular-nums text-slate-900">
+            <strong className="text-base font-bold tabular-nums text-foreground">
               {formatBRL(totalCents)}
             </strong>
           </p>
         </div>
 
         {expenses.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-slate-600">
+          <p className="rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-center text-foreground-muted">
             {`Nenhum gasto em ${monthOptions.find((option) => option.value === mes)?.label ?? mes}. Lance o primeiro.`}
           </p>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-border">
             {expenses.map((expense) => {
               const onCredit = expense.paymentMethod === "CREDIT";
               const busy = deletingId === expense.id;
@@ -519,15 +519,15 @@ export default function GastosManager({
                   className="flex flex-wrap items-center justify-between gap-3 py-3"
                 >
                   <div className="min-w-0 space-y-1">
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-foreground">
                       {expense.description}
                       {onCredit ? (
-                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                        <span className="ml-2 rounded-full bg-amber-950 px-2 py-0.5 text-xs font-medium text-amber-200">
                           Cartão — não conta no orçamento
                         </span>
                       ) : null}
                     </p>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-foreground-muted">
                       {formatDate(expense.date)} ·{" "}
                       {PAYMENT_LABELS[expense.paymentMethod]}
                       {expense.category ? ` · ${expense.category}` : ""} ·{" "}
@@ -535,14 +535,14 @@ export default function GastosManager({
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="tabular-nums font-semibold text-slate-900">
+                    <span className="tabular-nums font-semibold text-foreground">
                       {formatBRL(expense.amountCents)}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleEdit(expense)}
                       disabled={busy || submitting}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
+                      className="rounded-lg border border-border-strong bg-surface-raised px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
                     >
                       Editar
                     </button>
@@ -551,7 +551,7 @@ export default function GastosManager({
                       onClick={() => handleDelete(expense)}
                       disabled={busy || submitting}
                       aria-busy={busy}
-                      className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:opacity-60"
+                      className="rounded-lg border border-red-800 px-3 py-1.5 text-sm font-medium text-red-300 transition hover:bg-red-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 disabled:opacity-60"
                     >
                       {busy ? "Excluindo..." : "Excluir"}
                     </button>

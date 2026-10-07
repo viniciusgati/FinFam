@@ -12,7 +12,7 @@ interface MonthSelectorProps {
 }
 
 const buttonClass =
-  "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white";
+  "rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm font-medium text-foreground-muted transition hover:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface-raised";
 
 export default function MonthSelector({
   monthKey,
@@ -46,7 +46,7 @@ export default function MonthSelector({
 
       <p
         aria-live="polite"
-        className="min-w-[10rem] text-center text-lg font-semibold text-slate-900"
+        className="min-w-[10rem] text-center text-lg font-semibold text-foreground"
       >
         {monthLabel(monthKey)}
       </p>
@@ -57,7 +57,7 @@ export default function MonthSelector({
         disabled={isPending}
         onChange={(event) => navigate(event.target.value)}
         aria-label="Selecionar mês"
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm font-medium text-foreground-muted transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
       />
 
       <button

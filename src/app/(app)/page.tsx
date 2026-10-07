@@ -114,10 +114,10 @@ export default async function DashboardPage({
           className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center"
         >
           <header className="space-y-1">
-            <p className="text-sm font-medium uppercase tracking-widest text-slate-500">
+            <p className="text-sm font-medium uppercase tracking-widest text-subtle">
               FinFam
             </p>
-            <h1 className="text-3xl font-bold text-slate-900">
+            <h1 className="text-3xl font-bold text-foreground">
               Não foi possível carregar seus dados. Tente novamente.
             </h1>
           </header>
@@ -127,15 +127,15 @@ export default async function DashboardPage({
       )}
 
       {view.state === "empty" && (
-        <section className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+        <section className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl border border-dashed border-border-strong bg-surface p-8 text-center">
           <header className="space-y-1">
-            <p className="text-sm font-medium uppercase tracking-widest text-slate-500">
+            <p className="text-sm font-medium uppercase tracking-widest text-subtle">
               FinFam
             </p>
-            <h1 className="text-3xl font-bold text-slate-900">Sem dados ainda</h1>
+            <h1 className="text-3xl font-bold text-foreground">Sem dados ainda</h1>
           </header>
 
-          <p className="text-lg text-slate-600">
+          <p className="text-lg text-foreground-muted">
             Cadastre suas entradas fixas para ver o percentual de renda consumida.
           </p>
 
@@ -195,14 +195,14 @@ export default async function DashboardPage({
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
               <IncomeVsExpenseChart
                 entriesCents={series.entriesCents}
                 expensesCents={series.totalExpensesCents}
               />
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
               <DailySpendChart
                 dailyExpensesCents={series.dailyExpensesCents}
                 cumulativeExpensesCents={series.cumulativeExpensesCents}
@@ -212,8 +212,8 @@ export default async function DashboardPage({
             </section>
           </div>
 
-          <section className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
+          <section className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">
               Avaliação do dia
             </h2>
             <DayRatingBadge

@@ -9,12 +9,12 @@ interface DayRatingBadgeProps {
 }
 
 const LEVEL_CLASSES: Record<FinanceLevel, string> = {
-  neutral: "border-slate-300 bg-slate-100 text-slate-700",
-  green: "border-emerald-300 bg-emerald-100 text-emerald-800",
-  lime: "border-lime-300 bg-lime-100 text-lime-800",
-  yellow: "border-amber-300 bg-amber-100 text-amber-800",
-  orange: "border-orange-300 bg-orange-100 text-orange-800",
-  red: "border-red-300 bg-red-100 text-red-800",
+  neutral: "border-border-strong bg-surface-strong text-foreground",
+  green: "border-emerald-700 bg-emerald-950 text-emerald-200",
+  lime: "border-lime-700 bg-lime-950 text-lime-200",
+  yellow: "border-amber-700 bg-amber-950 text-amber-200",
+  orange: "border-orange-700 bg-orange-950 text-orange-200",
+  red: "border-red-700 bg-red-950 text-red-200",
 };
 
 /**

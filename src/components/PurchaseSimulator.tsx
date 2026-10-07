@@ -29,9 +29,9 @@ interface SimulatorResponse {
 }
 
 const VERDICT_CLASSES: Record<PurchaseVerdict, string> = {
-  ok: "border-emerald-300 bg-emerald-50 text-emerald-800",
-  cuidado: "border-amber-300 bg-amber-50 text-amber-800",
-  nao: "border-red-300 bg-red-50 text-red-800",
+  ok: "border-emerald-700 bg-emerald-950 text-emerald-200",
+  cuidado: "border-amber-700 bg-amber-950 text-amber-200",
+  nao: "border-red-700 bg-red-950 text-red-200",
 };
 
 export default function PurchaseSimulator({
@@ -106,14 +106,12 @@ export default function PurchaseSimulator({
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">
-        Posso comprar?
-      </h2>
+    <section className="space-y-3 rounded-2xl border border-border bg-surface p-6 text-left shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">Posso comprar?</h2>
 
       <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3" noValidate>
         <label className="flex-1 space-y-1">
-          <span className="text-sm font-medium text-slate-700">
+          <span className="text-sm font-medium text-foreground-muted">
             Valor da compra (R$)
           </span>
           <input
@@ -124,8 +122,8 @@ export default function PurchaseSimulator({
             onChange={(event) => setValue(event.target.value)}
             aria-label="Valor da compra em reais"
             aria-invalid={showValidation}
-            className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 ${
-              showValidation ? "border-red-500" : "border-slate-300"
+            className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 ${
+              showValidation ? "border-red-500" : "border-border-strong"
             }`}
           />
         </label>
@@ -140,17 +138,21 @@ export default function PurchaseSimulator({
       </form>
 
       {showValidation && (
-        <p className="text-sm text-red-600">Informe um valor maior que zero</p>
+        <p className="text-sm text-red-400">Informe um valor maior que zero</p>
       )}
 
       {status === "loading" && (
-        <p role="status" aria-live="polite" className="text-sm text-slate-600">
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-sm text-foreground-muted"
+        >
           Analisando sua compra…
         </p>
       )}
 
       {status === "done" && failed && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-red-300">
           Não foi possível simular agora. Tente novamente.
         </p>
       )}

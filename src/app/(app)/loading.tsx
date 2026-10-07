@@ -4,14 +4,14 @@ export default function Loading() {
       <div
         role="status"
         aria-live="polite"
-        className="text-sm font-medium text-slate-600"
+        className="text-sm font-medium text-foreground-muted"
       >
         Carregando…
       </div>
-      <div className="h-8 w-48 animate-pulse rounded bg-slate-200" />
-      <div className="h-48 w-full animate-pulse rounded-2xl bg-slate-200" />
-      <div className="h-6 w-2/3 animate-pulse rounded bg-slate-200" />
-      <div className="h-6 w-1/2 animate-pulse rounded bg-slate-200" />
+      <div className="h-8 w-48 animate-pulse rounded bg-surface-strong" />
+      <div className="h-48 w-full animate-pulse rounded-2xl bg-surface-strong" />
+      <div className="h-6 w-2/3 animate-pulse rounded bg-surface-strong" />
+      <div className="h-6 w-1/2 animate-pulse rounded bg-surface-strong" />
     </div>
   );
 }

@@ -10,9 +10,9 @@ export default function PlaceholderPage({
   message,
 }: PlaceholderPageProps) {
   return (
-    <section className="mx-auto flex max-w-xl flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-      <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-      <p className="text-slate-600">
+    <section className="mx-auto flex max-w-xl flex-col items-center gap-4 rounded-2xl border border-dashed border-border-strong bg-surface p-8 text-center">
+      <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+      <p className="text-foreground-muted">
         {message ??
           "O cadastro desta seção chega em breve. Estamos preparando tudo para você."}
       </p>
