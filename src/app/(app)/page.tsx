@@ -24,6 +24,7 @@ import DailySpendChart from "@/components/DailySpendChart";
 import IncomeVsExpenseChart from "@/components/IncomeVsExpenseChart";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
 import PurchaseSimulator from "@/components/PurchaseSimulator";
+import QuickExpenseCard from "@/components/QuickExpenseCard";
 
 export const dynamic = "force-dynamic";
 
@@ -181,6 +182,8 @@ export default async function DashboardPage({
               {view.feedback}
             </p>
           </section>
+
+          {isCalendarMonth && <QuickExpenseCard />}
 
           <div className="grid gap-4 md:grid-cols-2">
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
