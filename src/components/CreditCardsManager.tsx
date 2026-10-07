@@ -712,11 +712,11 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
         </p>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-900">
+      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-foreground">
           Definir total da fatura
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-foreground-muted">
           Informe o total que a fatura deve ter em {referenceLabel}. A diferença
           para o total já lançado vira um lançamento genérico de ajuste.
         </p>
@@ -728,7 +728,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
         >
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">Cartão</span>
+              <span className="text-sm font-medium text-foreground-muted">Cartão</span>
               <select
                 value={adjustmentCardId}
                 onChange={(event) => {
@@ -738,7 +738,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                   setAdjustmentMessage(null);
                 }}
                 disabled={loading || savingAdjustment}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50"
+                className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong"
               >
                 <option value="">Selecione um cartão</option>
                 {activeCards.map((card) => (
@@ -750,16 +750,16 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Total atual da fatura
               </span>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900">
+              <div className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground">
                 {adjustmentCardId ? formatCents(currentTotalCents) : "—"}
               </div>
             </label>
 
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground-muted">
                 Total-alvo (R$)
               </span>
               <input
@@ -774,12 +774,12 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                   setAdjustmentMessage(null);
                 }}
                 disabled={loading || savingAdjustment}
-                className={`w-full rounded-lg border px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 ${
-                  adjustmentFieldError ? "border-red-500" : "border-slate-300"
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  adjustmentFieldError ? "border-red-500" : "border-border-strong"
                 }`}
               />
               {adjustmentFieldError && (
-                <span className="text-sm text-red-600">
+                <span className="text-sm text-red-400">
                   {adjustmentFieldError}
                 </span>
               )}
@@ -799,7 +799,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
           {adjustmentMessage && (
             <p
               role="status"
-              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+              className="rounded-lg border border-emerald-800 bg-emerald-950 px-4 py-3 text-sm font-medium text-emerald-200"
             >
               {adjustmentMessage.text}
             </p>
@@ -808,7 +808,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
           {adjustmentError && (
             <p
               role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+              className="rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200"
             >
               {adjustmentError}
             </p>
