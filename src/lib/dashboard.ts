@@ -3,9 +3,15 @@ import {
   buildDailySeries,
   type DailySeries,
 } from "./dashboard-series";
+import {
+  cycleWindow,
+  dailyAllowanceCents,
+  type DailyAllowance,
+} from "./cycle";
 import type { FinanceInput } from "./finance";
 import { isActiveInMonth, monthKey, shiftMonthKey } from "./finance";
 import { allocateInstallments, sumCardExpensesForMonth } from "./invoices";
+import { getSettings } from "./settings";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
 
@@ -132,4 +138,63 @@ export async function loadDashboardData(
     series,
     referenceDate,
   };
+}
+
+/**
+ * Agrega os dados do **ciclo financeiro** atual para o card "Pode gastar por
+ * dia" (história #225).
+ *
+ * - Renda e obrigações seguem o mês de início do ciclo (`cycleKey`): rendas e
+ *   saídas fixas ativas (`isActiveInMonth`) + parcelas de fatura com competência
+ *   no `cycleKey`.
+ * - Gastos avulsos contam por `date` dentro de `[início do ciclo, hoje]`, apenas
+ *   nas formas de pagamento do orçamento (mesma regra de `loadDashboardData`).
+ */
+export async function loadCycleAllowance(
+  now: Date = new Date(),
+): Promise<DailyAllowance> {
+  const timeZone = resolveTimeZone();
+  const { cycleStartDay } = await getSettings();
+  const window = cycleWindow(now, cycleStartDay, timeZone);
+  const cycleKey = window.cycleKey;
+
+  // Limite superior dos gastos avulsos: fim de hoje, sem ultrapassar o ciclo.
+  const today = zonedDateParts(now, timeZone);
+  const tomorrow = zonedTimeToUtc(today.year, today.month, today.day + 1, timeZone);
+  const upperBound =
+    tomorrow.getTime() < window.nextStart.getTime() ? tomorrow : window.nextStart;
+
+  const [incomes, fixedExpenses, variableExpenses, cardPurchases] =
+    await Promise.all([
+      prisma.income.findMany({ where: { active: true } }),
+      prisma.fixedExpense.findMany({ where: { active: true } }),
+      prisma.variableExpense.findMany({
+        where: {
+          date: { gte: window.start, lt: upperBound },
+          paymentMethod: { in: budgetPaymentMethods },
+        },
+      }),
+      prisma.cardPurchase.findMany({
+        where: { purchaseDate: { lt: window.nextStart } },
+        include: { card: true },
+      }),
+    ]);
+
+  const incomeCents = sumByAmount(
+    incomes.filter((item) => isActiveInMonth(item, cycleKey)),
+  );
+  const fixedCents = sumByAmount(
+    fixedExpenses.filter((item) => isActiveInMonth(item, cycleKey)),
+  );
+  const cardCents = sumCardExpensesForMonth(cardPurchases, cycleKey);
+  const variableSpentCents = sumByAmount(variableExpenses);
+
+  return dailyAllowanceCents({
+    incomeCents,
+    obligationsCents: fixedCents + cardCents,
+    variableSpentCents,
+    cycleStartDay,
+    now,
+    timeZone,
+  });
 }

@@ -147,6 +147,20 @@ export const cardPurchaseCreateSchema =
 export const cardPurchaseUpdateSchema =
   cardPurchaseFields.partial().superRefine(refineInstallments);
 
+const CYCLE_START_DAY_MESSAGE = "Dia do ciclo deve ser entre 1 e 28";
+
+/** Configuração global: dia do mês em que começa o ciclo financeiro (1–28). */
+export const settingsUpdateSchema = z.object({
+  cycleStartDay: z
+    .number({
+      invalid_type_error: CYCLE_START_DAY_MESSAGE,
+      required_error: CYCLE_START_DAY_MESSAGE,
+    })
+    .int(CYCLE_START_DAY_MESSAGE)
+    .min(1, CYCLE_START_DAY_MESSAGE)
+    .max(28, CYCLE_START_DAY_MESSAGE),
+});
+
 export type IncomeCreateInput = z.infer<typeof incomeCreateSchema>;
 export type IncomeUpdateInput = z.infer<typeof incomeUpdateSchema>;
 export type FixedExpenseCreateInput = z.infer<typeof fixedExpenseCreateSchema>;
@@ -155,6 +169,7 @@ export type CreditCardCreateInput = z.infer<typeof creditCardCreateSchema>;
 export type CreditCardUpdateInput = z.infer<typeof creditCardUpdateSchema>;
 export type CardPurchaseCreateInput = z.infer<typeof cardPurchaseCreateSchema>;
 export type CardPurchaseUpdateInput = z.infer<typeof cardPurchaseUpdateSchema>;
+export type SettingsUpdateInput = z.infer<typeof settingsUpdateSchema>;
 
 /** Primeira mensagem de erro do zod, usada nas respostas `{ error }`. */
 export function firstErrorMessage(error: z.ZodError): string {
