@@ -10,6 +10,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/gastos", label: "Gastos" },
   { href: "/cartoes", label: "Cartões" },
   { href: "/historico", label: "Histórico" },
+  { href: "/configuracoes", label: "Configurações" },
 ];
 
 /**

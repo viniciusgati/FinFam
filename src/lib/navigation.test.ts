@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isActivePath, NAV_ITEMS } from "./navigation";
 
 describe("NAV_ITEMS", () => {
-  it("lista exatamente as 6 rotas na ordem esperada", () => {
+  it("lista exatamente as 7 rotas na ordem esperada", () => {
     expect(NAV_ITEMS.map((item) => item.href)).toEqual([
       "/",
       "/entradas",
@@ -10,6 +10,7 @@ describe("NAV_ITEMS", () => {
       "/gastos",
       "/cartoes",
       "/historico",
+      "/configuracoes",
     ]);
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
       "Dashboard",
@@ -18,7 +19,16 @@ describe("NAV_ITEMS", () => {
       "Gastos",
       "Cartões",
       "Histórico",
+      "Configurações",
     ]);
+  });
+
+  it("inclui a rota de configurações", () => {
+    expect(NAV_ITEMS).toContainEqual({
+      href: "/configuracoes",
+      label: "Configurações",
+    });
+    expect(isActivePath("/configuracoes", "/configuracoes")).toBe(true);
   });
 });
 
