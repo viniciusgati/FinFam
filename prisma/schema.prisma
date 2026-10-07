@@ -118,6 +118,18 @@ model MonthlySnapshot {
   @@map("monthly_snapshots")
 }
 
+/// Configuração global da família. Linha singleton (id fixo "singleton");
+/// `cycleStartDay` é o dia do mês que marca o início do ciclo financeiro
+/// (default 1 = mês calendário).
+model AppSettings {
+  id            String   @id @default("singleton")
+  cycleStartDay Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
 /// Avaliação de um mês fechado gerada por IA, cacheada por `monthKey` para não
 /// repetir a chamada à DeepSeek. `summary` é o texto exibido no dashboard.
 model MonthlyReview {

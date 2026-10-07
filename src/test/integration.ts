@@ -55,6 +55,7 @@ export function getTestPrisma(): PrismaClient {
  * PostgreSQL cobre as FKs restantes.
  */
 const TABLES = [
+  "app_settings",
   "card_purchases",
   "variable_expenses",
   "monthly_snapshots",

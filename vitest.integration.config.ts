@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 // Configuração das suítes de integração: mesmo ambiente/alias do
 // `vitest.config.ts`, porém coletando apenas `*.integration.test.ts`.
 export default defineConfig({
+  // Componentes JSX usam o runtime automático do React (igual ao Next.js).
+  esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
     include: ["src/**/*.integration.test.ts"],

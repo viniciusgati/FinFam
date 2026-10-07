@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { loadDashboardData } from "@/lib/dashboard";
+import { loadCycleAllowance, loadDashboardData } from "@/lib/dashboard";
+import { dailyAllowanceCard, type DailyAllowance } from "@/lib/cycle";
 import {
   computeFinanceStatus,
   dashboardView,
@@ -25,6 +26,7 @@ import IncomeVsExpenseChart from "@/components/IncomeVsExpenseChart";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
 import PurchaseSimulator from "@/components/PurchaseSimulator";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
+import DailyAllowanceCard from "@/components/DailyAllowanceCard";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,7 @@ export default async function DashboardPage({
   let series: DailySeries | null = null;
   let previousMonthsCents: number[] = [];
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
+  let allowance: DailyAllowance | null = null;
 
   try {
     const data = await loadDashboardData(referenceDate);
@@ -73,6 +76,11 @@ export default async function DashboardPage({
       projectedPercent: status.projectedPercent,
       previousPercents: data.previousPercents,
     });
+
+    // O card de diária segue o ciclo real; só faz sentido no mês corrente.
+    if (isCalendarMonth) {
+      allowance = await loadCycleAllowance();
+    }
   } catch {
     view = dashboardView({
       dbError: true,
@@ -184,6 +192,10 @@ export default async function DashboardPage({
           </section>
 
           {isCalendarMonth && <QuickExpenseCard />}
+
+          {allowance !== null && (
+            <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
