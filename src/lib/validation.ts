@@ -147,6 +147,16 @@ export const cardPurchaseCreateSchema =
 export const cardPurchaseUpdateSchema =
   cardPurchaseFields.partial().superRefine(refineInstallments);
 
+/**
+ * Payload de "definir total da fatura" (história #231): cartão, mês de
+ * competência (`YYYY-MM`) e total-alvo em centavos (inteiro positivo).
+ */
+export const invoiceSetTotalSchema = z.object({
+  cardId: z.string().trim().min(1, "Selecione um cartão"),
+  monthKey: z.string().regex(MONTH_REGEX, MONTH_MESSAGE),
+  totalCents: amountCentsSchema,
+});
+
 const CYCLE_START_DAY_MESSAGE = "Dia do ciclo deve ser entre 1 e 28";
 
 /** Configuração global: dia do mês em que começa o ciclo financeiro (1–28). */
@@ -169,6 +179,7 @@ export type CreditCardCreateInput = z.infer<typeof creditCardCreateSchema>;
 export type CreditCardUpdateInput = z.infer<typeof creditCardUpdateSchema>;
 export type CardPurchaseCreateInput = z.infer<typeof cardPurchaseCreateSchema>;
 export type CardPurchaseUpdateInput = z.infer<typeof cardPurchaseUpdateSchema>;
+export type InvoiceSetTotalInput = z.infer<typeof invoiceSetTotalSchema>;
 export type SettingsUpdateInput = z.infer<typeof settingsUpdateSchema>;
 
 /** Primeira mensagem de erro do zod, usada nas respostas `{ error }`. */

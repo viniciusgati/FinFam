@@ -4,6 +4,7 @@ import {
   cardPurchaseUpdateSchema,
   creditCardCreateSchema,
   creditCardUpdateSchema,
+  invoiceSetTotalSchema,
 } from "./validation";
 
 const validCard = {
@@ -131,6 +132,30 @@ describe("cardPurchaseUpdateSchema", () => {
         installmentNumber: 5,
         installmentsTotal: 2,
       }).success,
+    ).toBe(false);
+  });
+});
+
+describe("invoiceSetTotalSchema", () => {
+  const validInput = { cardId: "card-1", monthKey: "2026-03", totalCents: 75000 };
+
+  it("aceita payload válido", () => {
+    expect(invoiceSetTotalSchema.safeParse(validInput).success).toBe(true);
+  });
+
+  it("rejeita cardId vazio, monthKey inválido e totalCents <= 0", () => {
+    expect(
+      invoiceSetTotalSchema.safeParse({ ...validInput, cardId: "  " }).success,
+    ).toBe(false);
+    expect(
+      invoiceSetTotalSchema.safeParse({ ...validInput, monthKey: "2026-13" })
+        .success,
+    ).toBe(false);
+    expect(
+      invoiceSetTotalSchema.safeParse({ ...validInput, totalCents: 0 }).success,
+    ).toBe(false);
+    expect(
+      invoiceSetTotalSchema.safeParse({ ...validInput, totalCents: 1.5 }).success,
     ).toBe(false);
   });
 });

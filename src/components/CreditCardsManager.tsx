@@ -137,6 +137,18 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [savingPurchase, setSavingPurchase] = useState(false);
 
+  const [adjustmentCardId, setAdjustmentCardId] = useState("");
+  const [adjustmentTarget, setAdjustmentTarget] = useState("");
+  const [savingAdjustment, setSavingAdjustment] = useState(false);
+  const [adjustmentFieldError, setAdjustmentFieldError] = useState<string | null>(
+    null,
+  );
+  const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
+  const [adjustmentMessage, setAdjustmentMessage] = useState<{
+    type: "success" | "info";
+    text: string;
+  } | null>(null);
+
   const cardFormRef = useRef<HTMLFormElement>(null);
   const cardNameInputRef = useRef<HTMLInputElement>(null);
   const purchaseFormRef = useRef<HTMLFormElement>(null);
@@ -178,6 +190,23 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
   }, [purchases, cardsById, referenceMonth]);
 
   const referenceLabel = monthLabel(referenceMonth);
+
+  const activeCards = useMemo(
+    () => cards.filter((card) => card.active),
+    [cards],
+  );
+
+  const cardInvoiceTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const line of invoice.lines) {
+      totals.set(line.cardId, (totals.get(line.cardId) ?? 0) + line.amountCents);
+    }
+    return totals;
+  }, [invoice]);
+
+  const currentTotalCents = adjustmentCardId
+    ? (cardInvoiceTotals.get(adjustmentCardId) ?? 0)
+    : 0;
 
   function showSuccess(message: string) {
     setSuccess(message);
@@ -534,6 +563,71 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
     }
   }
 
+  async function handleInvoiceAdjustment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const targetCents = parseAmountToCents(adjustmentTarget);
+    if (targetCents === null) {
+      setAdjustmentFieldError("Informe um valor maior que zero");
+      setAdjustmentError(null);
+      setAdjustmentMessage(null);
+      return;
+    }
+
+    setAdjustmentFieldError(null);
+    setAdjustmentError(null);
+    setAdjustmentMessage(null);
+    setSavingAdjustment(true);
+
+    try {
+      const response = await fetch("/api/card-invoices/set-total", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cardId: adjustmentCardId,
+          monthKey: referenceMonth,
+          totalCents: targetCents,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as
+        | (CardPurchaseData & { error?: string })
+        | { created?: boolean; currentCents?: number; error?: string };
+
+      if (!response.ok) {
+        setAdjustmentError(
+          "error" in data && data.error
+            ? data.error
+            : "Não foi possível ajustar a fatura. Tente novamente.",
+        );
+        return;
+      }
+
+      if (response.status === 201) {
+        const purchase = data as CardPurchaseData;
+        setAdjustmentMessage({
+          type: "success",
+          text: `Ajuste criado: ${formatCents(purchase.amountCents)}. Fatura agora soma ${formatCents(targetCents)}`,
+        });
+        setAdjustmentTarget("");
+        await reload();
+        return;
+      }
+
+      const currentCents =
+        "currentCents" in data && typeof data.currentCents === "number"
+          ? data.currentCents
+          : targetCents;
+      setAdjustmentMessage({
+        type: "info",
+        text: `A fatura já está no valor informado (${formatCents(currentCents)})`,
+      });
+    } catch {
+      setAdjustmentError("Não foi possível ajustar a fatura. Tente novamente.");
+    } finally {
+      setSavingAdjustment(false);
+    }
+  }
+
   const disabled = savingCard || savingPurchase || busyId !== null || loading;
 
   return (
@@ -616,6 +710,110 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             {formatCents(invoice.totalCents)}
           </span>
         </p>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-foreground">
+          Definir total da fatura
+        </h3>
+        <p className="mt-1 text-sm text-foreground-muted">
+          Informe o total que a fatura deve ter em {referenceLabel}. A diferença
+          para o total já lançado vira um lançamento genérico de ajuste.
+        </p>
+
+        <form
+          onSubmit={handleInvoiceAdjustment}
+          className="mt-4 space-y-4"
+          noValidate
+        >
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-foreground-muted">Cartão</span>
+              <select
+                value={adjustmentCardId}
+                onChange={(event) => {
+                  setAdjustmentCardId(event.target.value);
+                  setAdjustmentFieldError(null);
+                  setAdjustmentError(null);
+                  setAdjustmentMessage(null);
+                }}
+                disabled={loading || savingAdjustment}
+                className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong"
+              >
+                <option value="">Selecione um cartão</option>
+                {activeCards.map((card) => (
+                  <option key={card.id} value={card.id}>
+                    {card.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-foreground-muted">
+                Total atual da fatura
+              </span>
+              <div className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground">
+                {adjustmentCardId ? formatCents(currentTotalCents) : "—"}
+              </div>
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-foreground-muted">
+                Total-alvo (R$)
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="750,00"
+                value={adjustmentTarget}
+                onChange={(event) => {
+                  setAdjustmentTarget(event.target.value);
+                  setAdjustmentFieldError(null);
+                  setAdjustmentError(null);
+                  setAdjustmentMessage(null);
+                }}
+                disabled={loading || savingAdjustment}
+                className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong ${
+                  adjustmentFieldError ? "border-red-500" : "border-border-strong"
+                }`}
+              />
+              {adjustmentFieldError && (
+                <span className="text-sm text-red-400">
+                  {adjustmentFieldError}
+                </span>
+              )}
+            </label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={loading || savingAdjustment || !adjustmentCardId}
+              className="rounded-lg bg-emerald-600 px-5 py-2 font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {savingAdjustment ? "Salvando…" : "Salvar total"}
+            </button>
+          </div>
+
+          {adjustmentMessage && (
+            <p
+              role="status"
+              className="rounded-lg border border-emerald-800 bg-emerald-950 px-4 py-3 text-sm font-medium text-emerald-200"
+            >
+              {adjustmentMessage.text}
+            </p>
+          )}
+
+          {adjustmentError && (
+            <p
+              role="alert"
+              className="rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200"
+            >
+              {adjustmentError}
+            </p>
+          )}
+        </form>
       </section>
 
       {loadError && (
