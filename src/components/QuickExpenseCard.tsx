@@ -16,7 +16,7 @@ const NETWORK_ERROR_MESSAGE =
 type Feedback = "success" | "error" | null;
 
 const FIELD_CLASSES =
-  "rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2";
+  "rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2";
 
 export default function QuickExpenseCard() {
   const router = useRouter();
@@ -71,17 +71,17 @@ export default function QuickExpenseCard() {
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">
+    <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">
         Lançamento rápido
       </h2>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-foreground-muted">
         Registre um gasto em segundos, sem sair do dashboard.
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
         <div className="grid gap-4 sm:grid-cols-3">
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
             <input
               type="date"
@@ -92,13 +92,13 @@ export default function QuickExpenseCard() {
               className={FIELD_CLASSES}
             />
             {errors.date ? (
-              <span id="erro-quick-date" className="text-sm text-red-600">
+              <span id="erro-quick-date" className="text-sm text-red-400">
                 {errors.date}
               </span>
             ) : null}
           </label>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Descrição
             <input
               type="text"
@@ -114,14 +114,14 @@ export default function QuickExpenseCard() {
             {errors.description ? (
               <span
                 id="erro-quick-description"
-                className="text-sm text-red-600"
+                className="text-sm text-red-400"
               >
                 {errors.description}
               </span>
             ) : null}
           </label>
 
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Valor (R$)
             <input
               type="text"
@@ -134,7 +134,7 @@ export default function QuickExpenseCard() {
               className={FIELD_CLASSES}
             />
             {errors.amount ? (
-              <span id="erro-quick-amount" className="text-sm text-red-600">
+              <span id="erro-quick-amount" className="text-sm text-red-400">
                 {errors.amount}
               </span>
             ) : null}
@@ -155,7 +155,7 @@ export default function QuickExpenseCard() {
             role="status"
             aria-live="polite"
             className={`min-h-5 text-sm ${
-              feedback === "error" ? "text-red-600" : "text-emerald-700"
+              feedback === "error" ? "text-red-400" : "text-emerald-300"
             }`}
           >
             {feedback === "success" ? "Gasto criado" : null}

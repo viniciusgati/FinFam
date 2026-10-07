@@ -28,12 +28,12 @@ export default function IncomeVsExpenseChart({
 
   return (
     <figure className="space-y-2">
-      <figcaption className="text-sm font-semibold text-slate-700">
+      <figcaption className="text-sm font-semibold text-foreground-muted">
         Entradas vs Saídas
       </figcaption>
 
       {empty ? (
-        <p className="text-sm text-slate-500">Sem gastos neste mês</p>
+        <p className="text-sm text-subtle">Sem gastos neste mês</p>
       ) : (
         <div
           role="img"
@@ -44,13 +44,13 @@ export default function IncomeVsExpenseChart({
             const width = max > 0 ? (row.value / max) * 100 : 0;
             return (
               <div key={row.key} className="space-y-1">
-                <div className="flex items-center justify-between text-sm text-slate-600">
+                <div className="flex items-center justify-between text-sm text-foreground-muted">
                   <span>{row.label}</span>
-                  <span className="font-semibold tabular-nums text-slate-900">
+                  <span className="font-semibold tabular-nums text-foreground">
                     {formatCents(row.value)}
                   </span>
                 </div>
-                <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-3 w-full overflow-hidden rounded-full bg-surface-strong">
                   <div
                     className={`h-full rounded-full ${row.bar}`}
                     style={{ width: `${width}%` }}

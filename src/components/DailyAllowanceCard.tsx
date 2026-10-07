@@ -13,15 +13,17 @@ export default function DailyAllowanceCard({ card }: DailyAllowanceCardProps) {
   return (
     <section
       aria-label={card.ariaLabel}
-      className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm"
+      className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm"
     >
-      <h2 className="text-sm font-medium uppercase tracking-widest text-slate-500">
+      <h2 className="text-sm font-medium uppercase tracking-widest text-subtle">
         Pode gastar por dia
       </h2>
-      <p className="text-4xl font-black tabular-nums text-slate-900">
+      <p className="text-4xl font-black tabular-nums text-foreground">
         {card.label}
       </p>
-      {card.detail && <p className="text-lg text-slate-600">{card.detail}</p>}
+      {card.detail && (
+        <p className="text-lg text-foreground-muted">{card.detail}</p>
+      )}
     </section>
   );
 }

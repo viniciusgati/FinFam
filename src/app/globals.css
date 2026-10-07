@@ -1,5 +1,40 @@
 @import "tailwindcss";
 
+/*
+ * Tema dark fixo do FinFam (sem seletor/toggle). A paleta é exposta como
+ * tokens do Tailwind v4 (`--color-*`) para gerar utilitários semânticos como
+ * `bg-surface`, `text-foreground` e `border-border`. O verde esmeralda segue
+ * como cor de destaque; as cores semânticas de status são mantidas nos
+ * componentes com variantes escuras.
+ */
+@theme {
+  /* Superfícies */
+  --color-canvas: #020617;
+  --color-surface: #0f172a;
+  --color-surface-raised: #1e293b;
+  --color-surface-strong: #334155;
+
+  /* Bordas */
+  --color-border: #1e293b;
+  --color-border-strong: #334155;
+
+  /* Textos */
+  --color-foreground: #f1f5f9;
+  --color-foreground-muted: #cbd5e1;
+  --color-subtle: #94a3b8;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+/* O anel de foco tem offset na cor do canvas para não abrir um halo claro. */
+*,
+::before,
+::after {
+  --tw-ring-offset-color: var(--color-canvas);
+}
+
 html,
 body {
   height: 100%;
@@ -7,6 +42,8 @@ body {
 
 body {
   margin: 0;
+  background-color: var(--color-canvas);
+  color: var(--color-foreground);
   font-family:
     system-ui,
     -apple-system,

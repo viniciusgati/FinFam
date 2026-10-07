@@ -60,37 +60,39 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-900 p-6">
+    <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-5 rounded-2xl bg-white p-8 shadow-xl"
+        className="w-full max-w-sm space-y-5 rounded-2xl border border-border bg-surface p-8 shadow-xl"
       >
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">FinFam</h1>
-          <p className="text-sm text-slate-500">Acesso da família</p>
+          <h1 className="text-2xl font-bold text-foreground">FinFam</h1>
+          <p className="text-sm text-subtle">Acesso da família</p>
         </div>
 
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-slate-700">Usuário</span>
+          <span className="text-sm font-medium text-foreground-muted">
+            Usuário
+          </span>
           <input
             type="text"
             value={user}
             onChange={(event) => setUser(event.target.value)}
             autoComplete="username"
             required
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-emerald-500"
+            className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500"
           />
         </label>
 
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-slate-700">Senha</span>
+          <span className="text-sm font-medium text-foreground-muted">Senha</span>
           <input
             type="password"
             value={pass}
             onChange={(event) => setPass(event.target.value)}
             autoComplete="current-password"
             required
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-emerald-500"
+            className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500"
           />
         </label>
 
@@ -99,7 +101,7 @@ export default function LoginPage() {
             <div
               role="alert"
               aria-live="polite"
-              className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+              className="flex items-start gap-2 rounded-lg border border-amber-700 bg-amber-950 px-3 py-2 text-sm text-amber-200"
             >
               <svg
                 aria-hidden="true"
@@ -119,7 +121,7 @@ export default function LoginPage() {
             <p
               role="alert"
               aria-live="polite"
-              className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600"
+              className="rounded-lg bg-red-950 px-3 py-2 text-sm text-red-200"
             >
               {error.message}
             </p>

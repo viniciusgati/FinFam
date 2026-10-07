@@ -66,11 +66,11 @@ export default function SettingsForm({
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
       {success && (
         <div
           role="status"
-          className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+          className="mb-4 rounded-xl border border-emerald-800 bg-emerald-950 px-4 py-3 text-sm font-medium text-emerald-200"
         >
           Configuração salva com sucesso
         </div>
@@ -79,7 +79,7 @@ export default function SettingsForm({
       {error && (
         <p
           role="alert"
-          className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="mb-4 rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200"
         >
           {error}
         </p>
@@ -87,7 +87,7 @@ export default function SettingsForm({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-slate-700">
+          <span className="text-sm font-medium text-foreground-muted">
             Dia de início do ciclo financeiro
           </span>
           <input
@@ -97,9 +97,9 @@ export default function SettingsForm({
             value={cycleStartDay}
             onChange={(event) => setCycleStartDay(event.target.value)}
             disabled={saving}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50 sm:max-w-[10rem]"
+            className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong sm:max-w-[10rem]"
           />
-          <span className="block text-xs text-slate-500">
+          <span className="block text-xs text-subtle">
             Entre 1 e 28. Use o dia de fechamento do cartão para o ciclo
             refletir o seu mês real.
           </span>

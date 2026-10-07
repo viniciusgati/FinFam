@@ -81,10 +81,10 @@ export default async function GastosPage({
         className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center"
       >
         <header className="space-y-1">
-          <p className="text-sm font-medium uppercase tracking-widest text-slate-500">
+          <p className="text-sm font-medium uppercase tracking-widest text-subtle">
             Gastos
           </p>
-          <h1 className="text-3xl font-bold text-slate-900">
+          <h1 className="text-3xl font-bold text-foreground">
             Não foi possível carregar os gastos.
           </h1>
         </header>

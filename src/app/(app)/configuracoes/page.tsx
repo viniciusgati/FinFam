@@ -19,8 +19,8 @@ export default async function ConfiguracoesPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-slate-900">Configurações</h1>
-        <p className="text-slate-600">
+        <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
+        <p className="text-foreground-muted">
           Defina o dia do mês que marca o início do seu ciclo financeiro.
         </p>
       </header>
