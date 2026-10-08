@@ -30,7 +30,7 @@ export default function AppShell({ user, children }: AppShellProps) {
   const loading = logoutState === "loading";
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas lg:flex-row">
+    <div className="flex min-h-screen flex-col bg-canvas md:flex-row">
       <AppNav
         footer={
           <div className="space-y-2">
