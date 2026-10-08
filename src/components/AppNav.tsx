@@ -8,7 +8,9 @@ import {
   NAV_AUTO_COLLAPSE_MS,
   navExpanded,
   readNavPinned,
+  touchNav,
   writeNavPinned,
+  type NavCollapseState,
 } from "@/lib/nav-collapse";
 import { NAV_ICONS, PinIcon } from "@/components/NavIcons";
 
@@ -28,38 +30,41 @@ export default function AppNav({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(initialExpanded);
-  const [pinned, setPinned] = useState(initialPinned);
-  const [lastInteractionAt, setLastInteractionAt] = useState(0);
+  const [navState, setNavState] = useState<NavCollapseState>({
+    pinned: initialPinned,
+    lastInteractionAt: 0,
+  });
+  const { pinned } = navState;
 
   // Preferência persistida é aplicada só após a hidratação: o primeiro paint
   // é idêntico entre servidor e cliente (sem mismatch).
   useEffect(() => {
     const stored = readNavPinned();
-    setPinned(stored);
+    setNavState((state) => ({ ...state, pinned: stored }));
     if (stored) setExpanded(true);
   }, []);
 
   // Auto-colapso: 5000ms sem interação e sem fixar ⇒ encolhe. O efeito
   // visual é exclusivo de ≥768px (todas as classes de estado são `md:`).
   useEffect(() => {
-    if (pinned) return;
+    if (navState.pinned) return;
     const timer = setTimeout(() => {
-      if (navExpanded({ pinned, lastInteractionAt }, Date.now())) return;
+      if (navExpanded(navState, Date.now())) return;
       setExpanded(false);
     }, NAV_AUTO_COLLAPSE_MS);
     return () => clearTimeout(timer);
-  }, [pinned, lastInteractionAt]);
+  }, [navState]);
 
   function touch() {
-    setLastInteractionAt(Date.now());
+    setNavState((state) => touchNav(state, Date.now()));
     setExpanded(true);
   }
 
   function togglePinned() {
-    const next = !pinned;
-    setPinned(next);
-    writeNavPinned(next);
-    setLastInteractionAt(Date.now());
+    setNavState((state) =>
+      touchNav({ ...state, pinned: !state.pinned }, Date.now()),
+    );
+    writeNavPinned(!pinned);
     // Fixar com o menu colapsado reexpande imediatamente.
     setExpanded(true);
   }
