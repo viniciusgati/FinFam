@@ -14,6 +14,7 @@ export interface MonthSpendCardProps {
   invoiceDue: string;
   daysRemaining: number;
   feedback: string;
+  actionableMessage?: string | null;
   projectedPercent?: number;
   projectedRisk?: boolean;
   className?: string;
@@ -26,6 +27,7 @@ export default function MonthSpendCard({
   invoiceDue,
   daysRemaining,
   feedback,
+  actionableMessage,
   projectedPercent,
   projectedRisk = false,
   className = "",
@@ -65,6 +67,16 @@ export default function MonthSpendCard({
           className="text-base font-semibold uppercase tracking-wide"
         >
           {projectionRiskLabel(projectedPercent)}
+        </p>
+      )}
+
+      {actionableMessage && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="max-w-xl rounded-xl bg-black/10 px-4 py-3 text-base font-medium"
+        >
+          {actionableMessage}
         </p>
       )}
 

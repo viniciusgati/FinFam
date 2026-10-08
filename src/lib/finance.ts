@@ -7,6 +7,8 @@
  * Regras completas em docs/SPEC.md §4.
  */
 
+import { dailyCentsForBudget } from "./cycle";
+import { formatCents } from "./money";
 import { resolveTimeZone, zonedDateParts } from "./time";
 
 export type FinanceLevel =
@@ -369,6 +371,56 @@ export function compareWithHistory(
     return `Estão piores que os últimos ${previousPercents.length} meses.`;
   }
   return `Estão melhores que ${better} dos últimos ${previousPercents.length} meses.`;
+}
+
+export interface ActionableBudgetInput {
+  /** Há renda/obrigações cadastradas no ciclo? Sinais sem dados não geram aviso. */
+  hasData: boolean;
+  level: FinanceLevel;
+  /** Projeção de fechamento do mês, em percentual da renda. */
+  projectedPercent: number;
+  /** Orçamento livre do ciclo em centavos (0 quando estourado). */
+  freeBudgetCents: number;
+  /** Diária do ciclo em centavos; negativa quando o ciclo foi estourado. */
+  dailyCents: number;
+  /** Dias restantes do ciclo, contando o dia corrente. */
+  remainingDays: number;
+}
+
+/**
+ * Mensagem acionável quando o orçamento está em risco (`orange`/`red`) ou a
+ * projeção de fechamento arredondada alcança 100%. Diz quantos dias restam e
+ * quanto ajustar por dia para fechar o ciclo no orçamento. Retorna `null` sem
+ * dados ou fora de risco, para o card não renderizar nada.
+ */
+export function actionableBudgetMessage(
+  input: ActionableBudgetInput,
+): string | null {
+  if (!input.hasData) return null;
+
+  const atRisk =
+    input.level === "orange" ||
+    input.level === "red" ||
+    Math.round(input.projectedPercent) >= 100;
+  if (!atRisk) return null;
+
+  const days = `${input.remainingDays} ${
+    input.remainingDays === 1 ? "dia" : "dias"
+  }`;
+
+  if (input.freeBudgetCents > 0) {
+    const daily = dailyCentsForBudget(
+      input.freeBudgetCents,
+      input.remainingDays,
+    );
+    return `Restam ${days} no ciclo. Para fechar dentro do orçamento, limite o gasto a ${formatCents(daily)} por dia.`;
+  }
+
+  if (input.dailyCents < 0) {
+    return `Orçamento do ciclo estourado: restam ${days} e você está excedendo ${formatCents(-input.dailyCents)} por dia.`;
+  }
+
+  return `Orçamento do ciclo esgotado: restam ${days} e não há margem para novos gastos.`;
 }
 
 /**
