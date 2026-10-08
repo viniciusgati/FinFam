@@ -18,7 +18,10 @@ import {
   type FinanceLevel,
 } from "@/lib/finance";
 import { invoiceDueLabel, resolveReferenceDate } from "@/lib/invoices";
-import type { DailySeries } from "@/lib/dashboard-series";
+import {
+  consumptionAverageLabel,
+  type DailySeries,
+} from "@/lib/dashboard-series";
 import FutureMonthNotice from "@/components/FutureMonthNotice";
 import {
   buildMonthReviewData,
@@ -60,6 +63,7 @@ export default async function DashboardPage({
   let cardExpensesCents = 0;
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
+  let consumptionLabel: string | null = null;
 
   try {
     const data = await loadDashboardData(referenceDate);
@@ -89,6 +93,11 @@ export default async function DashboardPage({
       projectedPercent: status.projectedPercent,
       previousPercents: data.previousPercents,
     });
+
+    // O subtítulo de consumo só existe no ramo `ok` (com renda e movimentação).
+    if (view.state === "ok") {
+      consumptionLabel = consumptionAverageLabel(data.consumption);
+    }
 
     // O card de diária segue o ciclo real; só faz sentido no mês corrente.
     if (isCalendarMonth) {
@@ -191,6 +200,7 @@ export default async function DashboardPage({
               level={level}
               invoiceDue={invoiceDueLabel(referenceDate)}
               countdownLabel={cycleEndCountdownLabel(cycleDaysRemaining)}
+              consumptionLabel={consumptionLabel}
               feedback={view.feedback}
               actionableMessage={actionableMessage}
               projectedPercent={view.projectedPercent}

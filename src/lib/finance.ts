@@ -142,6 +142,36 @@ export function consumedCents(input: FinanceInput): number {
   );
 }
 
+export interface ConsumptionAvailableInput {
+  monthlyIncomeCents: number;
+  fixedExpensesCents: number;
+}
+
+/**
+ * Consumo disponível do mês: entradas menos gastos fixos ativos, nunca
+ * negativo (SPEC §3.2/§3.4). Faturas de cartão e gastos avulsos **não** entram
+ * — são consumo variável, não obrigação fixa.
+ */
+export function consumptionAvailableCents(
+  input: ConsumptionAvailableInput,
+): number {
+  return Math.max(input.monthlyIncomeCents - input.fixedExpensesCents, 0);
+}
+
+/**
+ * Média diária do consumo disponível, arredondada com `Math.round` (mesma
+ * convenção de `dailyCentsForBudget`). `days <= 0` devolve `0` sem dividir por
+ * zero; o `-0` do arredondamento é normalizado para `0`.
+ */
+export function consumptionDailyAverageCents(
+  availableCents: number,
+  days: number,
+): number {
+  if (days <= 0) return 0;
+  const daily = Math.round(availableCents / days);
+  return daily === 0 ? 0 : daily;
+}
+
 /**
  * Classifica a situação. Usa o ritmo quando há renda; retorna "neutral"
  * quando a renda mensal não está cadastrada (ver SPEC §5.6).

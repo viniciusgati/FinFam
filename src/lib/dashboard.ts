@@ -1,6 +1,8 @@
 import { prisma } from "./db";
 import {
+  buildConsumptionSummary,
   buildDailySeries,
+  type ConsumptionSummary,
   type DailySeries,
 } from "./dashboard-series";
 import {
@@ -39,7 +41,14 @@ export interface DashboardData extends FinanceInput {
   snapshots: DashboardSnapshot[];
   /** Série diária do mês de referência (gráficos e avaliação do dia). */
   series: DailySeries;
+  /**
+   * Consumo disponível (`entradas − gastos fixos`) e média diária. Leitura
+   * informativa; não substitui o `%` nem o orçamento livre do ciclo.
+   */
+  consumption: ConsumptionSummary;
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function sumByAmount(items: { amountCents: number }[]): number {
   return items.reduce((total, item) => total + item.amountCents, 0);
@@ -159,6 +168,27 @@ export async function loadDashboardData(
     cardInvoiceLines.length > 0 ||
     variableIncomes.length > 0;
 
+  // Total de dias do ciclo (entre `start` e `nextStart`) só faz sentido no mês
+  // corrente; fora dele a janela do ciclo é omitida (`cycleDays: null`).
+  // Atenção: `remainingCycleDays` devolve apenas os dias restantes e daria
+  // divisor errado — usamos a janela completa.
+  let cycleDays: number | null = null;
+  if (currentMonthKey === monthKey(new Date())) {
+    const { cycleStartDay } = await getSettings();
+    const cycle = cycleWindow(referenceDate, cycleStartDay, timeZone);
+    cycleDays = Math.round(
+      (cycle.nextStart.getTime() - cycle.start.getTime()) / DAY_MS,
+    );
+  }
+
+  const consumption = buildConsumptionSummary({
+    incomeCents: monthlyIncomeCents,
+    fixedExpensesCents,
+    daysInMonth: series.daysInMonth,
+    daysElapsed: series.elapsedDay,
+    cycleDays,
+  });
+
   return {
     monthlyIncomeCents,
     fixedExpensesCents,
@@ -174,6 +204,7 @@ export async function loadDashboardData(
       consumedPercent: snapshot.consumedPercent,
     })),
     series,
+    consumption,
     referenceDate,
   };
 }

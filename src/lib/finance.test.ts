@@ -4,6 +4,8 @@ import {
   classifyLevel,
   compareWithHistory,
   computeFinanceStatus,
+  consumptionAvailableCents,
+  consumptionDailyAverageCents,
   contrastRatio,
   dashboardView,
   emptyStateCopy,
@@ -176,6 +178,55 @@ describe("computeFinanceStatus", () => {
     expect(status.daysInMonth).toBe(30);
     expect(status.daysElapsed).toBe(1);
     expect(status.daysRemaining).toBe(29);
+  });
+});
+
+describe("consumptionAvailableCents", () => {
+  it("calcula entradas menos gastos fixos", () => {
+    expect(
+      consumptionAvailableCents({
+        monthlyIncomeCents: 500000,
+        fixedExpensesCents: 300000,
+      }),
+    ).toBe(200000);
+  });
+
+  it("nunca fica negativo quando as fixas superam as entradas", () => {
+    expect(
+      consumptionAvailableCents({
+        monthlyIncomeCents: 300000,
+        fixedExpensesCents: 500000,
+      }),
+    ).toBe(0);
+    expect(
+      consumptionAvailableCents({
+        monthlyIncomeCents: 500000,
+        fixedExpensesCents: 500000,
+      }),
+    ).toBe(0);
+    expect(
+      consumptionAvailableCents({
+        monthlyIncomeCents: -100,
+        fixedExpensesCents: 0,
+      }),
+    ).toBe(0);
+  });
+});
+
+describe("consumptionDailyAverageCents", () => {
+  it("divide pelos dias com Math.round", () => {
+    expect(consumptionDailyAverageCents(200000, 31)).toBe(6452);
+    expect(consumptionDailyAverageCents(200000, 15)).toBe(13333);
+  });
+
+  it("devolve 0 quando days <= 0 (sem divisão por zero)", () => {
+    expect(consumptionDailyAverageCents(200000, 0)).toBe(0);
+    expect(consumptionDailyAverageCents(200000, -5)).toBe(0);
+  });
+
+  it("normaliza -0 do arredondamento para 0", () => {
+    expect(Object.is(consumptionDailyAverageCents(-10, 31), 0)).toBe(true);
+    expect(Object.is(consumptionDailyAverageCents(0, 31), 0)).toBe(true);
   });
 });
 

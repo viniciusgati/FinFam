@@ -46,6 +46,12 @@ nem série temporal.
     (`src/lib/dashboard-series.ts:125-136`).
   - `dailyAllowanceCents` / ciclo (`src/lib/cycle.ts`).
   - `rateDay` usa o orçamento livre (`src/lib/day-rating.ts`).
+- **Consumo disponível** (`entradas − gastos fixos`) e média diária por
+  mês/dias decorridos/ciclo: `buildConsumptionSummary`/`consumptionAverageLabel`
+  (`src/lib/dashboard-series.ts`), sobre `consumptionAvailableCents`/
+  `consumptionDailyAverageCents` (`src/lib/finance.ts`). Já exibido como
+  subtítulo do `MonthSpendCard` (janela "mês"). Faturas e avulsos ficam fora da
+  subtração (consumo variável, SPEC §3.2/§3.4).
 
 Observação: `freeBudget`/diária livre **não** alimentam os gráficos nem o `%` —
 o `%` continua sendo "renda consumida" com as fixas embutidas.
@@ -93,7 +99,9 @@ Leitura para a próxima fase:
 ## 5. Lacunas de dados/cálculo (para virar tarefa)
 
 - Não há **agregação por categoria** (fixas, avulsos e compras de cartão).
-- Não há **série/métrica de média diária** baseada em `entradas − fixos`.
+- **Resolvido:** a métrica de média diária baseada em `entradas − fixos` é
+  exposta por `buildConsumptionSummary`/`consumptionAverageLabel`
+  (`src/lib/dashboard-series.ts`; ver §2).
 - `DailySpendChart` não tem **linha de referência** (média/orçamento diário) e
   mistura fixas com variáveis.
 - `%` e `consumedCents` **incluem fixas**; a diretriz separa "consumo" de

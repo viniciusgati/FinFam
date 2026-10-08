@@ -13,6 +13,8 @@ export interface MonthSpendCardProps {
   invoiceDue: string;
   /** Contador já formatado (ex.: `8 dias para o fim do ciclo`). */
   countdownLabel: string;
+  /** Subtítulo do consumo disponível (`entradas − gastos fixos`) e média diária. */
+  consumptionLabel?: string | null;
   feedback: string;
   actionableMessage?: string | null;
   projectedPercent?: number;
@@ -26,6 +28,7 @@ export default function MonthSpendCard({
   level,
   invoiceDue,
   countdownLabel,
+  consumptionLabel,
   feedback,
   actionableMessage,
   projectedPercent,
@@ -93,6 +96,12 @@ export default function MonthSpendCard({
       <p className="text-lg font-medium opacity-95">
         {countdownLabel}
       </p>
+
+      {consumptionLabel && (
+        <p className="max-w-xl text-base font-medium opacity-90">
+          {consumptionLabel}
+        </p>
+      )}
 
       <p
         role="status"

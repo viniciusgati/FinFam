@@ -12,7 +12,13 @@
  * duplicar a fatura.
  */
 
-import { daysInMonth as daysInMonthOf, monthKey } from "./finance";
+import {
+  consumptionAvailableCents,
+  consumptionDailyAverageCents,
+  daysInMonth as daysInMonthOf,
+  monthKey,
+} from "./finance";
+import { formatCents } from "./money";
 import { resolveTimeZone, zonedDateParts } from "./time";
 import {
   isCountedInBudget,
@@ -131,4 +137,80 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
     dailyBudgetCents,
     projectedMonthEndCents,
   };
+}
+
+/**
+ * Consumo disponível (`entradas − gastos fixos`) e sua média diária em cada
+ * janela. É uma leitura **informativa**: não substitui o `%` protagonista, o
+ * orçamento livre do ciclo (`dailyAllowanceCents`) nem a avaliação do dia
+ * (`rateDay`). Faturas de cartão e avulsos contam como consumo variável e ficam
+ * fora da subtração (SPEC §3.2/§3.4).
+ */
+export interface ConsumptionSummary {
+  /** Entradas − gastos fixos, nunca negativo. */
+  availableCents: number;
+  /** Gastos fixos ≥ entradas no mês (renda insuficiente para as obrigações). */
+  overCommitted: boolean;
+  /** Consumo disponível ÷ dias do mês calendário. */
+  dailyByMonthCents: number;
+  /** Consumo disponível ÷ dias decorridos. */
+  dailyByElapsedCents: number;
+  /** Consumo disponível ÷ dias do ciclo; `null` fora do mês corrente. */
+  dailyByCycleCents: number | null;
+  daysInMonth: number;
+  daysElapsed: number;
+  /** Total de dias do ciclo financeiro; `null` fora do mês corrente. */
+  cycleDays: number | null;
+}
+
+export interface BuildConsumptionSummaryInput {
+  incomeCents: number;
+  fixedExpensesCents: number;
+  daysInMonth: number;
+  daysElapsed: number;
+  cycleDays?: number | null;
+}
+
+export function buildConsumptionSummary(
+  input: BuildConsumptionSummaryInput,
+): ConsumptionSummary {
+  const availableCents = consumptionAvailableCents({
+    monthlyIncomeCents: input.incomeCents,
+    fixedExpensesCents: input.fixedExpensesCents,
+  });
+  const cycleDays = input.cycleDays ?? null;
+
+  return {
+    availableCents,
+    overCommitted: input.fixedExpensesCents >= input.incomeCents,
+    dailyByMonthCents: consumptionDailyAverageCents(
+      availableCents,
+      input.daysInMonth,
+    ),
+    dailyByElapsedCents: consumptionDailyAverageCents(
+      availableCents,
+      input.daysElapsed,
+    ),
+    dailyByCycleCents:
+      cycleDays === null
+        ? null
+        : consumptionDailyAverageCents(availableCents, cycleDays),
+    daysInMonth: input.daysInMonth,
+    daysElapsed: input.daysElapsed,
+    cycleDays,
+  };
+}
+
+/**
+ * Rótulo do consumo disponível e da média diária (janela "mês"). Quando as
+ * contas fixas consomem toda a renda, não exibe valores em R$ — apenas a
+ * mensagem de indisponibilidade.
+ */
+export function consumptionAverageLabel(summary: ConsumptionSummary): string {
+  if (summary.overCommitted) {
+    return "Sem consumo disponível: as contas fixas consomem toda a renda do mês.";
+  }
+  return `Consumo de ${formatCents(summary.availableCents)} · ${formatCents(
+    summary.dailyByMonthCents,
+  )}/dia (mês) · não inclui contas fixas`;
 }
