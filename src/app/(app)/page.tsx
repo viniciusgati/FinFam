@@ -103,7 +103,7 @@ export default async function DashboardPage({
   const rating =
     series !== null
       ? rateDay({
-          dailyBudgetCents: series.dailyBudgetCents,
+          dailyFreeBudgetCents: series.dailyFreeBudgetCents,
           todayExpensesCents: series.todayExpensesCents,
           incomeCents,
         })
