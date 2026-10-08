@@ -218,6 +218,34 @@ export function dailyAllowanceCents(
   };
 }
 
+export interface UsualDailySpendInput {
+  /** Gastos avulsos (PIX/débito/dinheiro) dentro do ciclo. */
+  variableSpentCents: number;
+  /**
+   * Fatura de cartão do mês calendário corrente. Ela já é contabilizada como
+   * obrigação no orçamento livre; aqui entra **também** como consumo, porque a
+   * compra no cartão é consumo real (decisão de produto do usuário).
+   */
+  cardExpensesCents: number;
+  /** Dias decorridos do ciclo (contando hoje). */
+  elapsedDays: number;
+}
+
+/**
+ * Consumo médio por dia do ciclo ("ritmo recente" do simulador "posso
+ * comprar?"): gastos avulsos + fatura de cartão do mês, divididos pelos dias
+ * decorridos do ciclo. `null` quando não há consumo medido ou dias decorridos.
+ */
+export function usualDailySpendCents(
+  input: UsualDailySpendInput,
+): number | null {
+  if (input.elapsedDays <= 0) return null;
+  const consumed =
+    Math.max(input.variableSpentCents, 0) + Math.max(input.cardExpensesCents, 0);
+  if (consumed <= 0) return null;
+  return Math.round(consumed / input.elapsedDays);
+}
+
 export type DailyAllowanceCardState =
   | "no-data"
   | "exhausted"

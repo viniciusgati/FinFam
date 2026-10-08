@@ -7,6 +7,7 @@ import {
   dailyCentsForBudget,
   elapsedCycleDays,
   remainingCycleDays,
+  usualDailySpendCents,
   type DailyAllowance,
 } from "./cycle";
 
@@ -74,6 +75,48 @@ describe("elapsedCycleDays", () => {
   it("no primeiro dia do ciclo retorna 1", () => {
     const firstDay = new Date("2026-03-20T15:00:00.000Z");
     expect(elapsedCycleDays(firstDay, 20)).toBe(1);
+  });
+});
+
+describe("usualDailySpendCents", () => {
+  it("soma avulsos e fatura do mês e divide pelos dias decorridos", () => {
+    expect(
+      usualDailySpendCents({
+        variableSpentCents: 24000,
+        cardExpensesCents: 600000,
+        elapsedDays: 25,
+      }),
+    ).toBe(24960);
+  });
+
+  it("sem consumo medido retorna null", () => {
+    expect(
+      usualDailySpendCents({
+        variableSpentCents: 0,
+        cardExpensesCents: 0,
+        elapsedDays: 10,
+      }),
+    ).toBeNull();
+  });
+
+  it("sem dias decorridos retorna null", () => {
+    expect(
+      usualDailySpendCents({
+        variableSpentCents: 1000,
+        cardExpensesCents: 1000,
+        elapsedDays: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it("ignora valores negativos", () => {
+    expect(
+      usualDailySpendCents({
+        variableSpentCents: -100,
+        cardExpensesCents: 10000,
+        elapsedDays: 10,
+      }),
+    ).toBe(1000);
   });
 });
 

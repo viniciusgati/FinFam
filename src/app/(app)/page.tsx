@@ -4,6 +4,7 @@ import {
   cycleEndCountdownLabel,
   dailyAllowanceCard,
   remainingCycleDays,
+  usualDailySpendCents,
   type DailyAllowance,
 } from "@/lib/cycle";
 import { getSettings } from "@/lib/settings";
@@ -56,6 +57,7 @@ export default async function DashboardPage({
   let cycleDaysRemaining = 0;
   let level: FinanceLevel = "neutral";
   let series: DailySeries | null = null;
+  let cardExpensesCents = 0;
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
 
@@ -71,6 +73,7 @@ export default async function DashboardPage({
     cycleDaysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
     level = status.level;
     series = data.series;
+    cardExpensesCents = data.cardExpensesCents;
     localMonthSummary = localMonthReview(
       buildMonthReviewData(
         monthReviewSnapshotFrom(data),
@@ -103,11 +106,15 @@ export default async function DashboardPage({
     });
   }
 
-  // Ritmo recente de gastos avulsos por dia do ciclo — base do simulador
-  // "posso comprar?" (avulsos dentro do ciclo ÷ dias decorridos).
-  const usualDailySpendCents =
-    allowance !== null && allowance.elapsedDays > 0
-      ? Math.round(allowance.variableSpentCents / allowance.elapsedDays)
+  // Ritmo recente de consumo do ciclo — base do simulador "posso comprar?":
+  // avulsos do ciclo + fatura de cartão do mês, ÷ dias decorridos.
+  const usualDailySpend =
+    allowance !== null
+      ? usualDailySpendCents({
+          variableSpentCents: allowance.variableSpentCents,
+          cardExpensesCents,
+          elapsedDays: allowance.elapsedDays,
+        })
       : null;
 
   const actionableMessage =
@@ -229,7 +236,7 @@ export default async function DashboardPage({
               freeBudgetCents={allowance.freeBudgetCents}
               dailyCents={allowance.dailyCents}
               remainingDays={allowance.remainingDays}
-              usualDailySpendCents={usualDailySpendCents}
+              usualDailySpendCents={usualDailySpend}
             />
           )}
         </>

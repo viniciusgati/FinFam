@@ -54,7 +54,9 @@ export default function PurchaseSimulator({
 
   const cents = parseAmountToCents(value);
   const invalid = cents === null;
-  const showValidation = invalid;
+  // Só acusa erro depois que o usuário digita algo inválido — no estado inicial
+  // (vazio) o botão fica desabilitado, sem borda vermelha nem mensagem.
+  const showValidation = value.trim().length > 0 && invalid;
 
   function buildInput(purchaseCents: number): SimulatePurchaseInput {
     return {

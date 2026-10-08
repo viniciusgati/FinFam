@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { usualDailySpendCents } from "../cycle";
 import {
   buildPurchaseData,
   buildPurchasePrompt,
@@ -152,5 +153,39 @@ describe("buildPurchasePrompt — privacidade", () => {
     const system = messages.find((message) => message.role === "system");
 
     expect(system?.content).toContain(VERDICT_LABELS.cuidado);
+  });
+});
+
+describe("integração com o ritmo do ciclo (fatura no ritmo)", () => {
+  it("a fatura do mês endurece o veredito de uma compra que caberia", () => {
+    // Regressão do sintoma "R$ 10,42 por dia": sem a fatura no ritmo, a compra
+    // passava como "Pode comprar"; com a fatura (consumo real), vira "nao".
+    const semFatura = usualDailySpendCents({
+      variableSpentCents: 24000,
+      cardExpensesCents: 0,
+      elapsedDays: 25,
+    });
+    const comFatura = usualDailySpendCents({
+      variableSpentCents: 24000,
+      cardExpensesCents: 600000,
+      elapsedDays: 25,
+    });
+
+    expect(semFatura).toBe(960);
+    expect(comFatura).toBe(24960);
+
+    const purchase = {
+      freeBudgetCents: 500000,
+      dailyCents: 20000,
+      remainingDays: 25,
+      purchaseCents: 300000,
+    };
+
+    expect(
+      simulatePurchase({ ...purchase, usualDailySpendCents: semFatura }).verdict,
+    ).toBe("ok");
+    expect(
+      simulatePurchase({ ...purchase, usualDailySpendCents: comFatura }).verdict,
+    ).toBe("nao");
   });
 });

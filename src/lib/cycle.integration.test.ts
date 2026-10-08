@@ -8,8 +8,8 @@ import {
   resetDatabase,
 } from "../test/integration";
 import DailyAllowanceCard from "../components/DailyAllowanceCard";
-import { dailyAllowanceCard } from "./cycle";
-import { loadCycleAllowance } from "./dashboard";
+import { dailyAllowanceCard, usualDailySpendCents } from "./cycle";
+import { loadCycleAllowance, loadDashboardData } from "./dashboard";
 import { updateSettings } from "./settings";
 
 // Falha de forma explícita sem `TEST_DATABASE_URL`; nunca toca SQLite.
@@ -155,5 +155,51 @@ describe("loadCycleAllowance — integração com PostgreSQL", () => {
 
     expect(allowance.hasData).toBe(false);
     expect(allowance.dailyCents).toBe(0);
+  });
+
+  it("ritmo recente inclui a fatura do mês além dos avulsos", async () => {
+    // Regressão do sintoma "Seu ritmo recente é de R$ 10,42 por dia": numa
+    // família que consome pelo cartão, o ritmo precisa incluir a fatura.
+    await updateSettings({ cycleStartDay: 1 });
+
+    await prisma.income.create({
+      data: { name: "Salário", amountCents: 1200000 },
+    });
+    const card = await prisma.creditCard.create({
+      data: { name: "Nubank", closingDay: 20, dueDay: 5 },
+    });
+    // Compra em 10/02 com fechamento 20 e vencimento 5 → fatura de março.
+    await prisma.cardPurchase.create({
+      data: {
+        cardId: card.id,
+        description: "Mercado",
+        amountCents: 600000,
+        purchaseDate: new Date("2026-02-10T12:00:00.000Z"),
+      },
+    });
+    await prisma.variableExpense.create({
+      data: {
+        description: "PIX",
+        amountCents: 24000,
+        date: new Date("2026-03-05T12:00:00.000Z"),
+        paymentMethod: "PIX",
+      },
+    });
+
+    const allowance = await loadCycleAllowance(NOW);
+    const data = await loadDashboardData(NOW);
+
+    expect(data.cardExpensesCents).toBe(600000);
+    expect(allowance.variableSpentCents).toBe(24000);
+    expect(allowance.elapsedDays).toBe(25);
+
+    // (24.000 + 600.000) / 25 dias = R$ 249,60/dia, não R$ 9,60/dia.
+    expect(
+      usualDailySpendCents({
+        variableSpentCents: allowance.variableSpentCents,
+        cardExpensesCents: data.cardExpensesCents,
+        elapsedDays: allowance.elapsedDays,
+      }),
+    ).toBe(24960);
   });
 });

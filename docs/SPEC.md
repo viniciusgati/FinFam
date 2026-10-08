@@ -187,11 +187,11 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
 - **Simulador "posso comprar?"**: veredito local determinístico
   (`ok`/`cuidado`/`nao`) pelo impacto no **poder de compra por dia** do ciclo:
   a compra ÷ dias restantes reduz a diária; compara-se a diária resultante com o
-  **ritmo recente** de gastos avulsos (avulsos do ciclo ÷ dias decorridos).
-  Não cabe no orçamento do ciclo ou cai abaixo de metade do ritmo → `nao`; fica
-  abaixo do ritmo → `cuidado`; mantém o ritmo → `ok`. A IA apenas redige a
-  justificativa; a rota sempre responde `200` com fallback local. O card só
-  aparece no mês corrente (depende do ciclo).
+  **ritmo recente** de consumo (gastos avulsos do ciclo + fatura de cartão do
+  mês ÷ dias decorridos). Não cabe no orçamento do ciclo ou cai abaixo de metade
+  do ritmo → `nao`; fica abaixo do ritmo → `cuidado`; mantém o ritmo → `ok`. A
+  IA apenas redige a justificativa; a rota sempre responde `200` com fallback
+  local. O card só aparece no mês corrente (depende do ciclo).
 - O seletor de mês do dashboard navega para `/?mes=YYYY-MM` (prop `basePath`).
 
 ## 5. Regras de negócio relevantes
