@@ -1,18 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock } = vi.hoisted(() => ({
+const { prismaMock, captureClosedMonthsMock } = vi.hoisted(() => ({
   prismaMock: {
     income: { findMany: vi.fn() },
     variableIncome: { findMany: vi.fn() },
     fixedExpense: { findMany: vi.fn() },
     variableExpense: { findMany: vi.fn() },
     cardPurchase: { findMany: vi.fn() },
-    monthlySnapshot: { findMany: vi.fn() },
+    monthlySnapshot: { findMany: vi.fn(), findUnique: vi.fn() },
     appSettings: { findUnique: vi.fn() },
   },
+  captureClosedMonthsMock: vi.fn(),
 }));
 
-vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+vi.mock("@/lib/db", () => ({
+  prisma: prismaMock,
+  captureClosedMonths: captureClosedMonthsMock,
+}));
 
 import { loadCycleAllowance, loadDashboardData } from "./dashboard";
 import { computeFinanceStatus } from "./finance";
@@ -25,6 +29,10 @@ beforeEach(() => {
   prismaMock.variableIncome.findMany.mockResolvedValue([]);
   prismaMock.cardPurchase.findMany.mockResolvedValue([]);
   prismaMock.monthlySnapshot.findMany.mockResolvedValue([]);
+  // Default: não há snapshot do mês de referência — o ramo de mês fechado cai
+  // para a captura e, sem snapshot completo, para o cálculo ao vivo.
+  prismaMock.monthlySnapshot.findUnique.mockResolvedValue(null);
+  captureClosedMonthsMock.mockResolvedValue(undefined);
 });
 
 describe("loadDashboardData — vigência", () => {
@@ -530,5 +538,103 @@ describe("loadDashboardData — consumo disponível", () => {
     expect(data.consumption.overCommitted).toBe(true);
     expect(data.consumption.dailyByMonthCents).toBe(0);
     expect(data.consumption.dailyByCycleCents ?? 0).toBe(0);
+  });
+});
+
+describe("loadDashboardData — mês fechado lê o snapshot imutável", () => {
+  // Setembro/2026 é mês fechado em relação a outubro/2026 (mês corrente dos testes).
+  const closedReference = new Date(Date.UTC(2026, 8, 15, 12));
+
+  function completeSnapshotRow() {
+    const days = 30;
+    return {
+      id: "s1",
+      monthKey: "2026-09",
+      incomeCents: 500000,
+      fixedIncomeCents: 500000,
+      variableIncomeCents: 0,
+      fixedExpensesCents: 120000,
+      variableExpensesCents: 30000,
+      cardExpensesCents: 0,
+      consumedCents: 150000,
+      consumedPercent: 30,
+      consumptionAvailableCents: 380000,
+      dailyAverageCents: 12667,
+      daysInMonth: days,
+      variableDailyCents: Array.from({ length: days }, (_, index) =>
+        index === 4 ? 30000 : 0,
+      ),
+      obligationDailyCents: Array.from({ length: days }, (_, index) =>
+        index === 9 ? 120000 : 0,
+      ),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      categories: [
+        {
+          id: "c1",
+          monthKey: "2026-09",
+          categoryKey: "moradia",
+          categoryLabel: "Moradia",
+          amountCents: 120000,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "c2",
+          monthKey: "2026-09",
+          categoryKey: "mercado",
+          categoryLabel: "Mercado",
+          amountCents: 30000,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    };
+  }
+
+  it("usa o snapshot do mês fechado sem tocar nas tabelas vivas", async () => {
+    prismaMock.monthlySnapshot.findUnique.mockResolvedValue(
+      completeSnapshotRow(),
+    );
+
+    const data = await loadDashboardData(closedReference);
+
+    expect(data.monthlyIncomeCents).toBe(500000);
+    expect(data.fixedIncomeCents).toBe(500000);
+    expect(data.fixedExpensesCents).toBe(120000);
+    expect(data.variableExpensesCents).toBe(30000);
+    expect(data.series.elapsedDay).toBe(30);
+    expect(data.series.variableDailyCents[4]).toBe(30000);
+    expect(data.series.obligationDailyCents[9]).toBe(120000);
+    expect(data.series.dailyExpensesCents[9]).toBe(120000);
+    expect(data.hasMovements).toBe(true);
+    expect(data.categoryBreakdown.items).toEqual([
+      { category: "Moradia", amountCents: 120000 },
+      { category: "Mercado", amountCents: 30000 },
+    ]);
+
+    // Nem recalculou ao vivo, nem precisou capturar.
+    expect(prismaMock.income.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.fixedExpense.findMany).not.toHaveBeenCalled();
+    expect(captureClosedMonthsMock).not.toHaveBeenCalled();
+  });
+
+  it("cai no cálculo ao vivo quando o snapshot é legado (sem série diária)", async () => {
+    const legacy = completeSnapshotRow();
+    legacy.daysInMonth = 0;
+    legacy.fixedIncomeCents = 0;
+    legacy.variableIncomeCents = 0;
+    legacy.variableDailyCents = [];
+    legacy.obligationDailyCents = [];
+    prismaMock.monthlySnapshot.findUnique.mockResolvedValue(legacy);
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+
+    const data = await loadDashboardData(closedReference);
+
+    // Tentou capturar; sem snapshot completo, seguiu ao vivo.
+    expect(captureClosedMonthsMock).toHaveBeenCalled();
+    expect(prismaMock.income.findMany).toHaveBeenCalled();
+    expect(data.monthlyIncomeCents).toBe(0);
   });
 });

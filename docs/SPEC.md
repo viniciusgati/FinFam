@@ -245,6 +245,28 @@ media_diaria       = consumo_disponivel / dias_da_janela   (Math.round)
   avulsos e divide pelos dias **restantes**; esta métrica separa o **consumo
   variável** das obrigações fixas, sem alterar nenhum desses cálculos.
 
+### 4.6 Mês fechado é imutável (snapshots)
+
+Um mês estritamente anterior ao corrente é **fechado**: seus números viram um
+snapshot (`monthly_snapshots`) e **não mudam mais**, mesmo que os dados de
+origem sejam editados, desativados ou apagados depois.
+
+- **Captura sem cron:** a primeira escrita (gancho no client Prisma) ou a
+  primeira leitura de `/` ou `/historico` no mês seguinte captura os meses
+  fechados ausentes (janela automática de 12 meses). Meses sem movimentação não
+  geram snapshot; se receberem um lançamento retroativo, a captura seguinte os
+  pega.
+- **Nunca sobrescreve:** existente nunca é recalculado automaticamente. A
+  correção explícita é `npm run db:snapshots -- --force [--month AAAA-MM]`
+  (§README).
+- **Leitura:** o dashboard de um mês fechado e o `/historico` leem o snapshot
+  (agregados, série diária, consumo disponível e categorias) — `elapsedDay` é o
+  mês inteiro e não há janela de ciclo. O mês corrente continua ao vivo.
+- **Legado:** capturas anteriores à série diária (sem
+  `variableDailyCents`/`obligationDailyCents`/split de renda) caem no cálculo ao
+  vivo até um `--force`. Snapshots são retidos por tempo indeterminado
+  (alvo ≥ 5 anos), sem expurgo automático.
+
 ## 5. Regras de negócio relevantes
 
 1. **Renda mensal** = soma das entradas fixas ativas no mês.

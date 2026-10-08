@@ -1,5 +1,11 @@
 import { PrismaClient, PaymentMethod } from "@prisma/client";
-import { monthKey, previousMonthKeys } from "../src/lib/finance";
+import {
+  consumptionAvailableCents,
+  consumptionDailyAverageCents,
+  monthKey,
+  previousMonthKeys,
+} from "../src/lib/finance";
+import { daysInMonthKey } from "../src/lib/snapshots";
 
 const prisma = new PrismaClient();
 
@@ -174,13 +180,39 @@ async function seedSnapshots(now: Date) {
       SNAPSHOT_FIXED_EXPENSES_CENTS +
       snapshot.variableExpensesCents +
       SNAPSHOT_CARD_EXPENSES_CENTS;
+    const days = daysInMonthKey(snapshot.monthKey);
+    const available = consumptionAvailableCents({
+      monthlyIncomeCents: SNAPSHOT_INCOME_CENTS,
+      fixedExpensesCents: SNAPSHOT_FIXED_EXPENSES_CENTS,
+    });
+
+    // Série diária sintética coerente com os agregados: o consumo variável cai
+    // no dia 3 e as obrigações (fixas + fatura) no dia 10, como no cenário real
+    // do seed. Assim os meses fechados de demonstração são "completos" e o
+    // dashboard não precisa cair no cálculo ao vivo.
+    const variableDailyCents = Array.from({ length: days }, (_, index) =>
+      index === 2 ? snapshot.variableExpensesCents : 0,
+    );
+    const obligationDailyCents = Array.from({ length: days }, (_, index) =>
+      index === 9
+        ? SNAPSHOT_FIXED_EXPENSES_CENTS + SNAPSHOT_CARD_EXPENSES_CENTS
+        : 0,
+    );
+
     const data = {
       incomeCents: SNAPSHOT_INCOME_CENTS,
+      fixedIncomeCents: SNAPSHOT_INCOME_CENTS,
+      variableIncomeCents: 0,
       fixedExpensesCents: SNAPSHOT_FIXED_EXPENSES_CENTS,
       variableExpensesCents: snapshot.variableExpensesCents,
       cardExpensesCents: SNAPSHOT_CARD_EXPENSES_CENTS,
       consumedCents,
       consumedPercent: (consumedCents / SNAPSHOT_INCOME_CENTS) * 100,
+      consumptionAvailableCents: available,
+      dailyAverageCents: consumptionDailyAverageCents(available, days),
+      daysInMonth: days,
+      variableDailyCents,
+      obligationDailyCents,
     };
 
     await upsertRow(

@@ -1,4 +1,4 @@
-import { prisma } from "./db";
+import { captureClosedMonths, prisma } from "./db";
 import {
   buildConsumptionSummary,
   buildDailySeries,
@@ -16,7 +16,14 @@ import {
 } from "./category-breakdown";
 import type { FinanceInput } from "./finance";
 import { isActiveInMonth, monthKey, shiftMonthKey } from "./finance";
-import { allocateInstallments, sumCardExpensesForMonth } from "./invoices";
+import {
+  invoiceLinesForSeries,
+  sumCardExpensesForMonth,
+} from "./invoices";
+import {
+  buildDashboardDataFromSnapshot,
+  isCompleteSnapshot,
+} from "./snapshot-month";
 import { getSettings } from "./settings";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
@@ -71,7 +78,82 @@ function sumByAmount(items: { amountCents: number }[]): number {
 }
 
 /**
+ * Dashboard de um mês fechado a partir do snapshot imutável. Devolve `null`
+ * quando o mês não tem snapshot ou ele é anterior à série diária (captura
+ * antiga) — nesse caso o chamador tenta capturar e, em último caso, calcula ao
+ * vivo (comportamento transitório até um `db:snapshots --force`).
+ *
+ * A comparação ("melhores/piores que os últimos N meses") continua vindo dos
+ * snapshots dos 4 meses anteriores, como no ramo ao vivo.
+ */
+async function loadClosedMonthData(
+  referenceMonthKey: string,
+  referenceDate: Date,
+): Promise<DashboardData | null> {
+  const startMonthKey = shiftMonthKey(referenceMonthKey, -4);
+
+  const [snapshot, previous] = await Promise.all([
+    prisma.monthlySnapshot.findUnique({
+      where: { monthKey: referenceMonthKey },
+      include: { categories: true },
+    }),
+    prisma.monthlySnapshot.findMany({
+      where: { monthKey: { gte: startMonthKey, lt: referenceMonthKey } },
+      orderBy: { monthKey: "asc" },
+      take: 4,
+      include: { categories: { orderBy: { amountCents: "desc" } } },
+    }),
+  ]);
+
+  if (!snapshot || !isCompleteSnapshot(snapshot)) return null;
+
+  const monthData = buildDashboardDataFromSnapshot(
+    {
+      monthKey: snapshot.monthKey,
+      incomeCents: snapshot.incomeCents,
+      fixedIncomeCents: snapshot.fixedIncomeCents,
+      variableIncomeCents: snapshot.variableIncomeCents,
+      fixedExpensesCents: snapshot.fixedExpensesCents,
+      variableExpensesCents: snapshot.variableExpensesCents,
+      cardExpensesCents: snapshot.cardExpensesCents,
+      consumedCents: snapshot.consumedCents,
+      consumedPercent: snapshot.consumedPercent,
+      consumptionAvailableCents: snapshot.consumptionAvailableCents,
+      dailyAverageCents: snapshot.dailyAverageCents,
+      daysInMonth: snapshot.daysInMonth,
+      variableDailyCents: snapshot.variableDailyCents,
+      obligationDailyCents: snapshot.obligationDailyCents,
+      categories: snapshot.categories.map((category) => ({
+        category: category.categoryLabel,
+        amountCents: category.amountCents,
+      })),
+    },
+    referenceDate,
+  );
+
+  return {
+    ...monthData,
+    previousPercents: previous.map((row) => row.consumedPercent),
+    previousMonthsCents: previous.map((row) => row.consumedCents),
+    snapshots: previous.map((row) => ({
+      monthKey: row.monthKey,
+      incomeCents: row.incomeCents,
+      consumedCents: row.consumedCents,
+      consumedPercent: row.consumedPercent,
+      categories: row.categories.map((category) => ({
+        category: category.categoryLabel,
+        amountCents: category.amountCents,
+      })),
+    })),
+  };
+}
+
+/**
  * Carrega os dados agregados do mês a partir do banco.
+ *
+ * Mês fechado (anterior ao corrente) lê o snapshot imutável; se ainda não
+ * houver, tenta capturar e, em último caso, calcula ao vivo. O mês corrente é
+ * sempre ao vivo.
  *
  * As entradas e saídas fixas respeitam a vigência (startMonth/endMonth) além
  * do flag `active`. Entradas avulsas (venda/saldo) do mês somam à renda mensal.
@@ -87,6 +169,23 @@ function sumByAmount(items: { amountCents: number }[]): number {
 export async function loadDashboardData(
   referenceDate: Date = new Date(),
 ): Promise<DashboardData> {
+  const referenceMonthKey = monthKey(referenceDate);
+  if (referenceMonthKey < monthKey(new Date())) {
+    const fromSnapshot = await loadClosedMonthData(
+      referenceMonthKey,
+      referenceDate,
+    );
+    if (fromSnapshot) return fromSnapshot;
+
+    // Sem snapshot completo: tenta capturar agora (idempotente) e reler.
+    await captureClosedMonths();
+    const retried = await loadClosedMonthData(
+      referenceMonthKey,
+      referenceDate,
+    );
+    if (retried) return retried;
+  }
+
   const timeZone = resolveTimeZone();
   const { year, month } = zonedDateParts(referenceDate, timeZone);
   const start = zonedTimeToUtc(year, month, 1, timeZone);
@@ -142,21 +241,10 @@ export async function loadDashboardData(
   // Parcelas cuja competência cai no mês, com o dia de vencimento do cartão e o
   // dia da compra (só quando a compra é do próprio mês — usada no gráfico de
   // consumo diário; parcelas anteriores são obrigação no vencimento).
-  const cardInvoiceLines = cardPurchases.flatMap((purchase) =>
-    allocateInstallments(
-      purchase,
-      purchase.card.closingDay,
-      purchase.card.dueDay,
-    )
-      .filter((installment) => installment.monthKey === currentMonthKey)
-      .map((installment) => ({
-        amountCents: installment.amountCents,
-        dueDay: purchase.card.dueDay,
-        purchaseDay:
-          monthKey(purchase.purchaseDate) === currentMonthKey
-            ? zonedDateParts(purchase.purchaseDate, timeZone).day
-            : null,
-      })),
+  const cardInvoiceLines = invoiceLinesForSeries(
+    cardPurchases,
+    currentMonthKey,
+    timeZone,
   );
 
   // Entradas avulsas do mês (venda/saldo) somam à renda, como as fixas.
