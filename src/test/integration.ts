@@ -58,6 +58,7 @@ const TABLES = [
   "app_settings",
   "card_purchases",
   "variable_expenses",
+  "variable_incomes",
   "monthly_snapshots",
   "credit_cards",
   "incomes",

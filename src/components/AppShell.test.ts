@@ -27,6 +27,6 @@ describe("AppShell (markup estático)", () => {
 
     expect(html).toContain("md:flex-row");
     expect(html).not.toContain("lg:flex-row");
-    expect(html).toContain("p-4 sm:p-6 lg:p-8");
+    expect(html).toContain("p-4 sm:p-6 md:p-8");
   });
 });

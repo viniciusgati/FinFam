@@ -16,6 +16,8 @@ import { NAV_ICONS, PinIcon } from "@/components/NavIcons";
 
 interface AppNavProps {
   footer?: ReactNode;
+  /** Sair (botão compacto) exibido apenas no trilho colapsado (≥768px). */
+  railFooter?: ReactNode;
   /** Estado inicial do trilho (≥768px). Padrão de produção: expandido. */
   initialExpanded?: boolean;
   /** Estado inicial do "fixar". Padrão de produção: não fixado. */
@@ -24,6 +26,7 @@ interface AppNavProps {
 
 export default function AppNav({
   footer,
+  railFooter,
   initialExpanded = true,
   initialPinned = false,
 }: AppNavProps) {
@@ -93,7 +96,7 @@ export default function AppNav({
         onMouseEnter={touch}
         onFocus={touch}
         onPointerDown={touch}
-        className={`${open ? "flex" : "hidden"} flex-col border-b border-border bg-surface p-2 md:sticky md:top-0 md:flex md:h-screen md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r ${
+        className={`${open ? "flex" : "hidden"} flex-col border-b border-border bg-surface p-2 transition-[width] duration-200 md:sticky md:top-0 md:flex md:h-screen md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r ${
           expanded ? "md:w-64 md:p-4" : "md:w-16"
         }`}
       >
@@ -137,7 +140,7 @@ export default function AppNav({
                     active
                       ? "border-emerald-500 bg-emerald-500/15 font-bold text-emerald-200"
                       : "border-transparent text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                  }`}
+                  } ${expanded ? "" : "md:justify-center md:px-2"}`}
                 >
                   <span
                     aria-hidden="true"
@@ -161,6 +164,16 @@ export default function AppNav({
             }`}
           >
             {footer}
+          </div>
+        )}
+
+        {railFooter && (
+          <div
+            className={`mt-4 border-t border-border pt-4 ${
+              expanded ? "hidden" : "hidden md:block"
+            }`}
+          >
+            {railFooter}
           </div>
         )}
       </nav>

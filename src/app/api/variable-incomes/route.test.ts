@@ -7,7 +7,7 @@ const { findManyMock, createMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({
   prisma: {
-    variableExpense: {
+    variableIncome: {
       findMany: findManyMock,
       create: createMock,
     },
@@ -16,15 +16,12 @@ vi.mock("@/lib/db", () => ({
 
 import { GET, POST } from "./route";
 
-const baseUrl = "http://localhost/api/variable-expenses";
+const baseUrl = "http://localhost/api/variable-incomes";
 
 const validPayload = {
-  description: "Mercado",
-  amountCents: 1234,
-  date: "2026-10-15T00:00:00.000Z",
-  category: "Alimentação",
-  paymentMethod: "PIX",
-  paid: true,
+  description: "Vendi a bicicleta",
+  amountCents: 35000,
+  date: "2026-10-03T00:00:00.000Z",
 };
 
 function postRequest(body: unknown): Request {
@@ -44,7 +41,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("GET /api/variable-expenses", () => {
+describe("GET /api/variable-incomes", () => {
   it("filtra pelo mês informado e ordena por data/createdAt desc", async () => {
     findManyMock.mockResolvedValue([{ id: "1" }]);
 
@@ -85,7 +82,7 @@ describe("GET /api/variable-expenses", () => {
   });
 });
 
-describe("POST /api/variable-expenses", () => {
+describe("POST /api/variable-incomes", () => {
   it("cria e retorna 201 com Location e o registro", async () => {
     createMock.mockResolvedValue({ id: "abc123", ...validPayload });
 
@@ -94,7 +91,7 @@ describe("POST /api/variable-expenses", () => {
 
     expect(response.status).toBe(201);
     expect(response.headers.get("Location")).toBe(
-      "/api/variable-expenses/abc123",
+      "/api/variable-incomes/abc123",
     );
     expect(json.id).toBe("abc123");
     expect(createMock).toHaveBeenCalledTimes(1);

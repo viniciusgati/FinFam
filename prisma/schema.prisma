@@ -33,6 +33,20 @@ model Income {
   @@map("incomes")
 }
 
+/// Entrada avulsa (não recorrente): venda de algo, saldo que sobrou no mês etc.
+/// Conta como renda do mês da `date` e entra no orçamento do ciclo.
+model VariableIncome {
+  id          String   @id @default(cuid())
+  description String
+  amountCents Int
+  date        DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@map("variable_incomes")
+}
+
 /// Saída fixa recorrente (ex.: aluguel, luz, internet).
 model FixedExpense {
   id          String   @id @default(cuid())

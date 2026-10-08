@@ -17,9 +17,12 @@ async function main() {
   const rangeStart = new Date(firstYear, firstMonth - 1, 1);
   const currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [incomes, fixedExpenses, variableExpenses, cardPurchases] =
+  const [incomes, variableIncomes, fixedExpenses, variableExpenses, cardPurchases] =
     await Promise.all([
       prisma.income.findMany({ where: { active: true } }),
+      prisma.variableIncome.findMany({
+        where: { date: { gte: rangeStart, lt: currentStart } },
+      }),
       prisma.fixedExpense.findMany({ where: { active: true } }),
       prisma.variableExpense.findMany({
         where: { date: { gte: rangeStart, lt: currentStart } },
@@ -33,6 +36,7 @@ async function main() {
     const snapshot = buildSnapshot({
       monthKey: key,
       incomes,
+      variableIncomes,
       fixedExpenses,
       variableExpenses,
       cardPurchases,

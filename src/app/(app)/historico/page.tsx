@@ -4,6 +4,11 @@ import MonthSelector from "@/components/MonthSelector";
 import RetryButton from "@/components/RetryButton";
 import { loadDashboardData } from "@/lib/dashboard";
 import {
+  cycleEndCountdownLabel,
+  remainingCycleDays,
+} from "@/lib/cycle";
+import { getSettings } from "@/lib/settings";
+import {
   computeFinanceStatus,
   dashboardView,
   monthKey,
@@ -35,7 +40,10 @@ export default async function HistoricoPage({
     const data = await loadDashboardData(referenceDate);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
-    daysRemaining = status.daysRemaining;
+    // Contador do ciclo financeiro (mesma regra do dashboard), não do mês
+    // calendário.
+    const { cycleStartDay } = await getSettings();
+    daysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
     view = dashboardView({
       dbError: false,
       incomeCents: status.incomeCents,
@@ -127,7 +135,7 @@ export default async function HistoricoPage({
           </p>
 
           <p className="text-2xl font-medium opacity-95">
-            {daysRemaining} dias para o fim do mês
+            {cycleEndCountdownLabel(daysRemaining)}
           </p>
 
           <p className="max-w-xl rounded-full bg-black/20 px-6 py-3 text-lg">

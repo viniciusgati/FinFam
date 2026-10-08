@@ -24,7 +24,7 @@ describe("MonthSpendCard (renderização)", () => {
     expect(html).toContain("42");
     expect(html).toContain("Ok");
     expect(html).toContain("Vencimento da fatura em 10/04");
-    expect(html).toContain("7 dias para o fim do mês");
+    expect(html).toContain("7 dias para o fim do ciclo");
   });
 
   it("aplica as classes compactas de tipografia e padding", () => {

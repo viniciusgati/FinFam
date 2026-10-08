@@ -1,3 +1,4 @@
+import { cycleEndCountdownLabel } from "@/lib/cycle";
 import { levelLabel, textColorForBackground, type FinanceLevel } from "@/lib/finance";
 
 export interface MonthSpendCardProps {
@@ -48,7 +49,7 @@ export default function MonthSpendCard({
       </p>
 
       <p className="text-lg font-medium opacity-95">
-        {daysRemaining} dias para o fim do mês
+        {cycleEndCountdownLabel(daysRemaining)}
       </p>
 
       <p

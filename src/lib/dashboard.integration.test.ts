@@ -57,6 +57,27 @@ describe("loadDashboardData — integração com PostgreSQL", () => {
     expect(data.fixedExpensesCents).toBe(120000);
   });
 
+  it("soma entradas avulsas do mês à renda e ignora as de outros meses", async () => {
+    await prisma.variableIncome.createMany({
+      data: [
+        {
+          description: "Vendi a bicicleta",
+          amountCents: 35000,
+          date: new Date(2026, 9, 3),
+        },
+        {
+          description: "Saldo de setembro",
+          amountCents: 9999,
+          date: new Date(2026, 8, 30),
+        },
+      ],
+    });
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.monthlyIncomeCents).toBe(35000);
+  });
+
   it("conta gastos avulsos CASH/DEBIT/PIX do mês e ignora CREDIT e fora do mês", async () => {
     await prisma.variableExpense.createMany({
       data: [

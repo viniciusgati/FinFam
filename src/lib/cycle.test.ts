@@ -65,8 +65,8 @@ describe("dailyCentsForBudget", () => {
     expect(dailyCentsForBudget(325000, 26)).toBe(12500);
   });
 
-  it("orçamento livre <= 0 retorna 0 (nunca negativo)", () => {
-    expect(dailyCentsForBudget(-500, 10)).toBe(0);
+  it("orçamento negativo (ciclo estourado) vira diária negativa", () => {
+    expect(dailyCentsForBudget(-500, 10)).toBe(-50);
     expect(dailyCentsForBudget(0, 10)).toBe(0);
   });
 
@@ -91,17 +91,17 @@ describe("dailyAllowanceCents", () => {
     expect(allowance.hasData).toBe(true);
   });
 
-  it("orçamento livre <= 0 retorna diária 0", () => {
+  it("ciclo estourado: orçamento livre 0 e diária negativa (excesso/dia)", () => {
     const allowance = dailyAllowanceCents({
       incomeCents: 100000,
       obligationsCents: 100000,
-      variableSpentCents: 1,
+      variableSpentCents: 50000,
       cycleStartDay: 1,
       now: NOW,
     });
 
     expect(allowance.freeBudgetCents).toBe(0);
-    expect(allowance.dailyCents).toBe(0);
+    expect(allowance.dailyCents).toBe(-7143);
     expect(allowance.hasData).toBe(true);
   });
 
@@ -182,5 +182,15 @@ describe("dailyAllowanceCard", () => {
 
     expect(card.state).toBe("no-data");
     expect(card.label).toBe("Sem dados do ciclo");
+  });
+
+  it("ciclo estourado mostra a diária negativa", () => {
+    const card = dailyAllowanceCard(
+      allowance({ dailyCents: -1250, freeBudgetCents: 0, remainingDays: 8 }),
+    );
+
+    expect(card.state).toBe("over-budget");
+    expect(card.label.replace(/\u00a0/g, " ")).toBe("-R$ 12,50 por dia");
+    expect(card.detail).toBe("Orçamento do ciclo estourado");
   });
 });

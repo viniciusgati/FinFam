@@ -28,6 +28,7 @@ export default function AppShell({ user, children }: AppShellProps) {
   }
 
   const loading = logoutState === "loading";
+  const logoutLabel = loading ? "Saindo..." : "Sair";
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas md:flex-row">
@@ -42,7 +43,7 @@ export default function AppShell({ user, children }: AppShellProps) {
               aria-busy={loading}
               className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-60"
             >
-              {loading ? "Saindo..." : "Sair"}
+              {logoutLabel}
             </button>
             <p aria-live="polite" className="min-h-5 px-1 text-xs text-red-400">
               {logoutState === "error"
@@ -51,8 +52,35 @@ export default function AppShell({ user, children }: AppShellProps) {
             </p>
           </div>
         }
+        railFooter={
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loading}
+            aria-busy={loading}
+            aria-label={logoutLabel}
+            title={logoutLabel}
+            className="flex w-full items-center justify-center rounded-lg border border-border-strong p-2 text-foreground-muted transition hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:opacity-60"
+          >
+            <svg
+              aria-hidden="true"
+              focusable="false"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5"
+            >
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <path d="M16 17l5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
+          </button>
+        }
       />
-      <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-8">{children}</main>
     </div>
   );
 }
