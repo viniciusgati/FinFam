@@ -10,6 +10,10 @@ import {
   dailyAllowanceCents,
   type DailyAllowance,
 } from "./cycle";
+import {
+  buildCategoryBreakdown,
+  type CategoryBreakdown,
+} from "./category-breakdown";
 import type { FinanceInput } from "./finance";
 import { isActiveInMonth, monthKey, shiftMonthKey } from "./finance";
 import { allocateInstallments, sumCardExpensesForMonth } from "./invoices";
@@ -46,6 +50,12 @@ export interface DashboardData extends FinanceInput {
    * informativa; não substitui o `%` nem o orçamento livre do ciclo.
    */
   consumption: ConsumptionSummary;
+  /**
+   * Gasto do mês por categoria (fixas vigentes + avulsos no orçamento +
+   * parcelas de cartão por competência). Invariante: a soma das fatias coincide
+   * com `consumedCents`.
+   */
+  categoryBreakdown: CategoryBreakdown;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -205,6 +215,12 @@ export async function loadDashboardData(
     })),
     series,
     consumption,
+    categoryBreakdown: buildCategoryBreakdown({
+      monthKey: currentMonthKey,
+      fixedExpenses,
+      variableExpenses,
+      cardPurchases,
+    }),
     referenceDate,
   };
 }

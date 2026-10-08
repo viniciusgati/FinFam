@@ -125,6 +125,70 @@ describe("loadDashboardData — integração com PostgreSQL", () => {
     expect(data.cardExpensesCents).toBe(60000);
   });
 
+  it("expõe categoryBreakdown cuja soma das fatias fecha com o total consumido", async () => {
+    await prisma.fixedExpense.createMany({
+      data: [
+        { name: "Aluguel", amountCents: 120000, category: "Moradia" },
+        { name: "Internet", amountCents: 10000, category: "Moradia" },
+      ],
+    });
+
+    await prisma.variableExpense.createMany({
+      data: [
+        { description: "Mercado", amountCents: 5000, date: new Date(2026, 9, 5), paymentMethod: "CASH", category: "Mercado" },
+        { description: "Farmácia", amountCents: 2000, date: new Date(2026, 9, 10), paymentMethod: "PIX", category: "Saúde" },
+        { description: "Cartão", amountCents: 9999, date: new Date(2026, 9, 15), paymentMethod: "CREDIT", category: "Lazer" },
+      ],
+    });
+
+    const card = await prisma.creditCard.create({
+      data: { name: "Nubank", closingDay: 20, dueDay: 5 },
+    });
+
+    await prisma.cardPurchase.createMany({
+      data: [
+        // Compra parcelada em 3x em 10/09/2026 → 1ª parcela vence em 2026-10:
+        // o mês recebe apenas a parcela (resto na 1ª), nunca o valor integral.
+        {
+          cardId: card.id,
+          description: "Móveis",
+          amountCents: 90000,
+          purchaseDate: new Date(2026, 8, 10),
+          installmentsTotal: 3,
+          category: "Casa",
+        },
+        // Parcelada a partir de 11/2026: não entra em outubro/2026.
+        {
+          cardId: card.id,
+          description: "Notebook",
+          amountCents: 300000,
+          purchaseDate: new Date(2026, 10, 15),
+          installmentsTotal: 3,
+          category: "Eletrônicos",
+        },
+      ],
+    });
+
+    const data = await loadDashboardData(referenceDate);
+    const fatiasCents = data.categoryBreakdown.items.reduce(
+      (total, item) => total + item.amountCents,
+      0,
+    );
+
+    expect(fatiasCents).toBe(data.categoryBreakdown.totalCents);
+    expect(data.categoryBreakdown.totalCents).toBe(
+      data.fixedExpensesCents +
+        data.variableExpensesCents +
+        data.cardExpensesCents,
+    );
+    // Uma parcela de R$ 300,00 (não o total de R$ 900,00) entra em outubro.
+    expect(data.cardExpensesCents).toBe(30000);
+    // Avulso CREDIT não entra em nenhuma fatia (SPEC §3.3).
+    expect(
+      data.categoryBreakdown.items.some((item) => item.category === "Lazer"),
+    ).toBe(false);
+  });
+
   it("carrega os percentuais dos meses anteriores a partir dos snapshots", async () => {
     await prisma.monthlySnapshot.createMany({
       data: [

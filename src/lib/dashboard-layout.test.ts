@@ -125,8 +125,40 @@ describe("skeleton de carregamento da rota", () => {
   });
 });
 
-const PAGES = ["../app/(app)/page.tsx", "../app/(app)/historico/page.tsx"];
+describe("seção Gastos por categoria no dashboard", () => {
+  it("renderiza o CategoryBreakdownCard dentro do ramo ok", () => {
+    const page = readSource("../app/(app)/page.tsx");
 
+    const okIndex = page.indexOf('view.state === "ok" && series !== null');
+    const cardIndex = page.indexOf("<CategoryBreakdownCard");
+
+    expect(okIndex).toBeGreaterThanOrEqual(0);
+    expect(cardIndex).toBeGreaterThan(okIndex);
+  });
+
+  it("não renderiza a seção no ramo de erro", () => {
+    const page = readSource("../app/(app)/page.tsx");
+
+    const errorIndex = page.indexOf('view.state === "error"');
+    const futureIndex = page.indexOf('view.state === "future"');
+    const errorBlock = page.slice(errorIndex, futureIndex);
+
+    expect(errorIndex).toBeGreaterThanOrEqual(0);
+    expect(futureIndex).toBeGreaterThan(errorIndex);
+    expect(errorBlock).not.toContain("CategoryBreakdownCard");
+    expect(errorBlock).toContain("<RetryButton");
+  });
+
+  it("o loading.tsx tem skeleton Gastos por categoria acessível", () => {
+    const loading = readSource("../app/(app)/loading.tsx");
+
+    expect(loading).toContain("Gastos por categoria");
+    expect(loading).toContain('aria-busy="true"');
+    expect(loading).toContain('role="status"');
+  });
+});
+
+const PAGES = ["../app/(app)/page.tsx", "../app/(app)/historico/page.tsx"];
 describe("estados de navegação e onboarding do ciclo", () => {
   it("renderiza FutureMonthNotice sob o estado future nas duas páginas", () => {
     for (const path of PAGES) {
