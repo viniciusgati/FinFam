@@ -565,3 +565,186 @@ comparação); `src/lib/quick-expense.ts:37-39` e
 `src/lib/dashboard.ts:87-112` (vigência/competência); `src/app/(app)/historico/page.tsx:103-137`
 (histórico duplica o `%`).
 
+---
+
+# Rodada 4 — Dashboard: média diária de consumo e categoria nos gráficos (task #250)
+
+> Fase 2 (auditor-ux) da task #250 ("Melhorias de usabilidade e gráficos mais úteis
+> no dashboard"). A retomada do usuário fixou a decisão de produto em aberto:
+> **consumo = total de entradas − gastos fixos** deve ser a fonte de verdade das
+> análises. Esta rodada avalia o **impacto na experiência** de introduzir essa
+> métrica e a categoria nos gráficos, aposentar o "Dia a dia" e transformar o
+> `/historico` em ferramenta de análise da família. Baseada na leitura do código
+> atual e na execução real de `npm test`, `npm run typecheck`, `npm run lint` e de
+> um cálculo repro dos números que o usuário verá na tela. Nenhum código de
+> produção foi alterado — apenas este documento.
+
+## Fluxos do usuário
+
+- **Abrir o dashboard no mês corrente (`/`)** — vê o `%` protagonista ("Renda do
+  mês consumida"), projeção ("No ritmo atual: Z% até o fim do mês"), "Mês
+  calendário", rótulo textual do nível, vencimento de fatura, contador do **ciclo**,
+  feedback comparativo, `QuickExpenseCard`, `DailyAllowanceCard` ("Pode gastar por
+  dia", diária do ciclo), dois gráficos, "Avaliação do dia", `MonthReviewPanel` e
+  `PurchaseSimulator`. Muita informação, mas os números não compartilham a mesma
+  moldura temporal nem o mesmo conceito de gasto.
+- **Interpretar os gráficos** — `IncomeVsExpenseChart` mostra só dois totais
+  (Entradas × Saídas) em barras proporcionais; `DailySpendChart` ("Dia a dia") plota
+  uma barra por dia (fixas + avulsos + fatura) e uma linha de acumulado, sem eixos,
+  sem escala em R$, sem legenda e sem linha de referência. O usuário não consegue
+  responder "quanto gastei de verdade por dia nem se estou dentro do ritmo".
+- **Lançar um gasto (Lançamento rápido)** — formulário Data/Descrição/Valor, sem
+  campo **categoria** (`QuickExpenseCard.tsx:82-142`). O gasto criado aqui entra
+  como `null` e, no novo gráfico de categoria, viraria "Sem categoria".
+- **Cadastrar categoria** — só em `/gastos`, `/saidas` e `/cartoes`, como **texto
+  livre** (ex.: `GastosManager.tsx:439`, `FixedItemsManager.tsx:430`,
+  `CreditCardsManager.tsx:1288`), sem lista, sugestão ou normalização. Duas pessoas
+  escrevem "Mercado", "mercado" e "supermercado" e viram três fatias.
+- **Consultar o histórico (`/historico`)** — há `MonthSelector` e o **mesmo** `%`
+  em tela cheia (`historico/page.tsx:111-144`); não há lista de meses, tendência,
+  comparativo por categoria nem consumo. O seletor de mês muda o número mostrado,
+  mas não há visão temporal: "como estivemos nos últimos meses" segue sem resposta.
+- **Navegar para mês futuro** — permitido pelo `input type="month"`; cai na
+  mensagem genérica de vazio (herdado da rodada anterior), sem explicar que o mês
+  ainda não chegou.
+- **Buscar ajuda para a família** — hoje apenas a frase comparativa do card e o
+  `MonthReviewPanel` (IA opcional, mês fechado). Não existe nenhuma leitura por
+  categoria nem resumo de "consumo médio por dia".
+
+## Problemas de usabilidade
+
+- **Três leituras diárias discordantes na mesma tela** — com renda R$ 5.000, fixas
+  R$ 3.000, fatura R$ 1.000 e avulsos R$ 400: o `%` protagonista mostra 88%
+  (`consumedCents` inclui fixas e fatura, `finance.ts:137-143`); o card de diária
+  mostra **R$ 32,26/dia** (`(renda − fixas − faturas)/dias`,
+  `dashboard-series.ts:134-136`); e o novo "consumo" pedido pelo usuário dá
+  **R$ 64,52/dia** (`(entradas − fixas)/dias`). Sem rótulo que explique a diferença,
+  o usuário vê três números "certos" que se contradizem.
+- **O "Dia a dia" é inútil exatamente como o usuário descreveu** — os vencimentos
+  dominam a escala: um fixo de R$ 3.000 no dia 10 esmaga um avulso real de R$ 400
+  no dia 5 para **13,3% da altura do pico**; a fatura no vencimento cria outro pico.
+  O gráfico não mostra valor por dia, não tem eixo, legenda, média nem separação
+  fixas × variáveis (`DailySpendChart.tsx:78-108`). Não responde nada.
+- **Gráfico de categoria nasce inviável sem noção de categoria no fluxo** — o
+  lançamento rápido não tem categoria e a categoria é texto livre/opcional; o
+  resultado prático é uma fatia "Sem categoria" grande e fatias fragmentadas. O
+  gráfico pode ser tecnicamente correto e ainda assim inútil para a família.
+- **Fatura de cartão é o caso mais fácil de divergir** — a categoria vive na
+  `CardPurchase` e a parcela é alocada por competência (`invoices.ts:105-121`,
+  `dashboard.ts:101-113`). Se a agregação somar a compra inteira (ou no mês da
+  compra) o total por categoria não fecha com o total do mês; se ignorar a
+  categoria, cai em "Sem categoria". Nos dois casos o usuário perde a confiança no
+  gráfico.
+- **Consumo negativo não tem tratamento de UX definido** — quando as fixas superam
+  as entradas, `(entradas − fixas)/dias` fica negativo. Sem decisão explícita, a
+  média pode aparecer negativa ou zerada sem explicação ("sua renda não cobre nem
+  as contas fixas" é a mensagem que falta).
+- **A categoria não é o único dado em falta no gráfico vazio** — não há estado
+  "ainda sem gastos/ categorias neste mês" projetado para os novos gráficos; o
+  padrão atual (barras zeradas) some silenciosamente em vez de orientar.
+- **Acessibilidade dos gráficos atuais é fraca e seria herdada** — o `aria-label`
+  do "Dia a dia" só anuncia "total de X" (`DailySpendChart.tsx:19-30`), sem os
+  picos; as barras dependem de duas cores sem legenda textual; não há texto/tabela
+  alternativa. Quem usa leitor de tela não obtém a informação do gráfico.
+- **Não há onboarding do novo conceito** — nenhum texto explica que "Renda do mês
+  consumida" (inclui fixas) passa a conviver com "consumo médio por dia" (exclui
+  fixas). Sem isso, a métrica nova parece um erro de cálculo, não uma melhoria.
+- **Moldura temporal implícita** — o card de diária usa o **ciclo**
+  (`cycleStartDay`), o `%` e os gráficos usam o **mês calendário**. A média diária
+  de consumo precisa declarar a janela; caso contrário a comparação
+  média × realizado mistura duas réguas.
+- **Ajuda à família inexistente** — não há resumo acionável ("sua média é R$ X/dia;
+  hoje você gastou 1,5× isso") nem destaque de categoria acima do normal. O
+  `/historico` não serve de base por ser só um número repetido.
+
+## Recomendações priorizadas
+
+- **P0 — Fixar e rotular a métrica na UI**: adotar `consumo = entradas − gastos
+  fixos` como fonte de verdade, exibindo um subtítulo explícito ("Consumo médio por
+  dia — não inclui contas fixas nem faturas") ao lado do `%`. Benefício: elimina a
+  contradição dos três números e o risco de o usuário achar que um deles está errado.
+- **P0 — Aposentar o "Dia a dia"** por um gráfico de **gasto variável por dia +
+  linha da média diária de consumo**, com as fixas/faturas como faixa ou anotação
+  à parte (não como barra). Benefício: atende literalmente a queixa (os fixos
+  atrapalham) e os picos de vencimento somem.
+- **P0 — Levar a categoria ao fluxo de lançamento**: campo com `datalist` de
+  categorias sugeridas (reaproveitando as já usadas) + opção "Sem categoria" tanto
+  no `QuickExpenseCard` quanto em `/gastos`. Benefício: o gráfico de categoria tem
+  dado confiável; sem isso ele não se sustenta.
+- **P0 — Garantir coerência do gráfico de categoria com o total**: faturas pela
+  competência da parcela e categoria da `CardPurchase`; `null`/vazio agrupado em
+  "Sem categoria"; soma das fatias == total do mês (teste). Benefício: o número do
+  gráfico bate com o `%` e o usuário confia.
+- **P1 — Estados de vazio/erro próprios de cada gráfico**: "Ainda sem gastos neste
+  mês", "Sem categorias cadastradas" com CTA para `/gastos`. Benefício: o gráfico
+  vazio orienta em vez de parecer quebrado.
+- **P1 — `/historico` como análise real**: lista dos últimos meses (consumo, `%`,
+  total) + gráfico de tendência + comparativo por categoria. Benefício: entrega o
+  "como estivemos" e a base para a ajuda à família.
+- **P1 — Mensagens acionáveis de ajuda à família**: "sua média é R$ X/dia; hoje
+  variou Y", "a categoria Alimentação ficou 40% acima da média dos últimos meses",
+  resumo do ciclo. Benefício: transforma gráficos em decisão.
+- **P1 — Tratar consumo ≤ 0 com mensagem clara**: quando as fixas consomem toda a
+  renda, exibir "sua renda não cobre as contas fixas" em vez de média negativa/zero
+  muda. Benefício: explica o caso extremo sem confundir.
+- **P2 — Acessibilidade dos gráficos**: legenda textual, valores por dia no
+  `aria-label`, descrição/tabela alternativa e contraste; nunca depender só da cor.
+  Benefício: leitores de tela e daltonismo acessam a mesma informação.
+- **P2 — Normalizar categorias**: trim/casefold + sugestões (ou enum com migração
+  do texto livre legado). Benefício: fatias estáveis ao longo do tempo.
+- **P2 — Padronizar a moldura temporal**: rotular explicitamente se a média/categoria
+  é do mês calendário ou do ciclo (`cycleStartDay`). Benefício: comparações válidas.
+- **P2 — Bloquear/avisar mês futuro** com mensagem adequada. Benefício: menos
+  leitura enganosa (item herdado, ainda aberto).
+
+## Evidência
+
+Comandos e saídas reais desta fase (nenhum código de produção alterado; apenas este
+documento). Baseline da branch `autoia/task-250` antes da alteração:
+
+```
+$ git branch --show-current
+autoia/task-250
+$ git status --short
+(limpo, antes deste documento)
+
+$ npm test 2>&1 | tail -6
+ Test Files  47 passed (47)
+      Tests  469 passed (469)
+   Duration  5.00s
+TEST_EXIT=0
+
+$ npm run typecheck 2>&1 | tail -4
+> tsc --noEmit
+TYPECHECK_EXIT=0
+
+$ npm run lint 2>&1 | tail -6
+  17:36  warning  '_omitted' is assigned a value but never used
+✖ 1 problem (0 errors, 1 warning)
+LINT_EXIT=0
+```
+
+Repro dos números que o usuário veria com renda R$ 5.000, fixas R$ 3.000, fatura
+R$ 1.000, avulsos R$ 400 (outubro, 31 dias):
+
+```
+$ node -e '...'
+protagonista consumedCents = 440000 => 88% da renda
+consumo proposto (entradas-fixas) = 200000 => media diaria 64.52 R$/dia
+dailyFreeBudget atual = (renda-fixas-faturas)/dias = 32.26 R$/dia
+Dia a dia: pico barra = 3000.00 R$ no dia 10 | avulso no dia 5 = 400.00 R$ (escala esmagada: 13.3% do pico)
+```
+
+Leituras-chave desta rodada: `src/lib/finance.ts:137-143,299-344` (`consumedCents`/`%`
+com fixas e a projeção); `src/lib/dashboard-series.ts:113-142` (série mistura fixas +
+faturas; `dailyFreeBudgetCents` desconta fixas **e** cartão);
+`src/components/DailySpendChart.tsx:19-30,78-108` (sem referência/legenda/valores);
+`src/components/IncomeVsExpenseChart.tsx:24-60` (só dois totais);
+`src/components/QuickExpenseCard.tsx:82-142` (sem categoria);
+`src/components/GastosManager.tsx:439` / `FixedItemsManager.tsx:430` /
+`CreditCardsManager.tsx:1288` (categoria texto livre);
+`src/lib/dashboard.ts:101-123` (rateio de fatura por competência);
+`src/app/(app)/historico/page.tsx:111-144` (placeholder);
+`src/components/DailyAllowanceCard.tsx:18-32` (diária do ciclo) e
+`src/lib/cycle.ts:230-315` (rótulos da diária); `docs/DASHBOARD_CHARTS.md` (diretriz).
+
