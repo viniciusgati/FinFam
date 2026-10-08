@@ -4,18 +4,21 @@ import MonthSelector from "@/components/MonthSelector";
 import RetryButton from "@/components/RetryButton";
 import { loadDashboardData } from "@/lib/dashboard";
 import {
-  cycleEndCountdownLabel,
-  remainingCycleDays,
-} from "@/lib/cycle";
-import { getSettings } from "@/lib/settings";
-import {
+  compareWithHistory,
   computeFinanceStatus,
   dashboardView,
+  levelLabel,
   monthKey,
-  textColorForBackground,
+  monthLabel,
   type DashboardView,
+  type FinanceLevel,
 } from "@/lib/finance";
-import { invoiceDueLabel, resolveReferenceDate } from "@/lib/invoices";
+import {
+  buildMonthHistory,
+  type MonthHistoryEntry,
+} from "@/lib/history";
+import { formatCents } from "@/lib/money";
+import { resolveReferenceDate } from "@/lib/invoices";
 
 export const dynamic = "force-dynamic";
 
@@ -33,17 +36,14 @@ export default async function HistoricoPage({
   const isCurrentMonth = referenceMonthKey >= monthKey(new Date());
 
   let view: DashboardView = { state: "error" };
-  let backgroundColor = "hsl(0 0% 45%)";
-  let daysRemaining = 0;
+  let history: MonthHistoryEntry[] = [];
+  let selectedPercent = 0;
+  let selectedLevel: FinanceLevel = "neutral";
+  let comparison = "";
 
   try {
     const data = await loadDashboardData(referenceDate);
     const status = computeFinanceStatus(data);
-    backgroundColor = status.color;
-    // Contador do ciclo financeiro (mesma regra do dashboard), não do mês
-    // calendário.
-    const { cycleStartDay } = await getSettings();
-    daysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
     view = dashboardView({
       dbError: false,
       incomeCents: status.incomeCents,
@@ -51,6 +51,16 @@ export default async function HistoricoPage({
       projectedPercent: status.projectedPercent,
       previousPercents: data.previousPercents,
     });
+
+    if (view.state === "ok") {
+      selectedPercent = status.consumedPercent;
+      selectedLevel = status.level;
+      comparison = compareWithHistory(
+        status.consumedPercent,
+        data.previousPercents,
+      );
+      history = buildMonthHistory(data.snapshots);
+    }
   } catch {
     view = dashboardView({
       dbError: true,
@@ -109,39 +119,65 @@ export default async function HistoricoPage({
       )}
 
       {view.state === "ok" && (
-        <section
-          className="flex min-h-[50vh] flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center transition-colors duration-700"
-          style={{
-            backgroundColor,
-            color: textColorForBackground(backgroundColor),
-          }}
-        >
-          <header className="space-y-1">
-            <p className="text-sm font-medium uppercase tracking-widest opacity-80">
-              FinFam
+        <div className="flex flex-col gap-4">
+          <section className="flex flex-col items-center gap-2 rounded-2xl border border-border-strong bg-surface p-6 text-center">
+            <p className="text-sm font-medium uppercase tracking-widest text-subtle">
+              {monthLabel(referenceMonthKey)}
             </p>
-            <h1 className="text-xl font-semibold opacity-90">
-              Renda do mês consumida
-            </h1>
-          </header>
+            <p className="text-5xl font-black tabular-nums text-foreground sm:text-6xl">
+              {Math.round(selectedPercent)}
+              <span className="align-top text-2xl sm:text-3xl">%</span>
+            </p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+              {levelLabel(selectedLevel)}
+            </p>
+          </section>
 
-          <p className="text-7xl font-black tabular-nums sm:text-9xl">
-            {view.percent}
-            <span className="text-4xl align-top sm:text-6xl">%</span>
+          <p
+            role="status"
+            aria-live="polite"
+            className="rounded-2xl border border-border-strong bg-surface-raised p-4 text-center text-lg text-foreground"
+          >
+            {comparison}
           </p>
 
-          <p className="text-sm font-medium uppercase tracking-wide opacity-80">
-            {invoiceDueLabel(referenceDate)}
-          </p>
+          <section
+            aria-label="Evolução dos meses"
+            className="flex flex-col gap-2"
+          >
+            <h2 className="text-sm font-medium uppercase tracking-widest text-subtle">
+              Evolução dos meses
+            </h2>
 
-          <p className="text-2xl font-medium opacity-95">
-            {cycleEndCountdownLabel(daysRemaining)}
-          </p>
-
-          <p className="max-w-xl rounded-full bg-black/20 px-6 py-3 text-lg">
-            {view.feedback}
-          </p>
-        </section>
+            {history.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-border-strong bg-surface p-6 text-center text-foreground-muted">
+                Ainda não há meses anteriores registrados.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {history.map((entry) => (
+                  <li
+                    key={entry.monthKey}
+                    className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-border-strong bg-surface px-4 py-3"
+                  >
+                    <span className="text-sm font-medium text-foreground">
+                      {entry.label}
+                    </span>
+                    <span className="text-sm tabular-nums text-foreground-muted">
+                      {formatCents(entry.totalCents)}
+                    </span>
+                    <span className="text-lg font-bold tabular-nums text-foreground">
+                      {entry.percent}%
+                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
+                      {entry.levelLabel}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       )}
     </div>
   );

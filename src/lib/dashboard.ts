@@ -18,10 +18,20 @@ import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
 /** Formas de pagamento de gasto avulso que entram no orçamento (SPEC §3.3). */
 const budgetPaymentMethods = PAYMENT_METHODS.filter(isCountedInBudget);
 
+/** Snapshot de um mês fechado, com os campos necessários para rotular a lista. */
+export interface DashboardSnapshot {
+  monthKey: string;
+  incomeCents: number;
+  consumedCents: number;
+  consumedPercent: number;
+}
+
 export interface DashboardData extends FinanceInput {
   previousPercents: number[];
   /** Totais gastos nos meses fechados (mais recente por último). */
   previousMonthsCents: number[];
+  /** Snapshots dos meses fechados já carregados (ordem cronológica). */
+  snapshots: DashboardSnapshot[];
   /** Série diária do mês de referência (gráficos e avaliação do dia). */
   series: DailySeries;
 }
@@ -144,6 +154,12 @@ export async function loadDashboardData(
     cardExpensesCents,
     previousPercents: snapshots.map((snapshot) => snapshot.consumedPercent),
     previousMonthsCents: snapshots.map((snapshot) => snapshot.consumedCents),
+    snapshots: snapshots.map((snapshot) => ({
+      monthKey: snapshot.monthKey,
+      incomeCents: snapshot.incomeCents,
+      consumedCents: snapshot.consumedCents,
+      consumedPercent: snapshot.consumedPercent,
+    })),
     series,
     referenceDate,
   };
