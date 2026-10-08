@@ -1,34 +1,63 @@
-/** Tempo de inatividade, em ms, após o qual o menu lateral recolhe sozinho. */
-export const NAV_AUTO_COLLAPSE_MS = 10_000;
-
-/** Chave do `localStorage` onde a preferência expandido/recolhido é salva. */
-export const NAV_EXPANDED_STORAGE_KEY = "finfam:nav-expanded";
-
 /**
- * Indica se o menu lateral deve recolher por inatividade.
+ * Regras puras do trilho de navegação colapsável (≥768px).
  *
- * `lastInteractionAt` e `now` são timestamps em ms (ex.: `Date.now()`); o
- * recolhimento ocorre quando o tempo desde a última interação atinge o timeout.
+ * Nenhum efeito de UI aqui: o componente `AppNav` combina estas funções com
+ * um timer de 5000ms; os testes cobrem apenas esta lógica.
  */
-export function shouldAutoCollapse(
-  lastInteractionAt: number,
+
+/** Milissemundos sem interação antes de o menu colapsar sozinho. */
+export const NAV_AUTO_COLLAPSE_MS = 5000;
+
+/** Chave de persistência do estado "fixado" no `localStorage`. */
+export const NAV_PINNED_STORAGE_KEY = "finfam.nav.pinned";
+
+export interface NavCollapseState {
+  /** Menu fixado (impede o colapso automático). */
+  pinned: boolean;
+  /** Timestamp da última interação (hover/foco/clique) no menu. */
+  lastInteractionAt: number;
+}
+
+/** Registra uma interação em `now`, reiniciando a contagem do auto-colapso. */
+export function touchNav(
+  state: NavCollapseState,
   now: number,
-  timeoutMs: number = NAV_AUTO_COLLAPSE_MS,
-): boolean {
-  return now - lastInteractionAt >= timeoutMs;
+): NavCollapseState {
+  return { ...state, lastInteractionAt: now };
+}
+
+/** Verdadeiro quando passou do limite sem interação (ignora `pinned`). */
+export function isNavIdle(state: NavCollapseState, now: number): boolean {
+  return now - state.lastInteractionAt >= NAV_AUTO_COLLAPSE_MS;
+}
+
+/** O menu deve estar expandido em `now`? Fixado ou ainda "quentinho" ⇒ sim. */
+export function navExpanded(state: NavCollapseState, now: number): boolean {
+  return state.pinned || !isNavIdle(state, now);
 }
 
 /**
- * Estado inicial do menu quando não há preferência salva: recolhido em viewports
- * de tablet (768–1023px) e expandido nas demais.
+ * Lê `finfam.nav.pinned` do `localStorage`. Retorna `false` em SSR,
+ * incognito ou qualquer ambiente sem `localStorage` — sem lançar exceção.
  */
-export function defaultNavExpanded(isTabletViewport: boolean): boolean {
-  return !isTabletViewport;
+export function readNavPinned(): boolean {
+  try {
+    if (typeof localStorage === "undefined") return false;
+    return localStorage.getItem(NAV_PINNED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
 }
 
-/** Converte a preferência persistida em `boolean` (`null` se ausente/inválida). */
-export function parseStoredExpanded(value: string | null): boolean | null {
-  if (value === "true") return true;
-  if (value === "false") return false;
-  return null;
+/**
+ * Grava `finfam.nav.pinned` ("true"/"false"). Silencioso quando o
+ * `localStorage` não está disponível (SSR/incognito).
+ */
+export function writeNavPinned(pinned: boolean): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(NAV_PINNED_STORAGE_KEY, pinned ? "true" : "false");
+  } catch {
+    // Preferência não persistida; o estado em memória continua válido.
+  }
 }

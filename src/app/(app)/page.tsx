@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { loadCycleAllowance, loadDashboardData } from "@/lib/dashboard";
 import {
-  cycleEndCountdownLabel,
   dailyAllowanceCard,
   remainingCycleDays,
   type DailyAllowance,
@@ -12,7 +11,6 @@ import {
   dashboardView,
   levelLabel,
   monthKey,
-  textColorForBackground,
   type DashboardView,
   type FinanceLevel,
 } from "@/lib/finance";
@@ -32,6 +30,7 @@ import IncomeVsExpenseChart from "@/components/IncomeVsExpenseChart";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
 import PurchaseSimulator from "@/components/PurchaseSimulator";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
+import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
 
 export const dynamic = "force-dynamic";
@@ -160,54 +159,18 @@ export default async function DashboardPage({
 
       {view.state === "ok" && series !== null && (
         <>
-          <div className="grid items-stretch gap-4 md:grid-cols-3">
-            <section
-              className={`flex h-full flex-col items-center justify-center gap-2 rounded-2xl p-5 text-center transition-colors duration-700 ${
-                isCalendarMonth ? "md:col-span-1" : "md:col-span-3"
-              }`}
-              style={{
-                backgroundColor,
-                color: textColorForBackground(backgroundColor),
-              }}
-            >
-              <header className="space-y-0.5">
-                <p className="text-xs font-medium uppercase tracking-widest opacity-80">
-                  FinFam
-                </p>
-                <h1 className="text-base font-semibold opacity-90">
-                  Renda do mês consumida
-                </h1>
-              </header>
+          <div className="grid items-stretch gap-6 md:grid-cols-2">
+            <MonthSpendCard
+              backgroundColor={backgroundColor}
+              percent={view.percent}
+              level={level}
+              invoiceDue={invoiceDueLabel(referenceDate)}
+              daysRemaining={daysRemaining}
+              feedback={view.feedback}
+              className={isCalendarMonth ? "" : "md:col-span-2"}
+            />
 
-              <p className="text-5xl font-black tabular-nums sm:text-6xl">
-                {view.percent}
-                <span className="text-2xl align-top sm:text-3xl">%</span>
-              </p>
-
-              <p className="text-lg font-semibold">{levelLabel(level)}</p>
-
-              <p className="text-xs font-medium uppercase tracking-wide opacity-80">
-                {invoiceDueLabel(referenceDate)}
-              </p>
-
-              <p className="text-base font-medium opacity-95">
-                {cycleEndCountdownLabel(daysRemaining)}
-              </p>
-
-              <p
-                role="status"
-                aria-live="polite"
-                className="max-w-xl rounded-full px-4 py-2 text-sm"
-              >
-                {view.feedback}
-              </p>
-            </section>
-
-            {isCalendarMonth && (
-              <div className="md:col-span-2">
-                <QuickExpenseCard />
-              </div>
-            )}
+            {isCalendarMonth && <QuickExpenseCard />}
           </div>
 
           {allowance !== null && (

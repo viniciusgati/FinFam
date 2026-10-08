@@ -2,86 +2,77 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { isActivePath, NAV_ITEMS } from "@/lib/navigation";
 import {
-  NAV_EXPANDED_STORAGE_KEY,
-  defaultNavExpanded,
-  parseStoredExpanded,
-  shouldAutoCollapse,
+  NAV_AUTO_COLLAPSE_MS,
+  navExpanded,
+  readNavPinned,
+  touchNav,
+  writeNavPinned,
+  type NavCollapseState,
 } from "@/lib/nav-collapse";
-import NavIcon from "./NavIcon";
+import { NAV_ICONS, PinIcon } from "@/components/NavIcons";
 
 interface AppNavProps {
   footer?: ReactNode;
+  /** Sair (botão compacto) exibido apenas no trilho colapsado (≥768px). */
   railFooter?: ReactNode;
+  /** Estado inicial do trilho (≥768px). Padrão de produção: expandido. */
+  initialExpanded?: boolean;
+  /** Estado inicial do "fixar". Padrão de produção: não fixado. */
+  initialPinned?: boolean;
 }
 
-function isTabletViewport(): boolean {
-  return window.matchMedia("(min-width: 768px) and (max-width: 1023px)").matches;
-}
-
-function supportsAutoCollapse(): boolean {
-  return window.matchMedia("(min-width: 768px)").matches;
-}
-
-export default function AppNav({ footer, railFooter }: AppNavProps) {
+export default function AppNav({
+  footer,
+  railFooter,
+  initialExpanded = true,
+  initialPinned = false,
+}: AppNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const lastInteractionRef = useRef(0);
+  const [expanded, setExpanded] = useState(initialExpanded);
+  const [navState, setNavState] = useState<NavCollapseState>({
+    pinned: initialPinned,
+    lastInteractionAt: 0,
+  });
+  const { pinned } = navState;
 
+  // Preferência persistida é aplicada só após a hidratação: o primeiro paint
+  // é idêntico entre servidor e cliente (sem mismatch).
   useEffect(() => {
-    let stored: boolean | null = null;
-    try {
-      stored = parseStoredExpanded(
-        window.localStorage.getItem(NAV_EXPANDED_STORAGE_KEY),
-      );
-    } catch {
-      stored = null;
-    }
-    setExpanded(stored ?? defaultNavExpanded(isTabletViewport()));
+    const stored = readNavPinned();
+    setNavState((state) => ({ ...state, pinned: stored }));
+    if (stored) setExpanded(true);
   }, []);
 
-  const registerInteraction = useCallback(() => {
-    lastInteractionRef.current = Date.now();
-  }, []);
-
-  const persistExpanded = useCallback((value: boolean) => {
-    try {
-      window.localStorage.setItem(NAV_EXPANDED_STORAGE_KEY, String(value));
-    } catch {
-      // `localStorage` indisponível: a preferência vale apenas em memória.
-    }
-  }, []);
-
-  const toggleExpanded = useCallback(() => {
-    setExpanded((value) => {
-      const next = !value;
-      persistExpanded(next);
-      return next;
-    });
-  }, [persistExpanded]);
-
+  // Auto-colapso: 5000ms sem interação e sem fixar ⇒ encolhe. O efeito
+  // visual é exclusivo de ≥768px (todas as classes de estado são `md:`).
   useEffect(() => {
-    if (!expanded || !supportsAutoCollapse()) return;
+    if (navState.pinned) return;
+    const timer = setTimeout(() => {
+      if (navExpanded(navState, Date.now())) return;
+      setExpanded(false);
+    }, NAV_AUTO_COLLAPSE_MS);
+    return () => clearTimeout(timer);
+  }, [navState]);
 
-    lastInteractionRef.current = Date.now();
-    const timer = window.setInterval(() => {
-      if (shouldAutoCollapse(lastInteractionRef.current, Date.now())) {
-        setExpanded(false);
-        persistExpanded(false);
-      }
-    }, 1000);
+  function touch() {
+    setNavState((state) => touchNav(state, Date.now()));
+    setExpanded(true);
+  }
 
-    return () => window.clearInterval(timer);
-  }, [expanded, persistExpanded]);
+  function togglePinned() {
+    setNavState((state) =>
+      touchNav({ ...state, pinned: !state.pinned }, Date.now()),
+    );
+    writeNavPinned(!pinned);
+    // Fixar com o menu colapsado reexpande imediatamente.
+    setExpanded(true);
+  }
+
+  const pinLabel = pinned ? "Desfixar menu" : "Fixar menu";
 
   return (
     <>
@@ -102,35 +93,37 @@ export default function AppNav({ footer, railFooter }: AppNavProps) {
       <nav
         id="app-menu"
         aria-label="Navegação principal"
-        onPointerMove={registerInteraction}
-        onFocus={registerInteraction}
-        onClick={registerInteraction}
-        className={`${
-          open ? "flex" : "hidden"
-        } flex-col border-b border-border bg-surface p-2 transition-[width] duration-200 md:sticky md:top-0 md:flex md:h-screen md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r md:p-4 ${
-          expanded ? "md:w-64" : "md:w-[4.5rem]"
+        onMouseEnter={touch}
+        onFocus={touch}
+        onPointerDown={touch}
+        className={`${open ? "flex" : "hidden"} flex-col border-b border-border bg-surface p-2 transition-[width] duration-200 md:sticky md:top-0 md:flex md:h-screen md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r ${
+          expanded ? "md:w-64 md:p-4" : "md:w-16"
         }`}
       >
-        <div className="mb-3 hidden items-center justify-between gap-2 md:flex">
-          {expanded && (
-            <span className="px-1 text-lg font-bold text-foreground">
-              FinFam
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={toggleExpanded}
-            aria-expanded={expanded}
-            aria-controls="app-menu"
-            aria-label={expanded ? "Recolher menu" : "Expandir menu"}
-            title={expanded ? "Recolher menu" : "Expandir menu"}
-            className="ml-auto rounded-lg border border-border-strong p-1.5 text-foreground-muted transition hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
-          >
-            <span aria-hidden="true" className="block text-sm leading-none">
-              {expanded ? "«" : "»"}
-            </span>
-          </button>
-        </div>
+        <span
+          className={`mb-2 hidden px-3 text-lg font-bold text-foreground ${
+            expanded ? "md:block" : ""
+          }`}
+        >
+          FinFam
+        </span>
+
+        <button
+          type="button"
+          onClick={togglePinned}
+          aria-pressed={pinned}
+          title={pinLabel}
+          className={`mb-2 hidden items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 md:flex ${
+            expanded ? "" : "md:justify-center md:px-0"
+          } ${
+            pinned
+              ? "border-emerald-500 bg-emerald-600 text-white"
+              : "border-border-strong text-foreground-muted hover:bg-surface-raised"
+          }`}
+        >
+          <PinIcon className="h-5 w-5 shrink-0" />
+          <span className="sr-only">{pinLabel}</span>
+        </button>
 
         <ul className="flex-1 space-y-1">
           {NAV_ITEMS.map((item) => {
@@ -140,15 +133,22 @@ export default function AppNav({ footer, railFooter }: AppNavProps) {
                 <Link
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  title={expanded ? undefined : item.label}
+                  title={item.label}
                   className={`flex items-center gap-3 rounded-lg border-l-4 px-3 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                    expanded ? "" : "md:px-0"
+                  } ${
                     active
                       ? "border-emerald-500 bg-emerald-500/15 font-bold text-emerald-200"
                       : "border-transparent text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                   } ${expanded ? "" : "md:justify-center md:px-2"}`}
                 >
-                  <NavIcon name={item.icon} className="h-5 w-5 shrink-0" />
-                  <span className={expanded ? "" : "md:sr-only"}>
+                  <span
+                    aria-hidden="true"
+                    className="flex shrink-0 items-center justify-center"
+                  >
+                    {NAV_ICONS[item.icon]}
+                  </span>
+                  <span className={expanded ? undefined : "md:sr-only"}>
                     {item.label}
                   </span>
                 </Link>

@@ -1,48 +1,99 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  isNavIdle,
+  navExpanded,
   NAV_AUTO_COLLAPSE_MS,
-  defaultNavExpanded,
-  parseStoredExpanded,
-  shouldAutoCollapse,
+  NAV_PINNED_STORAGE_KEY,
+  readNavPinned,
+  touchNav,
+  writeNavPinned,
+  type NavCollapseState,
 } from "./nav-collapse";
 
-describe("shouldAutoCollapse", () => {
-  it("recolhe quando o tempo de inatividade expira", () => {
-    expect(shouldAutoCollapse(0, NAV_AUTO_COLLAPSE_MS)).toBe(true);
-    expect(shouldAutoCollapse(1000, 1000 + NAV_AUTO_COLLAPSE_MS + 1)).toBe(
-      true,
-    );
+function state(overrides: Partial<NavCollapseState> = {}): NavCollapseState {
+  return { pinned: false, lastInteractionAt: 0, ...overrides };
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("navExpanded", () => {
+  it("colapsa quando passou 5000ms sem interação e sem fixar", () => {
+    const now = NAV_AUTO_COLLAPSE_MS;
+    expect(navExpanded(state({ lastInteractionAt: 0 }), now)).toBe(false);
   });
 
-  it("mantém expandido quando houve interação recente", () => {
-    expect(shouldAutoCollapse(1000, 1000)).toBe(false);
-    expect(shouldAutoCollapse(1000, 1000 + NAV_AUTO_COLLAPSE_MS - 1)).toBe(
-      false,
-    );
+  it("permanece expandido antes dos 5000ms", () => {
+    const now = NAV_AUTO_COLLAPSE_MS - 1;
+    expect(navExpanded(state({ lastInteractionAt: 0 }), now)).toBe(true);
   });
 
-  it("respeita um timeout customizado", () => {
-    expect(shouldAutoCollapse(0, 3000, 5000)).toBe(false);
-    expect(shouldAutoCollapse(0, 5000, 5000)).toBe(true);
+  it("permanece expandido após 5000ms quando fixado", () => {
+    const now = NAV_AUTO_COLLAPSE_MS + 10_000;
+    expect(
+      navExpanded(state({ pinned: true, lastInteractionAt: 0 }), now),
+    ).toBe(true);
   });
 });
 
-describe("defaultNavExpanded", () => {
-  it("inicia recolhido no tablet e expandido no desktop", () => {
-    expect(defaultNavExpanded(true)).toBe(false);
-    expect(defaultNavExpanded(false)).toBe(true);
+describe("isNavIdle", () => {
+  it("é ocioso exatamente no limite de 5000ms", () => {
+    expect(isNavIdle(state({ lastInteractionAt: 1000 }), 6000)).toBe(true);
+    expect(isNavIdle(state({ lastInteractionAt: 1000 }), 5999)).toBe(false);
   });
 });
 
-describe("parseStoredExpanded", () => {
-  it("converte a preferência persistida em boolean", () => {
-    expect(parseStoredExpanded("true")).toBe(true);
-    expect(parseStoredExpanded("false")).toBe(false);
+describe("touchNav", () => {
+  it("grava lastInteractionAt = now preservando pinned", () => {
+    const next = touchNav(state({ pinned: true, lastInteractionAt: 5 }), 42);
+
+    expect(next).toEqual({ pinned: true, lastInteractionAt: 42 });
   });
 
-  it("retorna null para valores ausentes ou inválidos", () => {
-    expect(parseStoredExpanded(null)).toBeNull();
-    expect(parseStoredExpanded("1")).toBeNull();
-    expect(parseStoredExpanded("")).toBeNull();
+  it("reinicia a contagem do auto-colapso", () => {
+    const touched = touchNav(state({ lastInteractionAt: 0 }), 4999);
+
+    expect(navExpanded(touched, 4999 + NAV_AUTO_COLLAPSE_MS - 1)).toBe(true);
+    expect(navExpanded(touched, 4999 + NAV_AUTO_COLLAPSE_MS)).toBe(false);
+  });
+});
+
+describe("readNavPinned / writeNavPinned", () => {
+  it("alterna o valor gravado em finfam.nav.pinned", () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    });
+
+    expect(readNavPinned()).toBe(false);
+    writeNavPinned(true);
+    expect(store.get(NAV_PINNED_STORAGE_KEY)).toBe("true");
+    expect(readNavPinned()).toBe(true);
+    writeNavPinned(false);
+    expect(store.get(NAV_PINNED_STORAGE_KEY)).toBe("false");
+    expect(readNavPinned()).toBe(false);
+  });
+
+  it("sem localStorage retorna false sem lançar exceção", () => {
+    vi.stubGlobal("localStorage", undefined);
+
+    expect(readNavPinned()).toBe(false);
+    expect(() => writeNavPinned(true)).not.toThrow();
+  });
+
+  it("quando o acesso ao localStorage lança, retorna false sem exceção", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw new Error("bloqueado");
+      },
+      setItem: () => {
+        throw new Error("bloqueado");
+      },
+    });
+
+    expect(readNavPinned()).toBe(false);
+    expect(() => writeNavPinned(true)).not.toThrow();
   });
 });

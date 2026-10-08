@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NAV_ICONS } from "@/components/NavIcons";
 import { isActivePath, NAV_ITEMS } from "./navigation";
 
 describe("NAV_ITEMS", () => {
@@ -44,6 +45,14 @@ describe("NAV_ITEMS", () => {
       icon: "configuracoes",
     });
     expect(isActivePath("/configuracoes", "/configuracoes")).toBe(true);
+  });
+
+  it("todos os icones de NAV_ITEMS existem no mapa de SVGs", () => {
+    expect(NAV_ITEMS).toHaveLength(7);
+    for (const item of NAV_ITEMS) {
+      expect(Object.keys(NAV_ICONS)).toContain(item.icon);
+      expect(NAV_ICONS[item.icon]).toBeDefined();
+    }
   });
 });
 
