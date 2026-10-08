@@ -1,5 +1,9 @@
-import { cycleEndCountdownLabel } from "@/lib/cycle";
-import { levelLabel, textColorForBackground, type FinanceLevel } from "@/lib/finance";
+import {
+  levelLabel,
+  monthEndCountdownLabel,
+  textColorForBackground,
+  type FinanceLevel,
+} from "@/lib/finance";
 
 export interface MonthSpendCardProps {
   backgroundColor: string;
@@ -42,6 +46,10 @@ export default function MonthSpendCard({
         <span className="text-2xl align-top sm:text-4xl">%</span>
       </p>
 
+      <p className="text-sm font-medium uppercase tracking-wide opacity-80">
+        Mês calendário
+      </p>
+
       <p className="text-lg font-semibold">{levelLabel(level)}</p>
 
       <p className="text-sm font-medium uppercase tracking-wide opacity-80">
@@ -49,7 +57,7 @@ export default function MonthSpendCard({
       </p>
 
       <p className="text-lg font-medium opacity-95">
-        {cycleEndCountdownLabel(daysRemaining)}
+        {monthEndCountdownLabel(daysRemaining)}
       </p>
 
       <p

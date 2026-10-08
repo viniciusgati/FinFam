@@ -41,6 +41,42 @@ describe("DailyAllowanceCard (renderização)", () => {
     expect(html).toContain("26 dias restantes no ciclo");
   });
 
+  it("mostra o rótulo do período do ciclo e o saldo restante", () => {
+    const html = render(
+      makeAllowance({
+        dailyCents: 12500,
+        freeBudgetCents: 325000,
+        remainingDays: 26,
+        window: cycleWindow(NOW, 20),
+      }),
+    );
+
+    expect(html).toContain("Ciclo financeiro · início dia 20");
+    expect(html).toContain("Ainda tem R$ 3.250,00 até o fim do ciclo");
+  });
+
+  it("quando o ciclo coincide com o mês, explica no rótulo do período", () => {
+    const html = render(makeAllowance({}));
+
+    expect(html).toContain(
+      "Ciclo financeiro · início dia 1 (coincide com o mês)",
+    );
+  });
+
+  it("inclui o rótulo do período no aria-label da seção", () => {
+    const html = render(makeAllowance({ window: cycleWindow(NOW, 20) }));
+    const match = html.match(/aria-label="([^"]*)"/);
+
+    expect(match?.[1]).toContain("Ciclo financeiro · início dia 20");
+  });
+
+  it("no-data mostra Sem dados do ciclo e não exibe linha de saldo", () => {
+    const html = render(makeAllowance({ hasData: false }));
+
+    expect(html).toContain("Sem dados do ciclo");
+    expect(html).not.toContain("Ainda tem");
+  });
+
   it("orçamento esgotado mostra R$ 0,00 por dia", () => {
     const html = render(makeAllowance({ freeBudgetCents: 0 }));
 

@@ -204,8 +204,23 @@ export interface DailyAllowanceCard {
   label: string;
   /** Ex.: `26 dias restantes no ciclo`. */
   detail: string;
+  /** Janela do ciclo. Ex.: `Ciclo financeiro · início dia 20`. */
+  periodLabel: string;
+  /**
+   * Saldo restante do ciclo. Ex.: `Ainda tem R$ 3.250,00 até o fim do ciclo`.
+   * Vazio no estado `no-data`.
+   */
+  freeBudgetLabel: string;
   /** Texto alternativo para leitor de tela / `aria-label`. */
   ariaLabel: string;
+}
+
+/** Rótulo da janela do ciclo a partir do dia de início. */
+function cyclePeriodLabel(startDay: number): string {
+  if (startDay === 1) {
+    return "Ciclo financeiro · início dia 1 (coincide com o mês)";
+  }
+  return `Ciclo financeiro · início dia ${startDay}`;
 }
 
 /**
@@ -215,6 +230,11 @@ export interface DailyAllowanceCard {
 export function dailyAllowanceCard(
   allowance: DailyAllowance,
 ): DailyAllowanceCard {
+  const periodLabel = cyclePeriodLabel(allowance.window.startDay);
+  const freeBudgetLabel = allowance.hasData
+    ? `Ainda tem ${formatCents(allowance.freeBudgetCents)} até o fim do ciclo`
+    : "";
+
   if (!allowance.hasData) {
     const value = "Sem dados do ciclo";
     return {
@@ -224,7 +244,9 @@ export function dailyAllowanceCard(
       value,
       label: value,
       detail: "",
-      ariaLabel: `Pode gastar por dia: ${value}`,
+      periodLabel,
+      freeBudgetLabel,
+      ariaLabel: `Pode gastar por dia: ${value}. ${periodLabel}`,
     };
   }
 
@@ -239,7 +261,9 @@ export function dailyAllowanceCard(
       value,
       label: `${value} por dia`,
       detail: "Orçamento do ciclo estourado",
-      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo estourado`,
+      periodLabel,
+      freeBudgetLabel,
+      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo estourado. ${periodLabel}`,
     };
   }
 
@@ -252,7 +276,9 @@ export function dailyAllowanceCard(
       value,
       label: `${value} por dia`,
       detail: "Orçamento do ciclo esgotado",
-      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo esgotado`,
+      periodLabel,
+      freeBudgetLabel,
+      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo esgotado. ${periodLabel}`,
     };
   }
 
@@ -266,7 +292,9 @@ export function dailyAllowanceCard(
       value,
       label: `${value} por dia`,
       detail: "Último dia do ciclo",
-      ariaLabel: `Pode gastar por dia: ${value}. Último dia do ciclo`,
+      periodLabel,
+      freeBudgetLabel,
+      ariaLabel: `Pode gastar por dia: ${value}. Último dia do ciclo. ${periodLabel}`,
     };
   }
 
@@ -277,7 +305,9 @@ export function dailyAllowanceCard(
     value,
     label: `${value} por dia`,
     detail: `${allowance.remainingDays} dias restantes no ciclo`,
-    ariaLabel: `Pode gastar por dia: ${value}, ${allowance.remainingDays} dias restantes no ciclo`,
+    periodLabel,
+    freeBudgetLabel,
+    ariaLabel: `Pode gastar por dia: ${value}, ${allowance.remainingDays} dias restantes no ciclo. ${periodLabel}`,
   };
 }
 

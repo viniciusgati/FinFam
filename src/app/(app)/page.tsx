@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { loadCycleAllowance, loadDashboardData } from "@/lib/dashboard";
-import {
-  dailyAllowanceCard,
-  remainingCycleDays,
-  type DailyAllowance,
-} from "@/lib/cycle";
-import { getSettings } from "@/lib/settings";
+import { dailyAllowanceCard, type DailyAllowance } from "@/lib/cycle";
 import {
   computeFinanceStatus,
   dashboardView,
@@ -63,10 +58,10 @@ export default async function DashboardPage({
     const data = await loadDashboardData(referenceDate);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
-    // O contador segue o ciclo financeiro (não o mês calendário): dia 08 com
-    // ciclo fechando no dia 15 ⇒ "8 dias para o fim do ciclo".
-    const { cycleStartDay } = await getSettings();
-    daysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
+    // O contador do card principal segue o mês calendário (coerente com o %).
+    // `status.daysRemaining` é exclusivo (diasInMonth − dia atual); +1 o torna
+    // inclusivo, contando o dia de hoje.
+    daysRemaining = status.daysRemaining + 1;
     level = status.level;
     incomeCents = status.incomeCents;
     series = data.series;

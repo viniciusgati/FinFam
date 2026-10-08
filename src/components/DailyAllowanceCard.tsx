@@ -18,11 +18,17 @@ export default function DailyAllowanceCard({ card }: DailyAllowanceCardProps) {
       <h2 className="text-sm font-medium uppercase tracking-widest text-subtle">
         Pode gastar por dia
       </h2>
+      <p className="text-sm font-medium text-subtle">{card.periodLabel}</p>
       <p className="text-4xl font-black tabular-nums text-foreground">
         {card.label}
       </p>
       {card.detail && (
         <p className="text-lg text-foreground-muted">{card.detail}</p>
+      )}
+      {card.freeBudgetLabel && (
+        <p className="text-lg font-semibold text-foreground">
+          {card.freeBudgetLabel}
+        </p>
       )}
     </section>
   );

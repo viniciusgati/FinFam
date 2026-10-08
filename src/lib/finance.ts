@@ -371,6 +371,16 @@ export function compareWithHistory(
   return `Estão melhores que ${better} dos últimos ${previousPercents.length} meses.`;
 }
 
+/**
+ * Rótulo do contador do card principal: dias até o fim do mês calendário,
+ * contando o dia corrente (inclusivo). Ex.: dia 08 de um mês de 31 dias ⇒
+ * "24 dias para o fim do mês"; no último dia ⇒ "Hoje é o último dia do mês".
+ */
+export function monthEndCountdownLabel(days: number): string {
+  if (days <= 1) return "Hoje é o último dia do mês";
+  return `${days} dias para o fim do mês`;
+}
+
 export interface DashboardViewInput {
   dbError: boolean;
   incomeCents: number;
