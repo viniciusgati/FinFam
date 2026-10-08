@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * Guarda o layout do dashboard (história #232, refinada na #233): largura total
- * (sem `max-w-4xl`/`mx-auto`) e o card de % lado a lado com o lançamento
- * rápido em viewports `md+` (tablet/desktop), empilhados abaixo disso.
+ * Guarda o layout do dashboard (história #232, refinada na #233 e revisada):
+ * largura total (sem `max-w-4xl`/`mx-auto`), card principal em **largura
+ * total** e "Lançamento rápido" lado a lado com "Pode gastar por dia" em
+ * viewports `md+` (empilhados abaixo disso).
  */
 
 function readSource(relativePath: string): string {
@@ -24,19 +25,32 @@ describe("layout do dashboard", () => {
     expect(page).not.toMatch(/mx-auto flex w-full/);
   });
 
-  it("coloca status e lançamento rápido no mesmo grid responsivo", () => {
+  it("deixa o card principal em largura total, fora do grid", () => {
     const page = readSource("../app/(app)/page.tsx");
 
-    expect(page).toContain("grid items-stretch gap-6 md:grid-cols-2");
-    expect(page).toContain('className={isCalendarMonth ? "" : "md:col-span-2"}');
+    // O hero não usa mais o span de grid do layout antigo.
+    expect(page).not.toContain('className={isCalendarMonth ? "" : "md:col-span-2"}');
 
-    // DailyAllowanceCard permanece fora do grid, em largura total.
+    const month = page.indexOf("<MonthSpendCard");
+    const gridStart = page.indexOf("grid items-stretch gap-6 md:grid-cols-2");
+    expect(month).toBeGreaterThanOrEqual(0);
+    expect(gridStart).toBeGreaterThan(month);
+  });
+
+  it("coloca o lançamento rápido ao lado do Pode gastar por dia", () => {
+    const page = readSource("../app/(app)/page.tsx");
+
     const gridStart = page.indexOf("grid items-stretch gap-6 md:grid-cols-2");
     const gridEnd = page.indexOf("</div>", gridStart);
+    const quick = page.indexOf("<QuickExpenseCard");
     const daily = page.indexOf("<DailyAllowanceCard");
+
     expect(gridStart).toBeGreaterThanOrEqual(0);
     expect(gridEnd).toBeGreaterThan(gridStart);
-    expect(daily).toBeGreaterThan(gridEnd);
+    expect(quick).toBeGreaterThan(gridStart);
+    expect(daily).toBeGreaterThan(quick);
+    expect(daily).toBeLessThan(gridEnd);
+    expect(page).toContain("{isCalendarMonth && (");
   });
 });
 
