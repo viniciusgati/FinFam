@@ -112,9 +112,21 @@ describe("isValidDateISO", () => {
 });
 
 describe("todayISO", () => {
-  it("formata a data no padrão YYYY-MM-DD", () => {
+  it("formata a data no padrão YYYY-MM-DD no fuso da família", () => {
     expect(todayISO(new Date("2026-10-07T15:30:00.000Z"))).toBe("2026-10-07");
-    expect(todayISO(new Date("2026-01-01T00:00:00.000Z"))).toBe("2026-01-01");
+    expect(todayISO(new Date("2026-01-01T00:00:00.000Z"))).toBe("2025-12-31");
+  });
+
+  it("usa o dia local na virada do dia (23:30 BRT)", () => {
+    const instante = new Date("2026-11-01T02:30:00.000Z");
+    expect(todayISO(instante, "America/Sao_Paulo")).toBe("2026-10-31");
+    expect(todayISO(instante)).toBe("2026-10-31");
+  });
+
+  it("reflete o dia local de um fuso enviesado (Asia/Tokyo)", () => {
+    expect(
+      todayISO(new Date("2026-10-07T15:30:00.000Z"), "Asia/Tokyo"),
+    ).toBe("2026-10-08");
   });
 });
 
