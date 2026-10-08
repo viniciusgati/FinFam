@@ -412,6 +412,46 @@ describe("loadCycleAllowance — diária restante (regressão #231)", () => {
   });
 });
 
+describe("loadDashboardData — gastos por categoria", () => {
+  it("expõe categoryBreakdown sem nenhuma consulta adicional", async () => {
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "1", amountCents: 500000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      { id: "f", amountCents: 120000, category: "Moradia", dueDay: 10, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      { amountCents: 6000, category: "Mercado", paymentMethod: "PIX", date: new Date(Date.UTC(2026, 9, 5, 12)) },
+    ]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([
+      {
+        id: "p",
+        description: "Compra",
+        amountCents: 60000,
+        purchaseDate: new Date(Date.UTC(2026, 8, 10, 12)),
+        category: "Lazer",
+        installmentsTotal: 1,
+        card: { id: "c", name: "Nubank", closingDay: 20, dueDay: 5 },
+      },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.categoryBreakdown.monthKey).toBe("2026-10");
+    expect(data.categoryBreakdown.totalCents).toBe(186000);
+    expect(data.categoryBreakdown.totalCents).toBe(
+      computeFinanceStatus(data).consumedCents,
+    );
+
+    expect(prismaMock.income.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.fixedExpense.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.variableExpense.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.variableIncome.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.cardPurchase.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.monthlySnapshot.findMany).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("loadDashboardData — consumo disponível", () => {
   it("expõe entradas − fixas e a média diária do mês", async () => {
     prismaMock.income.findMany.mockResolvedValue([

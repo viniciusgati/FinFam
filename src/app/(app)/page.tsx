@@ -39,6 +39,8 @@ import PurchaseSimulator from "@/components/PurchaseSimulator";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
 import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
+import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
+import type { CategoryBreakdown } from "@/lib/category-breakdown";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,7 @@ export default async function DashboardPage({
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
   let consumptionLabel: string | null = null;
+  let categoryBreakdown: CategoryBreakdown | null = null;
 
   try {
     const data = await loadDashboardData(referenceDate);
@@ -80,6 +83,7 @@ export default async function DashboardPage({
     level = status.level;
     series = data.series;
     cardExpensesCents = data.cardExpensesCents;
+    categoryBreakdown = data.categoryBreakdown;
     localMonthSummary = localMonthReview(
       buildMonthReviewData(
         monthReviewSnapshotFrom(data),
@@ -247,6 +251,10 @@ export default async function DashboardPage({
               />
             </section>
           </div>
+
+          {categoryBreakdown !== null && (
+            <CategoryBreakdownCard breakdown={categoryBreakdown} />
+          )}
 
           <MonthReviewPanel
             key={referenceMonthKey}
