@@ -108,7 +108,44 @@ describe("buildDailySeries — calendário", () => {
 
     expect(series.entriesCents).toBe(310000);
     expect(series.dailyBudgetCents).toBe(10000);
+    expect(series.dailyFreeBudgetCents).toBe(10000);
     expect(series.todayExpensesCents).toBe(4000);
     expect(series.projectedMonthEndCents).toBe(Math.round((4000 / 15) * 31));
+  });
+});
+
+describe("buildDailySeries — orçamento diário livre", () => {
+  it("desconta saídas fixas e faturas da renda antes de dividir pelos dias", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: NOW,
+      incomeCents: 100000,
+      fixedExpenses: [{ amountCents: 50000, dueDay: 10 }],
+      cardInvoiceLines: [{ amountCents: 20000, dueDay: 20 }],
+    });
+
+    expect(series.dailyFreeBudgetCents).toBe(968);
+    expect(series.dailyBudgetCents).toBe(Math.round(100000 / 31));
+  });
+
+  it("sem obrigações o orçamento livre é a renda dividida pelos dias", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: NOW,
+      incomeCents: 310000,
+    });
+
+    expect(series.dailyFreeBudgetCents).toBe(Math.round(310000 / 31));
+  });
+
+  it("obrigações maiores que a renda zeram o orçamento livre", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: NOW,
+      incomeCents: 310000,
+      fixedExpenses: [{ amountCents: 310000, dueDay: 10 }],
+    });
+
+    expect(series.dailyFreeBudgetCents).toBe(0);
   });
 });

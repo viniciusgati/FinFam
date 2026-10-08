@@ -12,8 +12,11 @@ import {
 } from "./finance";
 
 export interface RateDayInput {
-  /** Orçamento diário disponível (`renda / dias no mês`), em centavos. */
-  dailyBudgetCents: number;
+  /**
+   * Orçamento diário livre de obrigações (`max(renda − saídas fixas − faturas,
+   * 0) / dias no mês`), em centavos.
+   */
+  dailyFreeBudgetCents: number;
   /** Gasto de hoje, em centavos. */
   todayExpensesCents: number;
   /** Renda mensal, em centavos. */
@@ -28,16 +31,21 @@ export interface DayRating {
 /**
  * Classifica o dia.
  *
- * Sem renda (ou orçamento diário não positivo) não há como avaliar: `neutral`.
- * Dentro do orçamento do dia → `green` ("Ok"). Acima, escala por
- * `classifyLevel`, garantindo no mínimo `yellow` ("Cuidado").
+ * Sem renda cadastrada não há como avaliar: `neutral`. Com renda, mas sem
+ * orçamento livre (obrigações consumiram tudo), o dia é `red` ("Crítico"),
+ * alinhado a `computeFinanceStatus`. Dentro do orçamento livre do dia →
+ * `green` ("Ok"). Acima, escala por `classifyLevel`.
  */
 export function rateDay(input: RateDayInput): DayRating {
-  if (input.incomeCents <= 0 || input.dailyBudgetCents <= 0) {
+  if (input.incomeCents <= 0) {
     return { level: "neutral", label: levelLabel("neutral") };
   }
 
-  const ratio = input.todayExpensesCents / input.dailyBudgetCents;
+  if (input.dailyFreeBudgetCents <= 0) {
+    return { level: "red", label: levelLabel("red") };
+  }
+
+  const ratio = input.todayExpensesCents / input.dailyFreeBudgetCents;
   const level: FinanceLevel =
     ratio <= 1 ? "green" : classifyLevel(ratio, 0, input.incomeCents);
 

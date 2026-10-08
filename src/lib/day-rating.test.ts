@@ -4,33 +4,37 @@ import { rateDay } from "./day-rating";
 describe("rateDay", () => {
   it("sem renda retorna neutral / Sem renda cadastrada", () => {
     expect(
-      rateDay({ dailyBudgetCents: 0, todayExpensesCents: 100, incomeCents: 0 }),
-    ).toEqual({ level: "neutral", label: "Sem renda cadastrada" });
-  });
-
-  it("com renda mas orçamento diário não positivo retorna neutral", () => {
-    expect(
       rateDay({
-        dailyBudgetCents: 0,
+        dailyFreeBudgetCents: 0,
         todayExpensesCents: 100,
-        incomeCents: 310000,
+        incomeCents: 0,
       }),
     ).toEqual({ level: "neutral", label: "Sem renda cadastrada" });
   });
 
-  it("dentro do orçamento diário retorna green / Ok", () => {
+  it("com renda mas orçamento livre zerado retorna red / Crítico", () => {
     expect(
       rateDay({
-        dailyBudgetCents: 10000,
+        dailyFreeBudgetCents: 0,
+        todayExpensesCents: 100,
+        incomeCents: 310000,
+      }),
+    ).toEqual({ level: "red", label: "Crítico" });
+  });
+
+  it("dentro do orçamento livre diário retorna green / Ok", () => {
+    expect(
+      rateDay({
+        dailyFreeBudgetCents: 10000,
         todayExpensesCents: 10000,
         incomeCents: 310000,
       }),
     ).toEqual({ level: "green", label: "Ok" });
   });
 
-  it("acima do orçamento diário retorna no mínimo yellow / Cuidado", () => {
+  it("acima do orçamento livre retorna no mínimo yellow / Cuidado", () => {
     const rating = rateDay({
-      dailyBudgetCents: 10000,
+      dailyFreeBudgetCents: 10000,
       todayExpensesCents: 10001,
       incomeCents: 310000,
     });
@@ -39,14 +43,24 @@ describe("rateDay", () => {
     expect(rating.label).toBe("Cuidado");
   });
 
-  it("escala até red quando o gasto é muito acima do orçamento", () => {
+  it("escala até red quando o gasto é muito acima do orçamento livre", () => {
     const rating = rateDay({
-      dailyBudgetCents: 10000,
+      dailyFreeBudgetCents: 10000,
       todayExpensesCents: 50000,
       incomeCents: 310000,
     });
 
     expect(rating.level).toBe("red");
     expect(rating.label).toBe("Crítico");
+  });
+
+  it("orçamento livre apertado torna o dia vermelho", () => {
+    expect(
+      rateDay({
+        dailyFreeBudgetCents: 968,
+        todayExpensesCents: 3000,
+        incomeCents: 100000,
+      }),
+    ).toEqual({ level: "red", label: "Crítico" });
   });
 });
