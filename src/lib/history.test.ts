@@ -5,10 +5,12 @@ import {
   buildCategoryComparison,
   buildMonthHistory,
   historyChartView,
+  historyView,
   HISTORY_CHART_EMPTY_MESSAGE,
   HISTORY_CHART_SINGLE_MONTH_MESSAGE,
   type MonthHistorySnapshot,
 } from "./history";
+import { FAMILY_EMPTY_TEXT } from "./family-insights";
 
 function snapshot(
   overrides: Partial<MonthHistorySnapshot> & { monthKey: string },
@@ -17,6 +19,7 @@ function snapshot(
     incomeCents: 200000,
     consumedCents: 0,
     consumedPercent: 0,
+    fixedExpensesCents: 0,
     consumptionAvailableCents: 0,
     dailyAverageCents: 0,
     categories: [],
@@ -284,5 +287,52 @@ describe("historyChartView", () => {
     expect(view.isEmpty).toBe(true);
     expect(view.bars).toEqual([]);
     expect(view.message).toBe(HISTORY_CHART_EMPTY_MESSAGE);
+  });
+});
+
+describe("historyView — ajuda à família", () => {
+  it("gera ao menos um insight para um mês fechado com base de comparação", () => {
+    const view = historyView({
+      dbError: false,
+      isFutureMonth: false,
+      referenceMonthKey: "2026-10",
+      snapshots: [
+        snapshot({
+          monthKey: "2026-08",
+          categories: [{ category: "Mercado", amountCents: 25000 }],
+        }),
+        snapshot({
+          monthKey: "2026-09",
+          categories: [{ category: "Mercado", amountCents: 30000 }],
+        }),
+      ],
+    });
+
+    if (view.state !== "ok") throw new Error("estado esperado: ok");
+    expect(view.insights.length).toBeGreaterThan(0);
+    expect(
+      view.insights.some((insight) =>
+        insight.text.includes("acima da média dos últimos 1 meses"),
+      ),
+    ).toBe(true);
+  });
+
+  it("sem snapshot anterior exibe exatamente o neutro", () => {
+    const view = historyView({
+      dbError: false,
+      isFutureMonth: false,
+      referenceMonthKey: "2026-10",
+      snapshots: [snapshot({ monthKey: "2026-09" })],
+    });
+
+    if (view.state !== "ok") throw new Error("estado esperado: ok");
+    expect(view.insights).toEqual([
+      {
+        id: "neutral",
+        tone: "neutral",
+        marker: null,
+        text: FAMILY_EMPTY_TEXT,
+      },
+    ]);
   });
 });

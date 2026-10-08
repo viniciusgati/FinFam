@@ -1,6 +1,7 @@
 import Link from "next/link";
 import FutureMonthNotice from "@/components/FutureMonthNotice";
 import RetryButton from "@/components/RetryButton";
+import FamilyInsightList from "@/components/FamilyInsightList";
 import { HISTORY_TITLE, type CategoryTrend, type HistoryViewState } from "@/lib/history";
 import { formatCents } from "@/lib/money";
 
@@ -69,6 +70,7 @@ export default function HistoryView({ view }: HistoryViewProps) {
     comparison,
     comparisonTitle,
     tableHeaders,
+    insights,
   } = view;
 
   return (
@@ -80,6 +82,16 @@ export default function HistoryView({ view }: HistoryViewProps) {
         <h1 className="text-3xl font-bold text-foreground">
           {selectedMonthLabel}
         </h1>
+      </section>
+
+      <section
+        aria-label="Ajuda à família"
+        className="flex flex-col gap-3 rounded-2xl border border-border-strong bg-surface p-6"
+      >
+        <h2 className="text-sm font-medium uppercase tracking-widest text-subtle">
+          Ajuda à família
+        </h2>
+        <FamilyInsightList insights={insights} />
       </section>
 
       <section

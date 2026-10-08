@@ -32,6 +32,7 @@ export async function loadMonthHistory(
     incomeCents: row.incomeCents,
     consumedCents: row.consumedCents,
     consumedPercent: row.consumedPercent,
+    fixedExpensesCents: row.fixedExpensesCents,
     consumptionAvailableCents: row.consumptionAvailableCents,
     dailyAverageCents: row.dailyAverageCents,
     categories: row.categories.map((category) => ({
