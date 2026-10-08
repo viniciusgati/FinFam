@@ -8,6 +8,7 @@ import {
 } from "@/lib/variable-expenses";
 import GastosManager, { type ExpenseDTO } from "@/components/GastosManager";
 import RetryButton from "@/components/RetryButton";
+import { todayISO } from "@/lib/quick-expense";
 
 export const metadata: Metadata = { title: "Gastos — FinFam" };
 
@@ -46,7 +47,7 @@ export default async function GastosPage({
   const rawMes = Array.isArray(params.mes) ? params.mes[0] : params.mes;
   const mes = isValidMonthParam(rawMes) ? rawMes : currentMonthParam();
   const currentMes = currentMonthParam();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const monthOptions = buildMonthOptions(currentMes, mes);
 
   let expenses: ExpenseDTO[] = [];

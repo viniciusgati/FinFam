@@ -8,6 +8,7 @@
  */
 
 import { parseAmountToCents } from "./money";
+import { resolveTimeZone, zonedDateParts } from "./time";
 
 export const DESCRIPTION_ERROR = "Informe uma descrição.";
 export const AMOUNT_ERROR = "Informe um valor válido (ex.: 12,34).";
@@ -33,9 +34,16 @@ export interface QuickExpensePayload {
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-/** Data de hoje no formato `YYYY-MM-DD` (mesmo cálculo da tela de gastos). */
-export function todayISO(referenceDate: Date = new Date()): string {
-  return referenceDate.toISOString().slice(0, 10);
+/**
+ * Data de hoje no formato `YYYY-MM-DD`, no calendário do fuso da família
+ * (mesmo cálculo da tela de gastos e do dashboard).
+ */
+export function todayISO(
+  referenceDate: Date = new Date(),
+  timeZone: string = resolveTimeZone(),
+): string {
+  const { year, month, day } = zonedDateParts(referenceDate, timeZone);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 /** Aceita `YYYY-MM-DD` somente quando o dia existe de fato no calendário. */
