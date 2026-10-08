@@ -32,7 +32,10 @@ export interface SimulatePurchaseInput {
   dailyCents: number;
   /** Dias restantes do ciclo, contando hoje. */
   remainingDays: number;
-  /** Ritmo recente de gastos avulsos por dia; sem base de medida → ausente/0. */
+  /**
+   * Ritmo recente de consumo por dia (avulsos do ciclo + fatura do mês).
+   * Sem base de medida → ausente/0.
+   */
   usualDailySpendCents?: number | null;
   purchaseCents: number;
 }
@@ -136,12 +139,12 @@ export function simulatePurchase(
   } else if (verdict === "ok") {
     summary =
       impact.usualDailySpendCents > 0
-        ? `Seu ritmo recente é de ${formatCents(impact.usualDailySpendCents)} por dia em gastos avulsos e a compra o mantém.`
+        ? `Seu ritmo recente de consumo é de ${formatCents(impact.usualDailySpendCents)} por dia e a compra o mantém.`
         : "A compra cabe sem derrubar o poder de compra do ciclo pela metade.";
   } else if (verdict === "cuidado") {
     summary =
       impact.usualDailySpendCents > 0
-        ? `Você vem gastando cerca de ${formatCents(impact.usualDailySpendCents)} por dia; com a compra, vai precisar gastar menos que isso.`
+        ? `Você vem consumindo cerca de ${formatCents(impact.usualDailySpendCents)} por dia; com a compra, vai precisar gastar menos que isso.`
         : "A compra consome mais da metade do poder de compra que resta no ciclo.";
   } else {
     summary = `Sobraria menos da metade do seu ritmo recente de ${formatCents(impact.usualDailySpendCents)} por dia.`;
