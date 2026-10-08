@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cycleEndCountdownLabel,
   cycleWindow,
   dailyAllowanceCents,
   dailyAllowanceCard,
@@ -188,23 +189,19 @@ describe("dailyAllowanceCard", () => {
     );
   });
 
-  it("no-data não exibe saldo; esgotado e estourado mostram R$ 0,00", () => {
+  it("não exibe saldo sem dados nem com orçamento livre zerado", () => {
     const noData = dailyAllowanceCard(allowance({ hasData: false }));
     expect(noData.freeBudgetLabel).toBe("");
 
     const exhausted = dailyAllowanceCard(
       allowance({ freeBudgetCents: 0, remainingDays: 10 }),
     );
-    expect(exhausted.freeBudgetLabel.replace(/\u00a0/g, " ")).toBe(
-      "Ainda tem R$ 0,00 até o fim do ciclo",
-    );
+    expect(exhausted.freeBudgetLabel).toBe("");
 
     const over = dailyAllowanceCard(
       allowance({ dailyCents: -1250, freeBudgetCents: 0, remainingDays: 8 }),
     );
-    expect(over.freeBudgetLabel.replace(/\u00a0/g, " ")).toBe(
-      "Ainda tem R$ 0,00 até o fim do ciclo",
-    );
+    expect(over.freeBudgetLabel).toBe("");
   });
 
   it("orçamento esgotado mostra R$ 0,00 por dia", () => {
@@ -242,5 +239,19 @@ describe("dailyAllowanceCard", () => {
     expect(card.state).toBe("over-budget");
     expect(card.label.replace(/\u00a0/g, " ")).toBe("-R$ 12,50 por dia");
     expect(card.detail).toBe("Orçamento do ciclo estourado");
+  });
+});
+
+describe("cycleEndCountdownLabel", () => {
+  it("dia 08 com o ciclo fechando no dia 15 → 8 dias (contando hoje)", () => {
+    expect(cycleEndCountdownLabel(8)).toBe("8 dias para o fim do ciclo");
+  });
+
+  it("no último dia do ciclo", () => {
+    expect(cycleEndCountdownLabel(1)).toBe("Hoje é o último dia do ciclo");
+  });
+
+  it("ciclo encerrado", () => {
+    expect(cycleEndCountdownLabel(0)).toBe("Ciclo encerrado");
   });
 });
