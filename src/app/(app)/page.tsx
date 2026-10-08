@@ -2,6 +2,7 @@ import Link from "next/link";
 import { loadCycleAllowance, loadDashboardData } from "@/lib/dashboard";
 import { dailyAllowanceCard, type DailyAllowance } from "@/lib/cycle";
 import {
+  actionableBudgetMessage,
   computeFinanceStatus,
   dashboardView,
   levelLabel,
@@ -103,6 +104,18 @@ export default async function DashboardPage({
         })
       : { level, label: levelLabel(level) };
 
+  const actionableMessage =
+    view.state === "ok" && allowance !== null
+      ? actionableBudgetMessage({
+          hasData: allowance.hasData,
+          level,
+          projectedPercent: view.projectedPercent,
+          freeBudgetCents: allowance.freeBudgetCents,
+          dailyCents: allowance.dailyCents,
+          remainingDays: allowance.remainingDays,
+        })
+      : null;
+
   return (
     <div className="flex w-full flex-col gap-6">
       <MonthSelector
@@ -162,6 +175,7 @@ export default async function DashboardPage({
               invoiceDue={invoiceDueLabel(referenceDate)}
               daysRemaining={daysRemaining}
               feedback={view.feedback}
+              actionableMessage={actionableMessage}
               projectedPercent={view.projectedPercent}
               projectedRisk={view.projectedRisk}
               className={isCalendarMonth ? "" : "md:col-span-2"}

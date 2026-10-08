@@ -40,6 +40,16 @@ describe("layout do dashboard", () => {
   });
 });
 
+describe("mensagem acionável no MonthSpendCard", () => {
+  it("expõe a prop e a renderiza com role=status e aria-live", () => {
+    const card = readSource("../components/MonthSpendCard.tsx");
+
+    expect(card).toContain("actionableMessage");
+    expect(card).toContain('role="status"');
+    expect(card).toContain('aria-live="polite"');
+  });
+});
+
 describe("QuickExpenseCard em colunas estreitas", () => {
   it("empilha os campos antes de lg", () => {
     const card = readSource("../components/QuickExpenseCard.tsx");

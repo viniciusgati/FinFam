@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  actionableBudgetMessage,
   classifyLevel,
   compareWithHistory,
   computeFinanceStatus,
@@ -27,6 +28,7 @@ import {
   incomeUpdateSchema,
   isPeriodValid,
 } from "./validation";
+import { dailyCentsForBudget } from "./cycle";
 import { formatCents, parseAmountToCents } from "./money";
 
 describe("computeFinanceStatus", () => {
@@ -351,6 +353,168 @@ describe("compareWithHistory", () => {
 
     expect(message).toBe("Estão melhores que os últimos 4 meses.");
     expect(message).not.toContain("piores");
+  });
+});
+
+describe("actionableBudgetMessage", () => {
+  it("(a) não avisa quando está dentro do orçamento e sem risco", () => {
+    expect(
+      actionableBudgetMessage({
+        hasData: true,
+        level: "green",
+        projectedPercent: 50,
+        freeBudgetCents: 10000,
+        dailyCents: 1000,
+        remainingDays: 10,
+      }),
+    ).toBeNull();
+    expect(
+      actionableBudgetMessage({
+        hasData: true,
+        level: "lime",
+        projectedPercent: 90,
+        freeBudgetCents: 10000,
+        dailyCents: 1000,
+        remainingDays: 10,
+      }),
+    ).toBeNull();
+    expect(
+      actionableBudgetMessage({
+        hasData: true,
+        level: "yellow",
+        projectedPercent: 99,
+        freeBudgetCents: 10000,
+        dailyCents: 1000,
+        remainingDays: 10,
+      }),
+    ).toBeNull();
+  });
+
+  it("retorna null quando não há dados do ciclo, mesmo em risco", () => {
+    expect(
+      actionableBudgetMessage({
+        hasData: false,
+        level: "red",
+        projectedPercent: 200,
+        freeBudgetCents: 0,
+        dailyCents: -500,
+        remainingDays: 10,
+      }),
+    ).toBeNull();
+  });
+
+  it("(b) com nível orange e margem, informa os dias e o ajuste diário", () => {
+    const remainingDays = 10;
+    const freeBudgetCents = 10000;
+    const message = actionableBudgetMessage({
+      hasData: true,
+      level: "orange",
+      projectedPercent: 80,
+      freeBudgetCents,
+      dailyCents: 1200,
+      remainingDays,
+    });
+
+    expect(message).not.toBeNull();
+    expect(message).toContain(`${remainingDays} dias`);
+    expect(message).toContain(
+      formatCents(dailyCentsForBudget(freeBudgetCents, remainingDays)),
+    );
+  });
+
+  it("(c) com nível red retorna mensagem não vazia", () => {
+    const message = actionableBudgetMessage({
+      hasData: true,
+      level: "red",
+      projectedPercent: 120,
+      freeBudgetCents: 10000,
+      dailyCents: 1200,
+      remainingDays: 10,
+    });
+
+    expect(message).not.toBeNull();
+    expect(message).not.toBe("");
+  });
+
+  it("(d) avisa quando a projeção arredondada atinge 100% mesmo sem nível de risco", () => {
+    expect(
+      actionableBudgetMessage({
+        hasData: true,
+        level: "lime",
+        projectedPercent: 99.6,
+        freeBudgetCents: 10000,
+        dailyCents: 1000,
+        remainingDays: 10,
+      }),
+    ).not.toBeNull();
+    expect(
+      actionableBudgetMessage({
+        hasData: true,
+        level: "yellow",
+        projectedPercent: 100,
+        freeBudgetCents: 10000,
+        dailyCents: 1000,
+        remainingDays: 10,
+      }),
+    ).not.toBeNull();
+  });
+
+  it("não avisa quando a projeção arredondada fica abaixo de 100% sem nível de risco", () => {
+    expect(
+      actionableBudgetMessage({
+        hasData: true,
+        level: "lime",
+        projectedPercent: 99.4,
+        freeBudgetCents: 10000,
+        dailyCents: 1000,
+        remainingDays: 10,
+      }),
+    ).toBeNull();
+  });
+
+  it("(e) com orçamento esgotado e excesso diário, informa os dias e o excesso", () => {
+    const remainingDays = 5;
+    const dailyCents = -350;
+    const message = actionableBudgetMessage({
+      hasData: true,
+      level: "red",
+      projectedPercent: 130,
+      freeBudgetCents: 0,
+      dailyCents,
+      remainingDays,
+    });
+
+    expect(message).not.toBeNull();
+    expect(message).toContain(`${remainingDays} dias`);
+    expect(message).toContain(formatCents(-dailyCents));
+  });
+
+  it("com orçamento esgotado sem excesso diário, informa apenas os dias", () => {
+    const message = actionableBudgetMessage({
+      hasData: true,
+      level: "orange",
+      projectedPercent: 100,
+      freeBudgetCents: 0,
+      dailyCents: 0,
+      remainingDays: 3,
+    });
+
+    expect(message).not.toBeNull();
+    expect(message).toContain("3 dias");
+  });
+
+  it("usa singular quando resta apenas 1 dia", () => {
+    const message = actionableBudgetMessage({
+      hasData: true,
+      level: "orange",
+      projectedPercent: 100,
+      freeBudgetCents: 0,
+      dailyCents: 0,
+      remainingDays: 1,
+    });
+
+    expect(message).toContain("1 dia");
+    expect(message).not.toContain("1 dias");
   });
 });
 
