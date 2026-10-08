@@ -52,8 +52,8 @@ describe("GET /api/variable-incomes", () => {
     expect(findManyMock).toHaveBeenCalledWith({
       where: {
         date: {
-          gte: new Date("2026-10-01T00:00:00.000Z"),
-          lt: new Date("2026-11-01T00:00:00.000Z"),
+          gte: new Date("2026-10-01T03:00:00.000Z"),
+          lt: new Date("2026-11-01T03:00:00.000Z"),
         },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -69,8 +69,8 @@ describe("GET /api/variable-incomes", () => {
 
     expect(response.status).toBe(200);
     const [args] = findManyMock.mock.calls[0];
-    expect(args.where.date.gte.toISOString()).toBe("2026-10-01T00:00:00.000Z");
-    expect(args.where.date.lt.toISOString()).toBe("2026-11-01T00:00:00.000Z");
+    expect(args.where.date.gte.toISOString()).toBe("2026-10-01T03:00:00.000Z");
+    expect(args.where.date.lt.toISOString()).toBe("2026-11-01T03:00:00.000Z");
   });
 
   it("retorna 400 para mês em formato inválido e não consulta o banco", async () => {

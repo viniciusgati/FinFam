@@ -7,6 +7,7 @@ import ExtraIncomesManager, {
 } from "@/components/ExtraIncomesManager";
 import { prisma } from "@/lib/db";
 import { monthLabel, shiftMonthKey } from "@/lib/finance";
+import { todayISO } from "@/lib/quick-expense";
 import {
   currentMonthParam,
   isValidMonthParam,
@@ -42,7 +43,7 @@ export default async function EntradasPage({
   const rawMes = Array.isArray(params.mes) ? params.mes[0] : params.mes;
   const mes = isValidMonthParam(rawMes) ? rawMes : currentMonthParam();
   const currentMes = currentMonthParam();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const monthOptions = buildMonthOptions(currentMes, mes);
 
   let items: FixedItem[] = [];
