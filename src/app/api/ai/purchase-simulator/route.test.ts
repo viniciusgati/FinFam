@@ -12,12 +12,11 @@ function jsonRequest(body: unknown) {
 }
 
 const validPayload = {
-  incomeCents: 100000,
-  spentCents: 20000,
-  elapsedDay: 10,
-  daysInMonth: 30,
+  freeBudgetCents: 200000,
+  dailyCents: 25000,
+  remainingDays: 8,
+  usualDailySpendCents: 20000,
   purchaseCents: 30000,
-  previousMonthsCents: [1000, 2000],
 };
 
 beforeEach(() => {
@@ -42,7 +41,7 @@ describe("POST /api/ai/purchase-simulator", () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { verdict: string; summary: string };
     expect(body.verdict).toBe("ok");
-    expect(body.summary).toContain("Pode comprar");
+    expect(body.summary).toContain("ritmo recente");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -75,7 +74,7 @@ describe("POST /api/ai/purchase-simulator", () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { verdict: string; summary: string };
     expect(body.verdict).toBe("ok");
-    expect(body.summary).toContain("Pode comprar");
+    expect(body.summary).toContain("ritmo recente");
   });
 
   it("rejeita payload inválido", async () => {
@@ -83,5 +82,14 @@ describe("POST /api/ai/purchase-simulator", () => {
       jsonRequest({ ...validPayload, purchaseCents: 0 }),
     );
     expect(response.status).toBe(400);
+  });
+
+  it("aceita usualDailySpendCents nulo (sem ritmo medido)", async () => {
+    const response = await POST(
+      jsonRequest({ ...validPayload, usualDailySpendCents: null }),
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).verdict).toBe("ok");
   });
 });

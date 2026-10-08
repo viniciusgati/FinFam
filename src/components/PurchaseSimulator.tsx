@@ -6,14 +6,18 @@ import {
   simulatePurchase,
   VERDICT_LABELS,
   type PurchaseVerdict,
+  type SimulatePurchaseInput,
 } from "@/lib/ai/purchase-simulator";
 
 interface PurchaseSimulatorProps {
-  incomeCents: number;
-  spentCents: number;
-  elapsedDay: number;
-  daysInMonth: number;
-  previousMonthsCents: number[];
+  /** Orçamento livre restante do ciclo em centavos. */
+  freeBudgetCents: number;
+  /** Poder de compra por dia do ciclo em centavos (negativo se estourado). */
+  dailyCents: number;
+  /** Dias restantes do ciclo, contando hoje. */
+  remainingDays: number;
+  /** Ritmo recente de gastos avulsos por dia; `null` sem base para medir. */
+  usualDailySpendCents: number | null;
 }
 
 type Status = "idle" | "loading" | "done";
@@ -21,6 +25,7 @@ type Status = "idle" | "loading" | "done";
 interface SimulationResult {
   verdict: PurchaseVerdict;
   summary: string;
+  impactLabel: string;
 }
 
 interface SimulatorResponse {
@@ -35,11 +40,10 @@ const VERDICT_CLASSES: Record<PurchaseVerdict, string> = {
 };
 
 export default function PurchaseSimulator({
-  incomeCents,
-  spentCents,
-  elapsedDay,
-  daysInMonth,
-  previousMonthsCents,
+  freeBudgetCents,
+  dailyCents,
+  remainingDays,
+  usualDailySpendCents,
 }: PurchaseSimulatorProps) {
   const [value, setValue] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -50,16 +54,23 @@ export default function PurchaseSimulator({
   const invalid = cents === null;
   const showValidation = invalid;
 
-  function buildLocalResult(purchaseCents: number): SimulationResult {
-    const simulation = simulatePurchase({
-      incomeCents,
-      spentCents,
-      elapsedDay,
-      daysInMonth,
+  function buildInput(purchaseCents: number): SimulatePurchaseInput {
+    return {
+      freeBudgetCents,
+      dailyCents,
+      remainingDays,
+      usualDailySpendCents,
       purchaseCents,
-      previousMonthsCents,
-    });
-    return { verdict: simulation.verdict, summary: simulation.summary };
+    };
+  }
+
+  function buildLocalResult(purchaseCents: number): SimulationResult {
+    const simulation = simulatePurchase(buildInput(purchaseCents));
+    return {
+      verdict: simulation.verdict,
+      summary: simulation.summary,
+      impactLabel: simulation.impactLabel,
+    };
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -70,27 +81,24 @@ export default function PurchaseSimulator({
     setResult(null);
     setFailed(false);
 
+    const input = buildInput(cents);
+
     try {
       const response = await fetch("/api/ai/purchase-simulator", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          incomeCents,
-          spentCents,
-          elapsedDay,
-          daysInMonth,
-          purchaseCents: cents,
-          previousMonthsCents,
-        }),
+        body: JSON.stringify(input),
       });
 
       const data = (await response.json().catch(() => ({}))) as SimulatorResponse;
+      const local = buildLocalResult(cents);
       if (!response.ok || !data.verdict) {
-        setResult(buildLocalResult(cents));
+        setResult(local);
       } else {
         setResult({
           verdict: data.verdict,
-          summary: data.summary ?? buildLocalResult(cents).summary,
+          summary: data.summary ?? local.summary,
+          impactLabel: local.impactLabel,
         });
       }
     } catch {
@@ -108,6 +116,10 @@ export default function PurchaseSimulator({
   return (
     <section className="space-y-3 rounded-2xl border border-border bg-surface p-6 text-left shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">Posso comprar?</h2>
+      <p className="text-sm text-foreground-muted">
+        Veja quanto a compra reduz o seu poder de compra por dia até o fim do
+        ciclo.
+      </p>
 
       <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3" noValidate>
         <label className="flex-1 space-y-1">
@@ -167,6 +179,7 @@ export default function PurchaseSimulator({
           <p className="text-base font-semibold">
             {VERDICT_LABELS[result.verdict]}
           </p>
+          <p className="text-sm font-medium">{result.impactLabel}</p>
           <p className="text-sm">{result.summary}</p>
         </div>
       )}
