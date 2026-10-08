@@ -13,6 +13,8 @@ import {
   monthKey,
   monthLabel,
   previousMonthKeys,
+  projectionLabel,
+  projectionRiskLabel,
   resolveDashboardState,
   shiftMonthKey,
   textColorForBackground,
@@ -216,6 +218,34 @@ describe("monthEndCountdownLabel", () => {
   });
 });
 
+describe("projectionLabel", () => {
+  it("formata a projeção arredondada até o fim do mês", () => {
+    expect(projectionLabel(248)).toBe("No ritmo atual: 248% até o fim do mês");
+    expect(projectionLabel(90)).toBe("No ritmo atual: 90% até o fim do mês");
+  });
+
+  it("arredonda como o percentual consumido exibido", () => {
+    expect(projectionLabel(99.6)).toBe("No ritmo atual: 100% até o fim do mês");
+    expect(projectionLabel(99.4)).toBe("No ritmo atual: 99% até o fim do mês");
+  });
+});
+
+describe("projectionRiskLabel", () => {
+  it("alerta quando a projeção arredondada alcança 100%", () => {
+    expect(projectionRiskLabel(100)).toBe("Risco de estouro");
+  });
+
+  it("decide pelo valor arredondado exibido", () => {
+    expect(projectionRiskLabel(99.6)).toBe("Risco de estouro");
+    expect(projectionRiskLabel(99.4)).toBeNull();
+  });
+
+  it("não alerta abaixo de 100%", () => {
+    expect(projectionRiskLabel(90)).toBeNull();
+    expect(projectionRiskLabel(0)).toBeNull();
+  });
+});
+
 describe("classifyLevel", () => {
   it("respeita as faixas de ritmo", () => {
     expect(classifyLevel(0.5, 10, 100000)).toBe("green");
@@ -361,8 +391,58 @@ describe("dashboardView", () => {
     ).toEqual({
       state: "ok",
       percent: 80,
+      projectedPercent: 248,
+      projectedRisk: true,
       feedback: "Estão piores que os últimos 4 meses.",
     });
+  });
+
+  it("decide o risco pelo mesmo percentual arredondado exibido", () => {
+    expect(
+      dashboardView({
+        dbError: false,
+        incomeCents: 100000,
+        consumedPercent: 80,
+        projectedPercent: 99.6,
+        previousPercents: [],
+      }),
+    ).toEqual({
+      state: "ok",
+      percent: 80,
+      projectedPercent: 100,
+      projectedRisk: true,
+      feedback: "Ainda não há histórico suficiente.",
+    });
+  });
+
+  it("não sinaliza risco quando a projeção arredondada fica abaixo de 100%", () => {
+    expect(
+      dashboardView({
+        dbError: false,
+        incomeCents: 100000,
+        consumedPercent: 80,
+        projectedPercent: 99.4,
+        previousPercents: [],
+      }),
+    ).toEqual({
+      state: "ok",
+      percent: 80,
+      projectedPercent: 99,
+      projectedRisk: false,
+      feedback: "Ainda não há histórico suficiente.",
+    });
+  });
+
+  it("projeta sem risco abaixo do limiar", () => {
+    const view = dashboardView({
+      dbError: false,
+      incomeCents: 100000,
+      consumedPercent: 50,
+      projectedPercent: 90,
+      previousPercents: [],
+    });
+
+    expect(view).toMatchObject({ projectedPercent: 90, projectedRisk: false });
   });
 });
 

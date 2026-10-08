@@ -1,6 +1,8 @@
 import {
   levelLabel,
   monthEndCountdownLabel,
+  projectionLabel,
+  projectionRiskLabel,
   textColorForBackground,
   type FinanceLevel,
 } from "@/lib/finance";
@@ -12,6 +14,8 @@ export interface MonthSpendCardProps {
   invoiceDue: string;
   daysRemaining: number;
   feedback: string;
+  projectedPercent?: number;
+  projectedRisk?: boolean;
   className?: string;
 }
 
@@ -22,6 +26,8 @@ export default function MonthSpendCard({
   invoiceDue,
   daysRemaining,
   feedback,
+  projectedPercent,
+  projectedRisk = false,
   className = "",
 }: MonthSpendCardProps) {
   return (
@@ -45,6 +51,22 @@ export default function MonthSpendCard({
         {percent}
         <span className="text-2xl align-top sm:text-4xl">%</span>
       </p>
+
+      {projectedPercent !== undefined && (
+        <p className="text-sm font-medium opacity-80">
+          {projectionLabel(projectedPercent)}
+        </p>
+      )}
+
+      {projectedPercent !== undefined && projectedRisk && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-base font-semibold uppercase tracking-wide"
+        >
+          {projectionRiskLabel(projectedPercent)}
+        </p>
+      )}
 
       <p className="text-sm font-medium uppercase tracking-wide opacity-80">
         Mês calendário
