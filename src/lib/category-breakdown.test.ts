@@ -273,5 +273,97 @@ describe("categoryBreakdownView", () => {
     expect(view.emptyMessage).toBe("Nenhum gasto por categoria neste mês");
     expect(view.emptyCtaLabel).toBe("Registrar gastos");
     expect(view.emptyCtaHref).toBe("/gastos");
+    expect(view.slices).toEqual([]);
+    expect(view.ariaLabel).toBe(
+      "Gastos por categoria: nenhum gasto neste mês",
+    );
+  });
+
+  it("monta as slices na ordem da agregação com R$ e percentuais que somam 100", () => {
+    const view = categoryBreakdownView(
+      buildCategoryBreakdown(
+        input({
+          fixedExpenses: [
+            {
+              amountCents: 120000,
+              category: "Moradia",
+              active: true,
+              startMonth: null,
+              endMonth: null,
+            },
+          ],
+          variableExpenses: [
+            { amountCents: 6000, category: "Mercado", paymentMethod: "PIX" },
+          ],
+        }),
+      ),
+    );
+
+    expect(
+      view.slices.map((slice) => ({
+        ...slice,
+        amountLabel: normalize(slice.amountLabel),
+      })),
+    ).toEqual([
+      {
+        category: "Moradia",
+        amountCents: 120000,
+        amountLabel: "R$ 1.200,00",
+        percent: 95,
+      },
+      {
+        category: "Mercado",
+        amountCents: 6000,
+        amountLabel: "R$ 60,00",
+        percent: 5,
+      },
+    ]);
+    expect(view.slices.reduce((total, slice) => total + slice.percent, 0)).toBe(
+      100,
+    );
+  });
+
+  it("distribui o resto do maior percentual e ainda fecha em 100", () => {
+    const view = categoryBreakdownView(
+      buildCategoryBreakdown(
+        input({
+          variableExpenses: [
+            { amountCents: 100, category: "Aaa", paymentMethod: "PIX" },
+            { amountCents: 100, category: "Bbb", paymentMethod: "PIX" },
+            { amountCents: 100, category: "Ccc", paymentMethod: "PIX" },
+          ],
+        }),
+      ),
+    );
+
+    expect(view.slices.map((slice) => slice.percent)).toEqual([34, 33, 33]);
+    expect(view.slices.reduce((total, slice) => total + slice.percent, 0)).toBe(
+      100,
+    );
+  });
+
+  it("monta o aria-label exato do fixture", () => {
+    const view = categoryBreakdownView(
+      buildCategoryBreakdown(
+        input({
+          fixedExpenses: [
+            {
+              amountCents: 120000,
+              category: "Moradia",
+              active: true,
+              startMonth: null,
+              endMonth: null,
+            },
+          ],
+          variableExpenses: [
+            { amountCents: 6000, category: "Mercado", paymentMethod: "PIX" },
+          ],
+        }),
+      ),
+    );
+
+    expect(normalize(view.ariaLabel)).toBe(
+      "Gastos por categoria: Moradia R$ 1.200,00 (95%), Mercado R$ 60,00 (5%). Total R$ 1.260,00",
+    );
   });
 });

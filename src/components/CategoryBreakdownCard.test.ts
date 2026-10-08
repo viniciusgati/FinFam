@@ -26,24 +26,39 @@ const empty: CategoryBreakdown = {
 };
 
 describe("CategoryBreakdownCard (renderização)", () => {
-  it("renderiza os itens na ordem e o total com rótulo acessível", () => {
+  it("renderiza o gráfico com role=img e aria-label citando fatias e total", () => {
     const html = render(populated);
 
-    expect(html).toContain('aria-label="Gastos por categoria"');
+    expect(html).toContain('role="img"');
+    expect(html).toContain(
+      'aria-label="Gastos por categoria: Moradia R$ 1.200,00 (95%), Mercado R$ 60,00 (5%). Total R$ 1.260,00"',
+    );
+  });
+
+  it("lista as fatias com R$ e % na tabela, na ordem maior→menor", () => {
+    const html = render(populated);
+
     expect(html).toContain("Gastos por categoria");
-    expect(html).toContain("Moradia — R$ 1.200,00");
-    expect(html).toContain("Mercado — R$ 60,00");
+    expect(html).toContain("Categoria");
+    expect(html).toContain("Valor");
+    expect(html).toContain("Moradia");
+    expect(html).toContain("R$ 1.200,00");
+    expect(html).toContain("95%");
+    expect(html).toContain("Mercado");
+    expect(html).toContain("R$ 60,00");
+    expect(html).toContain("5%");
     expect(html).toContain("Total — R$ 1.260,00");
     expect(html.indexOf("Moradia")).toBeLessThan(html.indexOf("Mercado"));
     expect(html.indexOf("Mercado")).toBeLessThan(html.indexOf("Total"));
   });
 
-  it("no estado vazio mostra a mensagem e o CTA para /gastos", () => {
+  it("no estado vazio mostra a mensagem e o CTA para /gastos, sem gráfico", () => {
     const html = render(empty);
 
     expect(html).toContain("Nenhum gasto por categoria neste mês");
     expect(html).toContain('href="/gastos"');
     expect(html).toContain("Registrar gastos");
+    expect(html).not.toContain('role="img"');
     expect(html).not.toContain("Total —");
   });
 });

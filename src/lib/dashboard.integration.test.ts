@@ -5,6 +5,7 @@ import {
   requireTestDatabase,
   resetDatabase,
 } from "../test/integration";
+import { categoryBreakdownView } from "./category-breakdown";
 import { loadDashboardData } from "./dashboard";
 
 // Falha de forma explícita sem `TEST_DATABASE_URL`; nunca toca SQLite.
@@ -137,6 +138,7 @@ describe("loadDashboardData — integração com PostgreSQL", () => {
       data: [
         { description: "Mercado", amountCents: 5000, date: new Date(2026, 9, 5), paymentMethod: "CASH", category: "Mercado" },
         { description: "Farmácia", amountCents: 2000, date: new Date(2026, 9, 10), paymentMethod: "PIX", category: "Saúde" },
+        { description: "Diversos", amountCents: 3000, date: new Date(2026, 9, 6), paymentMethod: "CASH", category: null },
         { description: "Cartão", amountCents: 9999, date: new Date(2026, 9, 15), paymentMethod: "CREDIT", category: "Lazer" },
       ],
     });
@@ -187,6 +189,19 @@ describe("loadDashboardData — integração com PostgreSQL", () => {
     expect(
       data.categoryBreakdown.items.some((item) => item.category === "Lazer"),
     ).toBe(false);
+
+    // A view do gráfico soma as fatias == total == consumo do mês e fecha 100%.
+    const view = categoryBreakdownView(data.categoryBreakdown);
+    expect(
+      view.slices.reduce((total, slice) => total + slice.amountCents, 0),
+    ).toBe(data.categoryBreakdown.totalCents);
+    expect(
+      view.slices.reduce((total, slice) => total + slice.percent, 0),
+    ).toBe(100);
+    // Vazio/ausente vira uma única fatia "Sem categoria".
+    expect(view.slices.some((slice) => slice.category === "Sem categoria")).toBe(
+      true,
+    );
   });
 
   it("carrega os percentuais dos meses anteriores a partir dos snapshots", async () => {
