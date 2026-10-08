@@ -5,6 +5,7 @@ import {
   dailyAllowanceCents,
   dailyAllowanceCard,
   dailyCentsForBudget,
+  elapsedCycleDays,
   remainingCycleDays,
   type DailyAllowance,
 } from "./cycle";
@@ -61,6 +62,21 @@ describe("remainingCycleDays", () => {
   });
 });
 
+describe("elapsedCycleDays", () => {
+  it("cycleStartDay = 20 e 2026-03-25 → 6 dias (contando hoje)", () => {
+    expect(elapsedCycleDays(NOW, 20)).toBe(6);
+  });
+
+  it("cycleStartDay = 1 e 2026-03-25 → 25 dias", () => {
+    expect(elapsedCycleDays(NOW, 1)).toBe(25);
+  });
+
+  it("no primeiro dia do ciclo retorna 1", () => {
+    const firstDay = new Date("2026-03-20T15:00:00.000Z");
+    expect(elapsedCycleDays(firstDay, 20)).toBe(1);
+  });
+});
+
 describe("dailyCentsForBudget", () => {
   it("arredonda a divisão para centavos", () => {
     expect(dailyCentsForBudget(325000, 26)).toBe(12500);
@@ -88,6 +104,8 @@ describe("dailyAllowanceCents", () => {
 
     expect(allowance.freeBudgetCents).toBe(325000);
     expect(allowance.remainingDays).toBe(26);
+    expect(allowance.variableSpentCents).toBe(75000);
+    expect(allowance.elapsedDays).toBe(6);
     expect(allowance.dailyCents).toBe(12500);
     expect(allowance.hasData).toBe(true);
   });
@@ -138,6 +156,8 @@ describe("dailyAllowanceCard", () => {
       dailyCents: 0,
       freeBudgetCents: 0,
       remainingDays: 10,
+      variableSpentCents: 0,
+      elapsedDays: 0,
       hasData: true,
       window: cycleWindow(NOW, 1),
       ...overrides,

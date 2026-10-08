@@ -114,6 +114,26 @@ export function remainingCycleDays(
 }
 
 /**
+ * Dias do ciclo já decorridos, contando o próprio dia (inclusive). Nunca
+ * negativo. Ex.: ciclo começando no dia 20 e hoje 25/03 ⇒ 6.
+ */
+export function elapsedCycleDays(
+  now: Date,
+  cycleStartDay: number,
+  timeZone: string = resolveTimeZone(),
+): number {
+  const window = cycleWindow(now, cycleStartDay, timeZone);
+  const start = zonedDateParts(window.start, timeZone);
+  const today = zonedDateParts(now, timeZone);
+  const diff = Math.round(
+    (calendarDayUtc(today.year, today.month, today.day) -
+      calendarDayUtc(start.year, start.month, start.day)) /
+      DAY_MS,
+  );
+  return Math.max(diff + 1, 0);
+}
+
+/**
  * Divide o orçamento livre em centavos pelos dias restantes, arredondando para
  * centavos. `freeBudgetCents` pode ser negativo (ciclo estourado): nesse caso a
  * diária também fica negativa e informa o excesso diário. `remainingDays <= 0`
@@ -146,6 +166,10 @@ export interface DailyAllowance {
   freeBudgetCents: number;
   /** Dias restantes do ciclo (contando hoje). */
   remainingDays: number;
+  /** Gastos avulsos já feitos dentro do ciclo (mesma janela do orçamento). */
+  variableSpentCents: number;
+  /** Dias do ciclo já decorridos, contando hoje (≥ 0). */
+  elapsedDays: number;
   /** Há renda ou obrigações cadastradas no ciclo? */
   hasData: boolean;
   window: CycleWindow;
@@ -177,11 +201,18 @@ export function dailyAllowanceCents(
     input.cycleStartDay,
     timeZone,
   );
+  const elapsedDays = elapsedCycleDays(
+    input.now,
+    input.cycleStartDay,
+    timeZone,
+  );
 
   return {
     dailyCents: dailyCentsForBudget(rawFreeBudgetCents, remainingDays),
     freeBudgetCents,
     remainingDays,
+    variableSpentCents,
+    elapsedDays,
     hasData: incomeCents > 0 || obligationsCents > 0,
     window: cycleWindow(input.now, input.cycleStartDay, timeZone),
   };

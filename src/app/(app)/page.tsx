@@ -55,9 +55,7 @@ export default async function DashboardPage({
   let backgroundColor = "hsl(0 0% 45%)";
   let cycleDaysRemaining = 0;
   let level: FinanceLevel = "neutral";
-  let incomeCents = 0;
   let series: DailySeries | null = null;
-  let previousMonthsCents: number[] = [];
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
 
@@ -72,9 +70,7 @@ export default async function DashboardPage({
     const { cycleStartDay } = await getSettings();
     cycleDaysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
     level = status.level;
-    incomeCents = status.incomeCents;
     series = data.series;
-    previousMonthsCents = data.previousMonthsCents;
     localMonthSummary = localMonthReview(
       buildMonthReviewData(
         monthReviewSnapshotFrom(data),
@@ -106,6 +102,13 @@ export default async function DashboardPage({
       previousPercents: [],
     });
   }
+
+  // Ritmo recente de gastos avulsos por dia do ciclo — base do simulador
+  // "posso comprar?" (avulsos dentro do ciclo ÷ dias decorridos).
+  const usualDailySpendCents =
+    allowance !== null && allowance.elapsedDays > 0
+      ? Math.round(allowance.variableSpentCents / allowance.elapsedDays)
+      : null;
 
   const actionableMessage =
     view.state === "ok" && allowance !== null
@@ -220,14 +223,15 @@ export default async function DashboardPage({
             localSummary={localMonthSummary}
           />
 
-          <PurchaseSimulator
-            key={referenceMonthKey}
-            incomeCents={incomeCents}
-            spentCents={series.totalExpensesCents}
-            elapsedDay={series.elapsedDay}
-            daysInMonth={series.daysInMonth}
-            previousMonthsCents={previousMonthsCents}
-          />
+          {allowance !== null && (
+            <PurchaseSimulator
+              key={referenceMonthKey}
+              freeBudgetCents={allowance.freeBudgetCents}
+              dailyCents={allowance.dailyCents}
+              remainingDays={allowance.remainingDays}
+              usualDailySpendCents={usualDailySpendCents}
+            />
+          )}
         </>
       )}
     </div>

@@ -10,12 +10,11 @@ import { firstErrorMessage } from "@/lib/validation";
 export const runtime = "nodejs";
 
 const simulateSchema = z.object({
-  incomeCents: z.number().int().nonnegative(),
-  spentCents: z.number().int().nonnegative(),
-  elapsedDay: z.number().int().positive(),
-  daysInMonth: z.number().int().positive(),
+  freeBudgetCents: z.number().int().nonnegative(),
+  dailyCents: z.number().int(),
+  remainingDays: z.number().int().positive(),
+  usualDailySpendCents: z.number().int().nonnegative().nullable().optional(),
   purchaseCents: z.number().int().positive(),
-  previousMonthsCents: z.array(z.number().int().nonnegative()).optional(),
 });
 
 /**

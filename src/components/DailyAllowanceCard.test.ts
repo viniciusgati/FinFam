@@ -15,6 +15,8 @@ function makeAllowance(overrides: Partial<DailyAllowance>): DailyAllowance {
     dailyCents: 0,
     freeBudgetCents: 0,
     remainingDays: 10,
+    variableSpentCents: 0,
+    elapsedDays: 0,
     hasData: true,
     window: cycleWindow(NOW, 1),
     ...overrides,
