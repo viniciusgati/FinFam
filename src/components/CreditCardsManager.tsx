@@ -5,8 +5,12 @@ import {
   invoiceLinesForMonth,
   type CardPurchaseRecord,
 } from "@/lib/invoices";
+import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
 import { formatCents, parseAmountToCents } from "@/lib/money";
 import MaskedInput from "@/components/MaskedInput";
+import CategoryDatalist, {
+  CATEGORY_DATALIST_ID,
+} from "@/components/CategoryDatalist";
 import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
 
 export interface CreditCardData {
@@ -40,6 +44,7 @@ export interface CreditCardsManagerProps {
   initialPurchases: CardPurchaseData[];
   referenceMonthKey: string;
   initialError?: string | null;
+  categorySuggestions?: string[];
 }
 
 const MONTH_NAMES = [
@@ -96,6 +101,7 @@ function toDateInput(value: string | Date): string {
 export default function CreditCardsManager(props: CreditCardsManagerProps) {
   const { initialCards, initialPurchases, referenceMonthKey, initialError } =
     props;
+  const { categorySuggestions = [] } = props;
 
   const [cards, setCards] = useState<CreditCardData[]>(() =>
     sortCards(initialCards),
@@ -456,7 +462,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
       description: description.trim(),
       amountCents: cents,
       purchaseDate: `${isoDate}T00:00:00`,
-      category: category.trim() || null,
+      category: normalizeCategoryLabel(category),
       installmentNumber: Number(installmentNumber),
       installmentsTotal: Number(installmentsTotal),
     };
@@ -693,7 +699,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                   <p className="text-sm text-subtle">
                     parcela {line.installmentNumber}/{line.installmentsTotal} ·{" "}
                     {line.cardName}
-                    {line.category ? ` · ${line.category}` : ""}
+                    {` · ${categoryLabel(line.category)}`}
                   </p>
                 </div>
                 <span className="font-semibold text-foreground">
@@ -1090,7 +1096,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                       parcela {purchase.installmentNumber}/
                       {purchase.installmentsTotal}
                       {card ? ` · ${card.name}` : ""}
-                      {purchase.category ? ` · ${purchase.category}` : ""}
+                      {` · ${categoryLabel(purchase.category)}`}
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
@@ -1286,10 +1292,12 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
               <input
                 type="text"
                 value={category}
+                list={CATEGORY_DATALIST_ID}
                 onChange={(event) => setCategory(event.target.value)}
                 disabled={disabled}
                 className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong"
               />
+              <CategoryDatalist suggestions={categorySuggestions} />
             </label>
           </div>
 

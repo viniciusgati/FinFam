@@ -109,4 +109,17 @@ describe("POST /api/variable-expenses", () => {
     expect((await response.json()).error).toBeTruthy();
     expect(createMock).not.toHaveBeenCalled();
   });
+
+  it("aceita category null e persiste null (Sem categoria)", async () => {
+    createMock.mockResolvedValue({ id: "abc123", ...validPayload, category: null });
+
+    const response = await POST(
+      postRequest({ ...validPayload, category: null }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(createMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({ category: null }),
+    });
+  });
 });

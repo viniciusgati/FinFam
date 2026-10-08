@@ -9,6 +9,9 @@ import {
   validateQuickExpense,
   type QuickExpenseErrors,
 } from "@/lib/quick-expense";
+import CategoryDatalist, {
+  CATEGORY_DATALIST_ID,
+} from "@/components/CategoryDatalist";
 
 const NETWORK_ERROR_MESSAGE =
   "Não foi possível salvar. Verifique sua conexão e tente novamente.";
@@ -18,11 +21,18 @@ type Feedback = "success" | "error" | null;
 const FIELD_CLASSES =
   "rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2";
 
-export default function QuickExpenseCard() {
+interface QuickExpenseCardProps {
+  categorySuggestions?: string[];
+}
+
+export default function QuickExpenseCard({
+  categorySuggestions = [],
+}: QuickExpenseCardProps) {
   const router = useRouter();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(() => todayISO());
+  const [category, setCategory] = useState("");
   const [errors, setErrors] = useState<QuickExpenseErrors>({});
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -31,7 +41,7 @@ export default function QuickExpenseCard() {
     event.preventDefault();
     setFeedback(null);
 
-    const input = { description, amount, date };
+    const input = { description, amount, date, category };
     const validation = validateQuickExpense(input);
     setErrors(validation);
     if (Object.keys(validation).length > 0) return;
@@ -61,6 +71,7 @@ export default function QuickExpenseCard() {
       setDescription("");
       setAmount("");
       setDate(todayISO());
+      setCategory("");
       setFeedback("success");
       router.refresh();
     } catch {
@@ -80,7 +91,7 @@ export default function QuickExpenseCard() {
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-4">
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
             <input
@@ -139,7 +150,21 @@ export default function QuickExpenseCard() {
               </span>
             ) : null}
           </label>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
+            Categoria
+            <input
+              type="text"
+              value={category}
+              list={CATEGORY_DATALIST_ID}
+              onChange={(event) => setCategory(event.target.value)}
+              placeholder="Ex.: Mercado"
+              className={FIELD_CLASSES}
+            />
+          </label>
         </div>
+
+        <CategoryDatalist suggestions={categorySuggestions} />
 
         <div className="flex flex-col gap-2">
           <button

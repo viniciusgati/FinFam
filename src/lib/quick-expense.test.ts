@@ -60,6 +60,14 @@ describe("validateQuickExpense", () => {
   it("não retorna erros para entrada válida", () => {
     expect(validateQuickExpense(validInput)).toEqual({});
   });
+
+  it("não exige categoria (opcional, inclusive vazia)", () => {
+    expect(validateQuickExpense({ ...validInput, category: "" })).toEqual({});
+    expect(validateQuickExpense({ ...validInput, category: "   " })).toEqual({});
+    expect(validateQuickExpense({ ...validInput, category: "Feira" })).toEqual(
+      {},
+    );
+  });
 });
 
 describe("buildQuickExpensePayload", () => {
@@ -82,6 +90,39 @@ describe("buildQuickExpensePayload", () => {
     expect(payload.paid).toBe(true);
     expect(payload.date).toBe("2026-10-07");
     expect(createVariableExpenseSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it("normaliza a categoria e envia null quando vazia ou ausente", () => {
+    expect(buildQuickExpensePayload(validInput)?.category).toBeNull();
+    expect(
+      buildQuickExpensePayload({ ...validInput, category: "   " })?.category,
+    ).toBeNull();
+    expect(
+      buildQuickExpensePayload({ ...validInput, category: "  mercado  " })
+        ?.category,
+    ).toBe("mercado");
+    expect(
+      buildQuickExpensePayload({ ...validInput, category: "Mercado   do  bairro" })
+        ?.category,
+    ).toBe("Mercado do bairro");
+  });
+
+  it("gera payload válido com e sem categoria", () => {
+    const withCategory = buildQuickExpensePayload({
+      ...validInput,
+      category: "Mercado",
+    });
+    const withoutCategory = buildQuickExpensePayload(validInput);
+
+    expect(withCategory).not.toBeNull();
+    expect(withoutCategory).not.toBeNull();
+    if (!withCategory || !withoutCategory) return;
+    expect(createVariableExpenseSchema.safeParse(withCategory).success).toBe(
+      true,
+    );
+    expect(createVariableExpenseSchema.safeParse(withoutCategory).success).toBe(
+      true,
+    );
   });
 
   it("devolve null quando a entrada é inválida", () => {

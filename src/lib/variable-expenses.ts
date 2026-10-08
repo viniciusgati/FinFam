@@ -92,7 +92,7 @@ export const createVariableExpenseSchema = z.object({
   description: z.string().trim().min(1),
   amountCents: z.number().int().nonnegative(),
   date: z.coerce.date(),
-  category: z.string().trim().min(1).optional(),
+  category: z.string().trim().min(1).nullable().optional(),
   paymentMethod: z.enum(PAYMENT_METHODS),
   paid: z.boolean(),
   creditCardId: z.string().min(1).nullable().optional(),
