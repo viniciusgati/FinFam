@@ -50,8 +50,9 @@ nem série temporal.
   mês/dias decorridos/ciclo: `buildConsumptionSummary`/`consumptionAverageLabel`
   (`src/lib/dashboard-series.ts`), sobre `consumptionAvailableCents`/
   `consumptionDailyAverageCents` (`src/lib/finance.ts`). Já exibido como
-  subtítulo do `MonthSpendCard` (janela "mês"). Faturas e avulsos ficam fora da
-  subtração (consumo variável, SPEC §3.2/§3.4).
+  subtítulo do `MonthSpendCard`: no mês corrente com a janela do **ciclo**
+  (mesmos números do card de diária), em mês fechado com a janela **mês**.
+  Faturas e avulsos ficam fora da subtração (consumo variável, SPEC §3.2/§3.4).
 
 Observação: `freeBudget`/diária livre **não** alimentam os gráficos nem o `%` —
 o `%` continua sendo "renda consumida" com as fixas embutidas.

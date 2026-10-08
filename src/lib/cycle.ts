@@ -383,3 +383,16 @@ export function cycleEndCountdownLabel(days: number): string {
   if (days === 1) return "Hoje é o último dia do ciclo";
   return `${days} dias para o fim do ciclo`;
 }
+
+/**
+ * Subtítulo do card principal com o disponível do ciclo — repete exatamente os
+ * números do card "Pode gastar por dia" (decisão de produto: um único valor
+ * "por dia" no dashboard, já líquido de faturas e avulsos).
+ */
+export function cycleAvailabilityLabel(allowance: DailyAllowance): string {
+  if (!allowance.hasData) return "Sem dados do ciclo.";
+  if (allowance.dailyCents < 0) {
+    return `Ciclo estourado: ${formatCents(allowance.dailyCents)}/dia até o fim do ciclo.`;
+  }
+  return `Disponível no ciclo: ${formatCents(allowance.freeBudgetCents)} · ${formatCents(allowance.dailyCents)}/dia`;
+}
