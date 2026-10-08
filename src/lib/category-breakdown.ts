@@ -139,12 +139,26 @@ export const CATEGORY_BREAKDOWN_EMPTY_MESSAGE =
 export const CATEGORY_BREAKDOWN_EMPTY_CTA_LABEL = "Registrar gastos";
 export const CATEGORY_BREAKDOWN_EMPTY_CTA_HREF = "/gastos";
 
+/** Fatia do gráfico: o item da agregação enriquecido com rótulo e percentual. */
+export interface CategoryBreakdownSlice {
+  category: string;
+  amountCents: number;
+  /** Valor formatado em R$ (ex.: `R$ 1.200,00`). */
+  amountLabel: string;
+  /** Percentual inteiro do total; a soma exata é 100 quando `totalCents > 0`. */
+  percent: number;
+}
+
 export interface CategoryBreakdownView {
   title: string;
   /** Itens no formato `Rótulo — R$ valor`, na ordem da agregação. */
   itemLabels: string[];
   /** Linha de total no formato `Total — R$ valor`. */
   totalLabel: string;
+  /** Fatias do gráfico (mesma ordem da agregação) com valor e percentual. */
+  slices: CategoryBreakdownSlice[];
+  /** `aria-label` do gráfico, citando as fatias e o total. */
+  ariaLabel: string;
   isEmpty: boolean;
   emptyMessage: string;
   emptyCtaLabel: string;
@@ -152,18 +166,75 @@ export interface CategoryBreakdownView {
 }
 
 /**
+ * Distribui os percentuais inteiros (método do maior resto) de modo que a soma
+ * seja exatamente 100 quando `totalCents > 0`. Empates no resto são resolvidos
+ * por valor desc e, em seguida, por `localeCompare(..., "pt-BR")`.
+ */
+function allocatePercents(
+  items: CategoryBreakdownItem[],
+  totalCents: number,
+): number[] {
+  if (totalCents <= 0) return items.map(() => 0);
+
+  const exact = items.map((item) => (item.amountCents / totalCents) * 100);
+  const percents = exact.map((value) => Math.floor(value));
+  const leftover =
+    100 - percents.reduce((total, value) => total + value, 0);
+
+  const byRemainderDesc = items
+    .map((item, index) => ({ index, remainder: exact[index] - percents[index] }))
+    .sort((a, b) => {
+      if (b.remainder !== a.remainder) return b.remainder - a.remainder;
+      const byAmount = items[b.index].amountCents - items[a.index].amountCents;
+      if (byAmount !== 0) return byAmount;
+      return items[a.index].category.localeCompare(
+        items[b.index].category,
+        "pt-BR",
+      );
+    });
+
+  for (let i = 0; i < leftover; i += 1) {
+    percents[byRemainderDesc[i].index] += 1;
+  }
+  return percents;
+}
+
+/**
  * View pura da seção: monta todos os textos (inclusive os do estado vazio) para
  * o componente de apresentação não montar UI à mão e o teste rodar sem DOM.
+ *
+ * As `slices` mantêm a ordem da agregação e o `ariaLabel` no formato
+ * `"Gastos por categoria: <Cat> R$ X (NN%), ... Total R$ Y"`.
  */
 export function categoryBreakdownView(
   breakdown: CategoryBreakdown,
 ): CategoryBreakdownView {
+  const percents = allocatePercents(breakdown.items, breakdown.totalCents);
+  const slices = breakdown.items.map((item, index) => ({
+    category: item.category,
+    amountCents: item.amountCents,
+    amountLabel: formatCents(item.amountCents),
+    percent: percents[index],
+  }));
+
+  const ariaLabel =
+    slices.length === 0
+      ? `${CATEGORY_BREAKDOWN_TITLE}: nenhum gasto neste mês`
+      : `${CATEGORY_BREAKDOWN_TITLE}: ${slices
+          .map(
+            (slice) =>
+              `${slice.category} ${slice.amountLabel} (${slice.percent}%)`,
+          )
+          .join(", ")}. Total ${formatCents(breakdown.totalCents)}`;
+
   return {
     title: CATEGORY_BREAKDOWN_TITLE,
     itemLabels: breakdown.items.map(
       (item) => `${item.category} — ${formatCents(item.amountCents)}`,
     ),
     totalLabel: `Total — ${formatCents(breakdown.totalCents)}`,
+    slices,
+    ariaLabel,
     isEmpty: breakdown.items.length === 0,
     emptyMessage: CATEGORY_BREAKDOWN_EMPTY_MESSAGE,
     emptyCtaLabel: CATEGORY_BREAKDOWN_EMPTY_CTA_LABEL,
