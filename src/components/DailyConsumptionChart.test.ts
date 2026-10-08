@@ -28,6 +28,9 @@ describe("DailyConsumptionChart (renderização)", () => {
     expect(html).toContain("Dia típico (Mediana): R$ 35,00");
     expect(html).toContain("Consumo do dia");
     expect(html).toContain("Vencimento (fixas/fatura)");
+    // Cada série (barra, marcador e linha do dia típico) tem rótulo textual
+    // próprio, sem depender da cor/`fill`.
+    expect(html).toContain("Dia típico (Mediana)");
     expect(html).toContain('role="img"');
   });
 
