@@ -93,7 +93,10 @@ gastos avulsos, §4). CRUD em `/entradas` e `/api/variable-incomes`.
 O dashboard exibe:
 
 1. **% da renda mensal consumida** — número grande, é o protagonista.
-2. **Dias para o fim do mês**.
+2. **Dias para o fim do ciclo financeiro**, contando o dia corrente (o ciclo
+   começa em `cycleStartDay`; ex.: dia 08 com o ciclo fechando no dia 15 ⇒
+   "8 dias para o fim do ciclo"). O `%` e a projeção continuam no mês
+   calendário.
 3. **Feedback comparativo**: mensagem textual comparando o mês atual com os
    últimos `N` meses (padrão `N = 4`).
 4. **Cor de fundo** do dashboard, interpolada do verde ao vermelho.

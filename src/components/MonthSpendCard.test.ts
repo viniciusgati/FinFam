@@ -9,7 +9,7 @@ function render(overrides: Partial<Parameters<typeof MonthSpendCard>[0]> = {}) {
     percent: 42,
     level: "green" as const,
     invoiceDue: "Vencimento da fatura em 10/04",
-    daysRemaining: 7,
+    countdownLabel: "8 dias para o fim do ciclo",
     feedback: "Você está gastando abaixo do esperado.",
     ...overrides,
   };
@@ -17,7 +17,7 @@ function render(overrides: Partial<Parameters<typeof MonthSpendCard>[0]> = {}) {
 }
 
 describe("MonthSpendCard (renderização)", () => {
-  it("mantém todo o conteúdo do hero: percentual, nível, vencimento e dias", () => {
+  it("mantém todo o conteúdo do hero: percentual, nível, vencimento e contador do ciclo", () => {
     const html = render();
 
     expect(html).toContain("Renda do mês consumida");
@@ -25,21 +25,16 @@ describe("MonthSpendCard (renderização)", () => {
     expect(html).toContain("Ok");
     expect(html).toContain("Vencimento da fatura em 10/04");
     expect(html).toContain("Mês calendário");
-    expect(html).toContain("7 dias para o fim do mês");
-    expect(html).not.toContain("fim do ciclo");
+    expect(html).toContain("8 dias para o fim do ciclo");
+    expect(html).not.toContain("fim do mês");
   });
 
-  it("no último dia exibe Hoje é o último dia do mês", () => {
-    const html = render({ daysRemaining: 1 });
+  it("renderiza exatamente o rótulo do contador recebido", () => {
+    const lastDay = render({
+      countdownLabel: "Hoje é o último dia do ciclo",
+    });
 
-    expect(html).toContain("Hoje é o último dia do mês");
-  });
-
-  it("no penúltimo dia (daysRemaining = 2) exibe 2 dias e nunca Hoje é o último dia", () => {
-    const html = render({ daysRemaining: 2 });
-
-    expect(html).toContain("2 dias para o fim do mês");
-    expect(html).not.toContain("Hoje é o último dia do mês");
+    expect(lastDay).toContain("Hoje é o último dia do ciclo");
   });
 
   it("aplica as classes compactas de tipografia e padding", () => {

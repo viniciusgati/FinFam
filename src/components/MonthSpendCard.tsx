@@ -1,6 +1,5 @@
 import {
   levelLabel,
-  monthEndCountdownLabel,
   projectionLabel,
   projectionRiskLabel,
   textColorForBackground,
@@ -12,7 +11,8 @@ export interface MonthSpendCardProps {
   percent: number;
   level: FinanceLevel;
   invoiceDue: string;
-  daysRemaining: number;
+  /** Contador já formatado (ex.: `8 dias para o fim do ciclo`). */
+  countdownLabel: string;
   feedback: string;
   actionableMessage?: string | null;
   projectedPercent?: number;
@@ -25,7 +25,7 @@ export default function MonthSpendCard({
   percent,
   level,
   invoiceDue,
-  daysRemaining,
+  countdownLabel,
   feedback,
   actionableMessage,
   projectedPercent,
@@ -91,7 +91,7 @@ export default function MonthSpendCard({
       </p>
 
       <p className="text-lg font-medium opacity-95">
-        {monthEndCountdownLabel(daysRemaining)}
+        {countdownLabel}
       </p>
 
       <p

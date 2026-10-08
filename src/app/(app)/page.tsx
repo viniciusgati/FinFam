@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { loadCycleAllowance, loadDashboardData } from "@/lib/dashboard";
-import { dailyAllowanceCard, type DailyAllowance } from "@/lib/cycle";
+import {
+  cycleEndCountdownLabel,
+  dailyAllowanceCard,
+  remainingCycleDays,
+  type DailyAllowance,
+} from "@/lib/cycle";
+import { getSettings } from "@/lib/settings";
 import {
   actionableBudgetMessage,
   computeFinanceStatus,
@@ -47,7 +53,7 @@ export default async function DashboardPage({
 
   let view: DashboardView = { state: "error" };
   let backgroundColor = "hsl(0 0% 45%)";
-  let daysRemaining = 0;
+  let cycleDaysRemaining = 0;
   let level: FinanceLevel = "neutral";
   let incomeCents = 0;
   let series: DailySeries | null = null;
@@ -59,10 +65,12 @@ export default async function DashboardPage({
     const data = await loadDashboardData(referenceDate);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
-    // O contador do card principal segue o mês calendário (coerente com o %).
-    // `status.daysRemaining` é exclusivo (diasInMonth − dia atual); +1 o torna
-    // inclusivo, contando o dia de hoje.
-    daysRemaining = status.daysRemaining + 1;
+    // O contador do card principal segue o **ciclo financeiro** (não o mês
+    // calendário): dia 08 com o ciclo fechando no dia 15 ⇒ "8 dias para o fim
+    // do ciclo", contando o próprio dia. `status.daysRemaining` é do mês
+    // calendário e não serve aqui.
+    const { cycleStartDay } = await getSettings();
+    cycleDaysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
     level = status.level;
     incomeCents = status.incomeCents;
     series = data.series;
@@ -173,7 +181,7 @@ export default async function DashboardPage({
               percent={view.percent}
               level={level}
               invoiceDue={invoiceDueLabel(referenceDate)}
-              daysRemaining={daysRemaining}
+              countdownLabel={cycleEndCountdownLabel(cycleDaysRemaining)}
               feedback={view.feedback}
               actionableMessage={actionableMessage}
               projectedPercent={view.projectedPercent}

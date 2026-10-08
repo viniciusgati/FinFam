@@ -208,7 +208,7 @@ export interface DailyAllowanceCard {
   periodLabel: string;
   /**
    * Saldo restante do ciclo. Ex.: `Ainda tem R$ 3.250,00 até o fim do ciclo`.
-   * Vazio no estado `no-data`.
+   * Vazio sem dados ou com orçamento livre zerado (esgotado/estourado).
    */
   freeBudgetLabel: string;
   /** Texto alternativo para leitor de tela / `aria-label`. */
@@ -231,9 +231,12 @@ export function dailyAllowanceCard(
   allowance: DailyAllowance,
 ): DailyAllowanceCard {
   const periodLabel = cyclePeriodLabel(allowance.window.startDay);
-  const freeBudgetLabel = allowance.hasData
-    ? `Ainda tem ${formatCents(allowance.freeBudgetCents)} até o fim do ciclo`
-    : "";
+  // Só exibe o saldo com orçamento livre de fato: esgotado/estourado já têm o
+  // detalhe do estado, e "Ainda tem R$ 0,00" contradiz a diária negativa.
+  const freeBudgetLabel =
+    allowance.hasData && allowance.freeBudgetCents > 0
+      ? `Ainda tem ${formatCents(allowance.freeBudgetCents)} até o fim do ciclo`
+      : "";
 
   if (!allowance.hasData) {
     const value = "Sem dados do ciclo";
