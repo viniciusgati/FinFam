@@ -60,6 +60,8 @@ export function typicalDailySpend(
 
 export const CONSUMPTION_CHART_TITLE = "Consumo por dia";
 export const CONSUMPTION_CHART_EMPTY_MESSAGE = "Sem consumo variável neste mês";
+export const CONSUMPTION_CHART_EMPTY_CTA_LABEL = "Registrar gastos";
+export const CONSUMPTION_CHART_EMPTY_CTA_HREF = "/gastos";
 
 export interface ConsumptionChartDay {
   /** Dia do mês (1-based). */
@@ -91,11 +93,17 @@ export interface ConsumptionChartView {
   todayCents: number | null;
   /** Dias com consumo acima do dia típico. */
   aboveTypicalCount: number;
+  /** Soma do consumo variável do mês (barras). */
+  totalVariableCents: number;
+  /** Soma das obrigações que vencem no mês (marcadores). */
+  obligationTotalCents: number;
   /** Ex.: `Hoje: R$ 12,00 · Dia típico (Moda): R$ 30,00 · 5 dias acima`. */
   summaryLabel: string;
   ariaLabel: string;
   isEmpty: boolean;
   emptyMessage: string;
+  emptyCtaLabel: string;
+  emptyCtaHref: string;
 }
 
 export function buildConsumptionChartView(
@@ -125,6 +133,14 @@ export function buildConsumptionChartView(
     typical === null
       ? 0
       : days.filter((day) => day.variableCents > typical.cents).length;
+  const totalVariableCents = days.reduce(
+    (total, day) => total + day.variableCents,
+    0,
+  );
+  const obligationTotalCents = days.reduce(
+    (total, day) => total + day.obligationCents,
+    0,
+  );
 
   const parts: string[] = [];
   if (todayCents !== null) parts.push(`Hoje: ${formatCents(todayCents)}`);
@@ -146,10 +162,13 @@ export function buildConsumptionChartView(
       : `${obligationDays} dias com vencimento de contas fixas ou fatura`;
   const ariaParts = [
     `Consumo por dia, ${days.length} dias`,
+    `consumo total ${formatCents(totalVariableCents)}`,
     typical !== null
       ? `dia típico ${formatCents(typical.cents)} (${typical.label})`
       : "sem consumo variável",
-    obligationDays > 0 ? obligationPart : null,
+    obligationDays > 0
+      ? `${obligationPart} totalizando ${formatCents(obligationTotalCents)}`
+      : null,
   ].filter((part): part is string => part !== null);
 
   return {
@@ -160,19 +179,34 @@ export function buildConsumptionChartView(
     typicalPercent,
     todayCents,
     aboveTypicalCount,
+    totalVariableCents,
+    obligationTotalCents,
     summaryLabel: parts.join(" · "),
     ariaLabel: ariaParts.join("; "),
     isEmpty:
       maxVariableCents === 0 && !days.some((day) => day.obligationCents > 0),
     emptyMessage: CONSUMPTION_CHART_EMPTY_MESSAGE,
+    emptyCtaLabel: CONSUMPTION_CHART_EMPTY_CTA_LABEL,
+    emptyCtaHref: CONSUMPTION_CHART_EMPTY_CTA_HREF,
   };
 }
 
 export const INCOME_ALLOCATION_TITLE = "Para onde vai a renda";
 export const INCOME_ALLOCATION_EMPTY_MESSAGE =
   "Sem renda cadastrada neste mês";
+export const INCOME_ALLOCATION_EMPTY_CTA_LABEL = "Registrar gastos";
+export const INCOME_ALLOCATION_EMPTY_CTA_HREF = "/gastos";
 
 export type IncomeAllocationKey = "fixed" | "card" | "variable" | "remaining";
+export type IncomeEntryKey = "fixedIncome" | "variableIncome";
+
+export interface IncomeAllocationEntry {
+  key: IncomeEntryKey;
+  label: string;
+  amountCents: number;
+  /** Valor formatado em R$ (ex.: `R$ 800,00`). */
+  amountLabel: string;
+}
 
 export interface IncomeAllocationRow {
   key: IncomeAllocationKey;
@@ -185,6 +219,8 @@ export interface IncomeAllocationRow {
 
 export interface IncomeAllocationInput {
   incomeCents: number;
+  fixedIncomeCents: number;
+  variableIncomeCents: number;
   fixedExpensesCents: number;
   cardExpensesCents: number;
   variableExpensesCents: number;
@@ -192,34 +228,67 @@ export interface IncomeAllocationInput {
 
 export interface IncomeAllocationView {
   title: string;
+  /** Entradas decompostas em fixas e variáveis (rótulo + valor formatado). */
+  entriesByType: IncomeAllocationEntry[];
+  /** Soma das entradas do mês. */
+  totalIncomeCents: number;
+  /** Renda total formatada (ex.: `R$ 1.000,00`). */
   incomeLabel: string;
   rows: IncomeAllocationRow[];
+  /** Consumo disponível = entradas − contas fixas (nunca negativo). */
+  consumptionCents: number;
+  consumptionLabel: string;
+  /** Saldo do mês = entradas − (fixas + fatura + avulsos); negativo ⇒ estouro. */
+  balanceCents: number;
+  balanceLabel: string;
   /** Consumo (fixas + fatura + avulsos) acima da renda do mês. */
   overspent: boolean;
   overspentLabel: string | null;
   ariaLabel: string;
   isEmpty: boolean;
   emptyMessage: string;
+  emptyCtaLabel: string;
+  emptyCtaHref: string;
 }
 
 /**
- * Composição da renda do mês: cada real vai para contas fixas, fatura do
- * cartão, gastos avulsos ou sobra. Quando o consumo passa da renda, a linha de
- * "ainda disponível" some e a mensagem de estouro aparece; as fatias continuam
- * proporcionais ao consumo.
+ * Composição da renda do mês: as entradas (fixas + variáveis) viram contas
+ * fixas, fatura do cartão, gastos avulsos e sobra. Destaca ainda o **consumo
+ * disponível** (entradas − fixas, nunca negativo) e o **saldo do mês**
+ * (entradas − todas as saídas; negativo ⇒ estouro). Quando o saldo é negativo a
+ * linha de sobra some da barra e a mensagem de estouro aparece; as fatias
+ * continuam proporcionais ao consumo.
  */
 export function buildIncomeAllocationView(
   input: IncomeAllocationInput,
 ): IncomeAllocationView {
+  const fixedIncome = Math.max(input.fixedIncomeCents, 0);
+  const variableIncome = Math.max(input.variableIncomeCents, 0);
   const income = Math.max(input.incomeCents, 0);
   const fixed = Math.max(input.fixedExpensesCents, 0);
   const card = Math.max(input.cardExpensesCents, 0);
   const variable = Math.max(input.variableExpensesCents, 0);
   const consumed = fixed + card + variable;
   const remaining = income - consumed;
+  const consumption = Math.max(income - fixed, 0);
   const overspent = income > 0 && remaining < 0;
   const base = Math.max(income, consumed, 1);
   const percent = (value: number) => Math.round((value / base) * 100);
+
+  const entriesByType: IncomeAllocationEntry[] = [
+    {
+      key: "fixedIncome",
+      label: "Entradas fixas",
+      amountCents: fixedIncome,
+      amountLabel: formatCents(fixedIncome),
+    },
+    {
+      key: "variableIncome",
+      label: "Entradas variáveis",
+      amountCents: variableIncome,
+      amountLabel: formatCents(variableIncome),
+    },
+  ];
 
   const rows: IncomeAllocationRow[] = [
     {
@@ -247,22 +316,31 @@ export function buildIncomeAllocationView(
   if (remaining >= 0) {
     rows.push({
       key: "remaining",
-      label: "Ainda disponível",
+      label: "Saldo do mês",
       amountCents: remaining,
       percent: percent(remaining),
       barClass: "bg-emerald-500",
     });
   }
 
-  const rowsForAria = rows
-    .map((row) => `${row.label.toLowerCase()} ${formatCents(row.amountCents)}`)
+  const entriesForAria = entriesByType
+    .map((entry) => `${entry.label} ${entry.amountLabel}`)
     .join(", ");
-  const ariaLabel = `Renda do mês de ${formatCents(income)}: ${rowsForAria}.`;
+  const rowsForAria = rows
+    .map((row) => `${row.label} ${formatCents(row.amountCents)}`)
+    .join(", ");
+  const ariaLabel = `${INCOME_ALLOCATION_TITLE}: ${entriesForAria}, total de entradas ${formatCents(income)}, ${rowsForAria}, consumo disponível ${formatCents(consumption)}, saldo do mês ${formatCents(remaining)}.`;
 
   return {
     title: INCOME_ALLOCATION_TITLE,
+    entriesByType,
+    totalIncomeCents: income,
     incomeLabel: formatCents(income),
     rows,
+    consumptionCents: consumption,
+    consumptionLabel: formatCents(consumption),
+    balanceCents: remaining,
+    balanceLabel: formatCents(remaining),
     overspent,
     overspentLabel: overspent
       ? `No vermelho: o consumo passou a renda em ${formatCents(-remaining)}.`
@@ -270,5 +348,7 @@ export function buildIncomeAllocationView(
     ariaLabel,
     isEmpty: income <= 0,
     emptyMessage: INCOME_ALLOCATION_EMPTY_MESSAGE,
+    emptyCtaLabel: INCOME_ALLOCATION_EMPTY_CTA_LABEL,
+    emptyCtaHref: INCOME_ALLOCATION_EMPTY_CTA_HREF,
   };
 }

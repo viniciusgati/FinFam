@@ -33,6 +33,10 @@ export interface DashboardSnapshot {
 }
 
 export interface DashboardData extends FinanceInput {
+  /** Entradas fixas vigentes no mês. */
+  fixedIncomeCents: number;
+  /** Entradas avulsas (venda/saldo) do mês. */
+  variableIncomeCents: number;
   /**
    * Há qualquer movimentação no mês de referência: despesa fixa, avulsa ou de
    * cartão, ou entrada avulsa. Distingue "sem renda" de "renda sem gastos".
@@ -153,8 +157,9 @@ export async function loadDashboardData(
   );
 
   // Entradas avulsas do mês (venda/saldo) somam à renda, como as fixas.
-  const monthlyIncomeCents =
-    sumByAmount(activeIncomes) + sumByAmount(variableIncomes);
+  const fixedIncomeCents = sumByAmount(activeIncomes);
+  const variableIncomeCents = sumByAmount(variableIncomes);
+  const monthlyIncomeCents = fixedIncomeCents + variableIncomeCents;
   const fixedExpensesCents = sumByAmount(activeFixedExpenses);
   const variableExpensesCents = sumByAmount(variableExpenses);
   const cardExpensesCents = sumCardExpensesForMonth(
@@ -207,6 +212,8 @@ export async function loadDashboardData(
 
   return {
     monthlyIncomeCents,
+    fixedIncomeCents,
+    variableIncomeCents,
     fixedExpensesCents,
     variableExpensesCents,
     cardExpensesCents,
