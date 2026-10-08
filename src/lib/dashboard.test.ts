@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     income: { findMany: vi.fn() },
+    variableIncome: { findMany: vi.fn() },
     fixedExpense: { findMany: vi.fn() },
     variableExpense: { findMany: vi.fn() },
     cardPurchase: { findMany: vi.fn() },
@@ -21,6 +22,7 @@ const referenceDate = new Date(Date.UTC(2026, 9, 15, 12)); // outubro/2026
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.variableExpense.findMany.mockResolvedValue([]);
+  prismaMock.variableIncome.findMany.mockResolvedValue([]);
   prismaMock.cardPurchase.findMany.mockResolvedValue([]);
   prismaMock.monthlySnapshot.findMany.mockResolvedValue([]);
 });
@@ -84,6 +86,32 @@ describe("loadDashboardData — vigência", () => {
     const data = await loadDashboardData(referenceDate);
 
     expect(data.fixedExpensesCents).toBe(30000);
+  });
+
+  it("soma entradas avulsas do mês à renda mensal", async () => {
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "1", amountCents: 100000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([
+      {
+        id: "v1",
+        description: "Vendi a bicicleta",
+        amountCents: 25000,
+        date: new Date(Date.UTC(2026, 9, 3, 12)),
+      },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.monthlyIncomeCents).toBe(125000);
+    const [args] = prismaMock.variableIncome.findMany.mock.calls[0];
+    expect(args.where.date.gte.toISOString()).toBe(
+      "2026-10-01T03:00:00.000Z",
+    );
+    expect(args.where.date.lt.toISOString()).toBe(
+      "2026-11-01T03:00:00.000Z",
+    );
   });
 });
 
@@ -280,5 +308,36 @@ describe("loadCycleAllowance — diária restante (regressão #231)", () => {
 
     expect(allowance.freeBudgetCents).toBe(0);
     expect(allowance.dailyCents).toBe(0);
+  });
+
+  it("soma entradas avulsas da janela do ciclo ao orçamento livre", async () => {
+    // cycleStartDay = 20 e hoje 25/03 → ciclo 20/03–19/04; a janela superior
+    // limita em "amanhã" (26/03), como nos gastos avulsos.
+    prismaMock.appSettings.findUnique.mockResolvedValue({
+      id: "singleton",
+      cycleStartDay: 20,
+    });
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([
+      { id: "v1", amountCents: 30000, date: new Date("2026-03-21T12:00:00.000Z") },
+      { id: "v2", amountCents: 9999, date: new Date("2026-03-25T12:00:00.000Z") },
+    ]);
+
+    const allowance = await loadCycleAllowance(
+      new Date("2026-03-25T15:00:00.000Z"),
+    );
+
+    expect(allowance.freeBudgetCents).toBe(39999);
+    expect(allowance.hasData).toBe(true);
+    const [args] = prismaMock.variableIncome.findMany.mock.calls[0];
+    expect(args.where.date.gte.toISOString()).toBe(
+      "2026-03-20T03:00:00.000Z",
+    );
+    expect(args.where.date.lt.toISOString()).toBe(
+      "2026-03-26T03:00:00.000Z",
+    );
   });
 });

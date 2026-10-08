@@ -10,6 +10,10 @@ function input(
       { amountCents: 100000, active: true },
       { amountCents: 50000, active: false },
     ],
+    variableIncomes: [
+      { amountCents: 25000, date: new Date(Date.UTC(2026, 9, 3, 12)) },
+      { amountCents: 99999, date: new Date(Date.UTC(2026, 8, 15, 12)) },
+    ],
     fixedExpenses: [
       { amountCents: 20000, active: true },
       { amountCents: 99999, active: false },
@@ -64,26 +68,27 @@ describe("monthRange", () => {
 });
 
 describe("buildSnapshot", () => {
-  it("soma as quatro categorias e ignora itens inativos", () => {
+  it("soma as categorias, inclui entradas avulsas do mês e ignora inativas", () => {
     const snapshot = buildSnapshot(input());
 
-    expect(snapshot.incomeCents).toBe(100000);
+    expect(snapshot.incomeCents).toBe(125000);
     expect(snapshot.fixedExpensesCents).toBe(20000);
     expect(snapshot.variableExpensesCents).toBe(10000);
     expect(snapshot.cardExpensesCents).toBe(30000);
     expect(snapshot.consumedCents).toBe(60000);
-    expect(snapshot.consumedPercent).toBeCloseTo(60);
+    expect(snapshot.consumedPercent).toBeCloseTo(48);
   });
 
   it("respeita os limites do mês e exclui gastos no crédito", () => {
     const snapshot = buildSnapshot(input());
 
+    expect(snapshot.incomeCents).toBe(125000);
     expect(snapshot.variableExpensesCents).toBe(10000);
     expect(snapshot.cardExpensesCents).toBe(30000);
   });
 
   it("zera o percentual quando não há renda", () => {
-    const snapshot = buildSnapshot(input({ incomes: [] }));
+    const snapshot = buildSnapshot(input({ incomes: [], variableIncomes: [] }));
 
     expect(snapshot.incomeCents).toBe(0);
     expect(snapshot.consumedPercent).toBe(0);

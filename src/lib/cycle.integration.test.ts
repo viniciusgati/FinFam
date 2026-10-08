@@ -75,6 +75,56 @@ describe("loadCycleAllowance — integração com PostgreSQL", () => {
     expect(html).toContain("26 dias restantes no ciclo");
   });
 
+  it("soma entradas avulsas da janela do ciclo e ignora as de fora", async () => {
+    await updateSettings({ cycleStartDay: 20 });
+
+    await prisma.variableIncome.createMany({
+      data: [
+        // Antes do ciclo (dia 19): fora.
+        { description: "Antes", amountCents: 99999, date: new Date("2026-03-19T12:00:00.000Z") },
+        // Início do ciclo (dia 21): conta.
+        { description: "Venda", amountCents: 30000, date: new Date("2026-03-21T12:00:00.000Z") },
+        // Amanhã (dia 26): fora do limite superior.
+        { description: "Amanhã", amountCents: 5000, date: new Date("2026-03-26T12:00:00.000Z") },
+      ],
+    });
+
+    const allowance = await loadCycleAllowance(NOW);
+
+    expect(allowance.freeBudgetCents).toBe(30000);
+    expect(allowance.hasData).toBe(true);
+  });
+
+  it("mostra diária negativa quando o orçamento do ciclo estoura", async () => {
+    await updateSettings({ cycleStartDay: 20 });
+
+    await prisma.income.create({
+      data: { name: "Salário", amountCents: 100000 },
+    });
+    await prisma.variableExpense.create({
+      data: {
+        description: "Estouro",
+        amountCents: 126000,
+        date: new Date("2026-03-21T12:00:00.000Z"),
+        paymentMethod: "PIX",
+      },
+    });
+
+    const allowance = await loadCycleAllowance(NOW);
+
+    // 100000 - 126000 = -26000 em 26 dias → -1000/dia.
+    expect(allowance.freeBudgetCents).toBe(0);
+    expect(allowance.dailyCents).toBe(-1000);
+
+    const html = renderToStaticMarkup(
+      createElement(DailyAllowanceCard, {
+        card: dailyAllowanceCard(allowance),
+      }),
+    ).replace(/\u00a0/g, " ");
+    expect(html).toContain("-R$ 10,00 por dia");
+    expect(html).toContain("Orçamento do ciclo estourado");
+  });
+
   it("cycleStartDay = 1 considera o dia 19 (mês calendário)", async () => {
     await updateSettings({ cycleStartDay: 1 });
 

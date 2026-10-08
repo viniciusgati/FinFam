@@ -34,7 +34,7 @@ function sumByAmount(items: { amountCents: number }[]): number {
  * Carrega os dados agregados do mês a partir do banco.
  *
  * As entradas e saídas fixas respeitam a vigência (startMonth/endMonth) além
- * do flag `active`.
+ * do flag `active`. Entradas avulsas (venda/saldo) do mês somam à renda mensal.
  *
  * As compras de cartão são alocadas pela regra de fechamento/vencimento
  * (SPEC §3.4, `sumCardExpensesForMonth`), de modo que cada mês de referência
@@ -55,28 +55,35 @@ export async function loadDashboardData(
   const currentMonthKey = monthKey(referenceDate);
   const startMonthKey = shiftMonthKey(currentMonthKey, -4);
 
-  const [incomes, fixedExpenses, variableExpenses, cardPurchases, snapshots] =
-    await Promise.all([
-      prisma.income.findMany({ where: { active: true } }),
-      prisma.fixedExpense.findMany({ where: { active: true } }),
-      prisma.variableExpense.findMany({
-        where: {
-          date: { gte: start, lt: end },
-          paymentMethod: { in: budgetPaymentMethods },
-        },
-      }),
-      prisma.cardPurchase.findMany({
-        where: { purchaseDate: { lt: end } },
-        include: { card: true },
-      }),
-      prisma.monthlySnapshot.findMany({
-        where: {
-          monthKey: { gte: startMonthKey, lt: currentMonthKey },
-        },
-        orderBy: { monthKey: "asc" },
-        take: 4,
-      }),
-    ]);
+  const [
+    incomes,
+    fixedExpenses,
+    variableExpenses,
+    variableIncomes,
+    cardPurchases,
+    snapshots,
+  ] = await Promise.all([
+    prisma.income.findMany({ where: { active: true } }),
+    prisma.fixedExpense.findMany({ where: { active: true } }),
+    prisma.variableExpense.findMany({
+      where: {
+        date: { gte: start, lt: end },
+        paymentMethod: { in: budgetPaymentMethods },
+      },
+    }),
+    prisma.variableIncome.findMany({ where: { date: { gte: start, lt: end } } }),
+    prisma.cardPurchase.findMany({
+      where: { purchaseDate: { lt: end } },
+      include: { card: true },
+    }),
+    prisma.monthlySnapshot.findMany({
+      where: {
+        monthKey: { gte: startMonthKey, lt: currentMonthKey },
+      },
+      orderBy: { monthKey: "asc" },
+      take: 4,
+    }),
+  ]);
 
   // Suposição (g): a relação CardPurchase → CreditCard é obrigatória; uma
   // compra órfã indica corrupção de dados e deve falhar o carregamento.
@@ -105,7 +112,9 @@ export async function loadDashboardData(
       })),
   );
 
-  const monthlyIncomeCents = sumByAmount(activeIncomes);
+  // Entradas avulsas do mês (venda/saldo) somam à renda, como as fixas.
+  const monthlyIncomeCents =
+    sumByAmount(activeIncomes) + sumByAmount(variableIncomes);
   const fixedExpensesCents = sumByAmount(activeFixedExpenses);
   const variableExpensesCents = sumByAmount(variableExpenses);
   const cardExpensesCents = sumCardExpensesForMonth(
@@ -151,6 +160,8 @@ export async function loadDashboardData(
  *   `cycleStartDay ≠ 1` e zerava a diária mesmo com orçamento livre.
  * - Gastos avulsos contam por `date` dentro de `[início do ciclo, hoje]`, apenas
  *   nas formas de pagamento do orçamento (mesma regra de `loadDashboardData`).
+ * - Entradas avulsas contam por `date` dentro da mesma janela do ciclo e são
+ *   somadas à renda que forma o orçamento livre.
  */
 export async function loadCycleAllowance(
   now: Date = new Date(),
@@ -166,7 +177,7 @@ export async function loadCycleAllowance(
   const upperBound =
     tomorrow.getTime() < window.nextStart.getTime() ? tomorrow : window.nextStart;
 
-  const [incomes, fixedExpenses, variableExpenses, cardPurchases] =
+  const [incomes, fixedExpenses, variableExpenses, variableIncomes, cardPurchases] =
     await Promise.all([
       prisma.income.findMany({ where: { active: true } }),
       prisma.fixedExpense.findMany({ where: { active: true } }),
@@ -176,15 +187,18 @@ export async function loadCycleAllowance(
           paymentMethod: { in: budgetPaymentMethods },
         },
       }),
+      prisma.variableIncome.findMany({
+        where: { date: { gte: window.start, lt: upperBound } },
+      }),
       prisma.cardPurchase.findMany({
         where: { purchaseDate: { lt: window.nextStart } },
         include: { card: true },
       }),
     ]);
 
-  const incomeCents = sumByAmount(
-    incomes.filter((item) => isActiveInMonth(item, currentMonthKey)),
-  );
+  const incomeCents =
+    sumByAmount(incomes.filter((item) => isActiveInMonth(item, currentMonthKey))) +
+    sumByAmount(variableIncomes);
   const fixedCents = sumByAmount(
     fixedExpenses.filter((item) => isActiveInMonth(item, currentMonthKey)),
   );
