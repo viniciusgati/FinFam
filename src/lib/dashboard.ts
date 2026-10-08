@@ -30,6 +30,8 @@ export interface DashboardSnapshot {
   incomeCents: number;
   consumedCents: number;
   consumedPercent: number;
+  /** Gastos do mês por categoria (rótulo exibido + valor). */
+  categories: { category: string; amountCents: number }[];
 }
 
 export interface DashboardData extends FinanceInput {
@@ -120,6 +122,7 @@ export async function loadDashboardData(
       },
       orderBy: { monthKey: "asc" },
       take: 4,
+      include: { categories: { orderBy: { amountCents: "desc" } } },
     }),
   ]);
 
@@ -225,6 +228,10 @@ export async function loadDashboardData(
       incomeCents: snapshot.incomeCents,
       consumedCents: snapshot.consumedCents,
       consumedPercent: snapshot.consumedPercent,
+      categories: snapshot.categories.map((category) => ({
+        category: category.categoryLabel,
+        amountCents: category.amountCents,
+      })),
     })),
     series,
     consumption,

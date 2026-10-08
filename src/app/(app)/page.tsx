@@ -30,6 +30,15 @@ import {
   localMonthReview,
   monthReviewSnapshotFrom,
 } from "@/lib/ai/month-review";
+import {
+  buildFamilyHelpData,
+  localFamilyHelp,
+} from "@/lib/ai/family-help";
+import {
+  buildFamilyInsights,
+  type FamilyInsight,
+  type FamilyInsightInput,
+} from "@/lib/family-insights";
 import RetryButton from "@/components/RetryButton";
 import MonthSelector from "@/components/MonthSelector";
 import DailyConsumptionChart from "@/components/DailyConsumptionChart";
@@ -40,6 +49,7 @@ import QuickExpenseCard from "@/components/QuickExpenseCard";
 import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
 import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
+import FamilyHelpCard from "@/components/FamilyHelpCard";
 import type { CategoryBreakdown } from "@/lib/category-breakdown";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +86,8 @@ export default async function DashboardPage({
   let allowance: DailyAllowance | null = null;
   let consumptionLabel: string | null = null;
   let categoryBreakdown: CategoryBreakdown | null = null;
+  let familyInsights: FamilyInsight[] = [];
+  let familyHelpFallback = "";
 
   try {
     const data = await loadDashboardData(referenceDate);
@@ -127,6 +139,39 @@ export default async function DashboardPage({
         allowance !== null
           ? cycleAvailabilityLabel(allowance)
           : consumptionAverageLabel(data.consumption);
+
+      // Variação diária só existe no mês corrente (mês fechado não tem "hoje").
+      const todayVariableSpendCents = isCalendarMonth
+        ? (series.variableDailyCents[series.elapsedDay - 1] ?? 0)
+        : null;
+      const usualDailySpend =
+        allowance !== null
+          ? usualDailySpendCents({
+              variableSpentCents: allowance.variableSpentCents,
+              cardExpensesCents,
+              elapsedDays: allowance.elapsedDays,
+            })
+          : null;
+      const dailyReferenceCents = isCalendarMonth
+        ? usualDailySpend !== null && usualDailySpend > 0
+          ? usualDailySpend
+          : data.consumption.dailyByMonthCents
+        : null;
+
+      const familyInput: FamilyInsightInput = {
+        referenceMonthKey,
+        currentCategories: data.categoryBreakdown.items,
+        windowSnapshots: data.snapshots.map((snapshot) => ({
+          monthKey: snapshot.monthKey,
+          categories: snapshot.categories,
+        })),
+        monthlyIncomeCents: data.monthlyIncomeCents,
+        fixedExpensesCents: data.fixedExpensesCents,
+        todayVariableSpendCents,
+        dailyReferenceCents,
+      };
+      familyInsights = buildFamilyInsights(familyInput);
+      familyHelpFallback = localFamilyHelp(buildFamilyHelpData(familyInput));
     }
   } catch {
     view = dashboardView({
@@ -270,6 +315,12 @@ export default async function DashboardPage({
           {categoryBreakdown !== null && (
             <CategoryBreakdownCard breakdown={categoryBreakdown} />
           )}
+
+          <FamilyHelpCard
+            insights={familyInsights}
+            fallback={familyHelpFallback}
+            monthKey={referenceMonthKey}
+          />
 
           <MonthReviewPanel
             key={referenceMonthKey}

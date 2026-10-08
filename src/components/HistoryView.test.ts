@@ -32,6 +32,7 @@ function snapshot(
     incomeCents: 200000,
     consumedCents: 0,
     consumedPercent: 0,
+    fixedExpensesCents: 0,
     consumptionAvailableCents: 0,
     dailyAverageCents: 0,
     categories: [],
@@ -136,6 +137,13 @@ describe("HistoryView — estado ok (markup estático)", () => {
     const html = render(okView([snapshot({ monthKey: "2026-09" })]));
 
     expect(html).toContain(HISTORY_NO_CATEGORY_MESSAGE);
+  });
+
+  it("mostra a seção de ajuda à família com mensagem acionável", () => {
+    const html = render(okView([august, september]));
+
+    expect(html).toContain("Ajuda à família");
+    expect(html).toContain("acima da média dos últimos 1 meses");
   });
 });
 

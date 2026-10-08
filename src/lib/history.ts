@@ -18,6 +18,7 @@ import {
   monthLabel,
   type FinanceLevel,
 } from "./finance";
+import { buildFamilyInsights, type FamilyInsight } from "./family-insights";
 import { formatCents } from "./money";
 
 /** Gasto do mês em uma categoria, como persistido no snapshot. */
@@ -32,6 +33,8 @@ export interface MonthHistorySnapshot {
   incomeCents: number;
   consumedCents: number;
   consumedPercent: number;
+  /** Contas fixas do mês (base da ajuda à família). */
+  fixedExpensesCents: number;
   /** Consumo disponível do mês (`entradas − gastos fixos`). */
   consumptionAvailableCents: number;
   /** Média diária do consumo disponível no mês. */
@@ -318,6 +321,8 @@ export type HistoryViewState =
       entries: MonthHistoryEntry[];
       chart: HistoryChartView;
       comparison: CategoryComparison;
+      /** Insights acionáveis da janela (mês mais recente como referência). */
+      insights: FamilyInsight[];
       noCategoryMessage: string;
       comparisonTitle: string;
       tableHeaders: typeof HISTORY_TABLE_HEADERS;
@@ -344,6 +349,27 @@ export function historyView(input: HistoryViewInput): HistoryViewState {
   const entries = buildMonthHistory(input.snapshots);
   const comparison = buildCategoryComparison(input.snapshots);
 
+  // Ajuda à família: o snapshot mais recente da janela é a referência e os
+  // cronologicamente anteriores são a base de comparação. Mês fechado não tem
+  // "hoje" (variação diária suprimida).
+  const ordered = [...input.snapshots].sort((a, b) =>
+    a.monthKey.localeCompare(b.monthKey),
+  );
+  const reference = ordered[ordered.length - 1];
+  const windowSnapshots = ordered.slice(0, -1);
+  const insights = buildFamilyInsights({
+    referenceMonthKey: reference.monthKey,
+    currentCategories: reference.categories,
+    windowSnapshots: windowSnapshots.map((snapshot) => ({
+      monthKey: snapshot.monthKey,
+      categories: snapshot.categories,
+    })),
+    monthlyIncomeCents: reference.incomeCents,
+    fixedExpensesCents: reference.fixedExpensesCents,
+    todayVariableSpendCents: null,
+    dailyReferenceCents: null,
+  });
+
   return {
     state: "ok",
     title: HISTORY_TITLE,
@@ -356,6 +382,7 @@ export function historyView(input: HistoryViewInput): HistoryViewState {
       })),
     ),
     comparison,
+    insights,
     noCategoryMessage: HISTORY_NO_CATEGORY_MESSAGE,
     comparisonTitle: HISTORY_CATEGORY_COMPARISON_TITLE,
     tableHeaders: HISTORY_TABLE_HEADERS,

@@ -470,6 +470,36 @@ describe("loadDashboardData — gastos por categoria", () => {
   });
 });
 
+describe("loadDashboardData — categorias dos snapshots", () => {
+  it("carrega as categorias de cada mês fechado da janela", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.monthlySnapshot.findMany.mockResolvedValue([
+      {
+        monthKey: "2026-09",
+        incomeCents: 500000,
+        consumedCents: 120000,
+        consumedPercent: 24,
+        categories: [
+          { categoryKey: "mercado", categoryLabel: "Mercado", amountCents: 80000 },
+          { categoryKey: "lazer", categoryLabel: "Lazer", amountCents: 40000 },
+        ],
+      },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.snapshots[0].categories).toEqual([
+      { category: "Mercado", amountCents: 80000 },
+      { category: "Lazer", amountCents: 40000 },
+    ]);
+    const [args] = prismaMock.monthlySnapshot.findMany.mock.calls[0];
+    expect(args.include).toEqual({
+      categories: { orderBy: { amountCents: "desc" } },
+    });
+  });
+});
+
 describe("loadDashboardData — consumo disponível", () => {
   it("expõe entradas − fixas e a média diária do mês", async () => {
     prismaMock.income.findMany.mockResolvedValue([
