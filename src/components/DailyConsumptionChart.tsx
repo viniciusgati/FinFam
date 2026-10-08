@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   buildConsumptionChartView,
   type ConsumptionChartInput,
@@ -33,7 +34,15 @@ export default function DailyConsumptionChart(props: ConsumptionChartInput) {
       </h2>
 
       {view.isEmpty ? (
-        <p className="mt-4 text-sm text-subtle">{view.emptyMessage}</p>
+        <div className="mt-4 flex flex-col items-start gap-3">
+          <p className="text-sm text-subtle">{view.emptyMessage}</p>
+          <Link
+            href={view.emptyCtaHref}
+            className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+          >
+            {view.emptyCtaLabel}
+          </Link>
+        </div>
       ) : (
         <>
           <svg

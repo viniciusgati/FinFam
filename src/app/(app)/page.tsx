@@ -65,6 +65,8 @@ export default async function DashboardPage({
   let level: FinanceLevel = "neutral";
   let series: DailySeries | null = null;
   let incomeCents = 0;
+  let fixedIncomeCents = 0;
+  let variableIncomeCents = 0;
   let fixedExpensesCents = 0;
   let variableExpensesCents = 0;
   let cardExpensesCents = 0;
@@ -86,6 +88,8 @@ export default async function DashboardPage({
     level = status.level;
     series = data.series;
     incomeCents = status.incomeCents;
+    fixedIncomeCents = data.fixedIncomeCents;
+    variableIncomeCents = data.variableIncomeCents;
     fixedExpensesCents = data.fixedExpensesCents;
     variableExpensesCents = data.variableExpensesCents;
     cardExpensesCents = data.cardExpensesCents;
@@ -241,6 +245,8 @@ export default async function DashboardPage({
           <div className="grid gap-4 md:grid-cols-2">
             <IncomeAllocationCard
               incomeCents={incomeCents}
+              fixedIncomeCents={fixedIncomeCents}
+              variableIncomeCents={variableIncomeCents}
               fixedExpensesCents={fixedExpensesCents}
               cardExpensesCents={cardExpensesCents}
               variableExpensesCents={variableExpensesCents}

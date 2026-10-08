@@ -88,6 +88,24 @@ describe("loadDashboardData — vigência", () => {
     expect(data.fixedExpensesCents).toBe(30000);
   });
 
+  it("separa as entradas fixas das avulsas, somando ao total", async () => {
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "1", amountCents: 100000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([
+      { id: "v1", amountCents: 25000, date: new Date(Date.UTC(2026, 9, 3, 12)) },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.fixedIncomeCents).toBe(100000);
+    expect(data.variableIncomeCents).toBe(25000);
+    expect(data.fixedIncomeCents + data.variableIncomeCents).toBe(
+      data.monthlyIncomeCents,
+    );
+  });
+
   it("soma entradas avulsas do mês à renda mensal", async () => {
     prismaMock.income.findMany.mockResolvedValue([
       { id: "1", amountCents: 100000, active: true, startMonth: null, endMonth: null },

@@ -104,7 +104,19 @@ describe("buildConsumptionChartView", () => {
 
     expect(view.isEmpty).toBe(true);
     expect(view.emptyMessage).toBe("Sem consumo variável neste mês");
+    expect(view.emptyCtaLabel).toBe("Registrar gastos");
+    expect(view.emptyCtaHref).toBe("/gastos");
     expect(view.typical).toBeNull();
+  });
+
+  it("cita consumo, dia típico e vencimentos em R$ no aria-label", () => {
+    const aria = plain(buildConsumptionChartView(input).ariaLabel);
+
+    expect(aria).toContain("consumo total R$ 70,00");
+    expect(aria).toContain("dia típico R$ 35,00 (Mediana)");
+    expect(aria).toContain(
+      "1 dia com vencimento de contas fixas ou fatura totalizando R$ 100,00",
+    );
   });
 
   it("mostra marcadores mesmo sem consumo variável", () => {
@@ -123,38 +135,90 @@ describe("buildConsumptionChartView", () => {
 });
 
 describe("buildIncomeAllocationView", () => {
-  it("decompõe a renda em fixas, fatura, avulsos e disponível", () => {
+  const baseInput = {
+    incomeCents: 100000,
+    fixedIncomeCents: 80000,
+    variableIncomeCents: 20000,
+    fixedExpensesCents: 30000,
+    cardExpensesCents: 20000,
+    variableExpensesCents: 10000,
+  };
+
+  it("decompõe as entradas e expõe consumo disponível e saldo do mês", () => {
+    const view = buildIncomeAllocationView(baseInput);
+
+    expect(view.title).toBe("Para onde vai a renda");
+    expect(plain(view.incomeLabel)).toBe("R$ 1.000,00");
+    expect(view.totalIncomeCents).toBe(100000);
+    expect(view.consumptionCents).toBe(70000);
+    expect(plain(view.consumptionLabel)).toBe("R$ 700,00");
+    expect(view.balanceCents).toBe(40000);
+    expect(plain(view.balanceLabel)).toBe("R$ 400,00");
+
+    const entries = Object.fromEntries(
+      view.entriesByType.map((entry) => [entry.key, entry]),
+    );
+    expect(entries.fixedIncome.label).toBe("Entradas fixas");
+    expect(entries.fixedIncome.amountCents).toBe(80000);
+    expect(plain(entries.fixedIncome.amountLabel)).toBe("R$ 800,00");
+    expect(entries.variableIncome.label).toBe("Entradas variáveis");
+    expect(entries.variableIncome.amountCents).toBe(20000);
+    expect(plain(entries.variableIncome.amountLabel)).toBe("R$ 200,00");
+  });
+
+  it("decompõe a renda em fixas, fatura, avulsos e saldo", () => {
     const view = buildIncomeAllocationView({
       incomeCents: 1200000,
+      fixedIncomeCents: 800000,
+      variableIncomeCents: 400000,
       fixedExpensesCents: 300000,
       cardExpensesCents: 600000,
       variableExpensesCents: 40000,
     });
 
-    expect(view.title).toBe("Para onde vai a renda");
     expect(plain(view.incomeLabel)).toBe("R$ 12.000,00");
     const byKey = Object.fromEntries(view.rows.map((row) => [row.key, row]));
     expect(byKey.fixed.amountCents).toBe(300000);
     expect(byKey.fixed.percent).toBe(25);
     expect(byKey.card.percent).toBe(50);
     expect(byKey.variable.percent).toBe(3);
+    expect(byKey.remaining.label).toBe("Saldo do mês");
     expect(byKey.remaining.amountCents).toBe(260000);
     expect(byKey.remaining.percent).toBe(22);
     expect(view.rows.reduce((sum, row) => sum + row.percent, 0)).toBe(100);
+    expect(view.consumptionCents).toBe(900000);
+    expect(view.balanceCents).toBe(260000);
     expect(view.overspent).toBe(false);
     expect(view.overspentLabel).toBeNull();
     expect(view.isEmpty).toBe(false);
   });
 
-  it("marca estouro quando o consumo passa da renda, sem linha de disponível", () => {
+  it("nunca deixa o consumo disponível negativo", () => {
+    const view = buildIncomeAllocationView({
+      ...baseInput,
+      incomeCents: 20000,
+      fixedIncomeCents: 20000,
+      variableIncomeCents: 0,
+      fixedExpensesCents: 30000,
+    });
+
+    expect(view.consumptionCents).toBe(0);
+    expect(plain(view.consumptionLabel)).toBe("R$ 0,00");
+  });
+
+  it("marca estouro quando as saídas passam das entradas, sem linha de saldo", () => {
     const view = buildIncomeAllocationView({
       incomeCents: 100000,
+      fixedIncomeCents: 80000,
+      variableIncomeCents: 20000,
       fixedExpensesCents: 60000,
       cardExpensesCents: 50000,
       variableExpensesCents: 10000,
     });
 
     expect(view.overspent).toBe(true);
+    expect(view.balanceCents).toBe(-20000);
+    expect(plain(view.balanceLabel)).toBe("-R$ 200,00");
     expect(view.rows.some((row) => row.key === "remaining")).toBe(false);
     expect(plain(view.overspentLabel ?? "")).toContain(
       "o consumo passou a renda em R$ 200,00",
@@ -162,9 +226,24 @@ describe("buildIncomeAllocationView", () => {
     expect(view.rows.reduce((sum, row) => sum + row.percent, 0)).toBe(100);
   });
 
-  it("fica vazio sem renda cadastrada", () => {
+  it("inclui os valores em R$ das séries no aria-label", () => {
+    const aria = plain(buildIncomeAllocationView(baseInput).ariaLabel);
+
+    expect(aria).toContain("Entradas fixas R$ 800,00");
+    expect(aria).toContain("Entradas variáveis R$ 200,00");
+    expect(aria).toContain("total de entradas R$ 1.000,00");
+    expect(aria).toContain("Contas fixas R$ 300,00");
+    expect(aria).toContain("Fatura do cartão R$ 200,00");
+    expect(aria).toContain("Gastos avulsos R$ 100,00");
+    expect(aria).toContain("consumo disponível R$ 700,00");
+    expect(aria).toContain("saldo do mês R$ 400,00");
+  });
+
+  it("fica vazio sem renda cadastrada e aponta o CTA para /gastos", () => {
     const view = buildIncomeAllocationView({
       incomeCents: 0,
+      fixedIncomeCents: 0,
+      variableIncomeCents: 0,
       fixedExpensesCents: 0,
       cardExpensesCents: 0,
       variableExpensesCents: 0,
@@ -172,5 +251,7 @@ describe("buildIncomeAllocationView", () => {
 
     expect(view.isEmpty).toBe(true);
     expect(view.emptyMessage).toBe("Sem renda cadastrada neste mês");
+    expect(view.emptyCtaLabel).toBe("Registrar gastos");
+    expect(view.emptyCtaHref).toBe("/gastos");
   });
 });

@@ -28,10 +28,22 @@ describe("DailyConsumptionChart (renderização)", () => {
     expect(html).toContain("Dia típico (Mediana): R$ 35,00");
     expect(html).toContain("Consumo do dia");
     expect(html).toContain("Vencimento (fixas/fatura)");
+    // Cada série (barra, marcador e linha do dia típico) tem rótulo textual
+    // próprio, sem depender da cor/`fill`.
+    expect(html).toContain("Dia típico (Mediana)");
     expect(html).toContain('role="img"');
   });
 
-  it("mostra o estado vazio sem consumo", () => {
+  it("inclui consumo, dia típico e vencimentos em R$ no aria-label", () => {
+    const html = render();
+
+    const aria = html.match(/role="img" aria-label="([^"]*)"/)?.[1] ?? "";
+    expect(aria).toContain("consumo total R$ 70,00");
+    expect(aria).toContain("dia típico R$ 35,00 (Mediana)");
+    expect(aria).toContain("totalizando R$ 100,00");
+  });
+
+  it("no estado vazio mostra a mensagem e o CTA para /gastos", () => {
     const html = render({
       variableDailyCents: [0, 0],
       obligationDailyCents: [0, 0],
@@ -40,6 +52,8 @@ describe("DailyConsumptionChart (renderização)", () => {
     });
 
     expect(html).toContain("Sem consumo variável neste mês");
+    expect(html).toContain('href="/gastos"');
+    expect(html).toContain("Registrar gastos");
     expect(html).not.toContain("Hoje:");
   });
 });
