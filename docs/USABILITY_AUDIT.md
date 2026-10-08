@@ -380,3 +380,188 @@ competência); `prisma/seed.ts:54-62` (compra única à vista); `docs/SPEC.md:57
 (§3.4) e `:133-141` (§5); `docs/SPEC.md:146-159` (§6 — telas `/cartoes` e
 `/historico` ainda inexistentes).
 
+---
+
+# Rodada 3 — Localizar no mês e manter dentro da renda (task #241)
+
+> Fase 2 (auditor-ux) da task #241 ("Proposta de melhorias de usabilidade"). Foco:
+> os fluxos que respondem **"onde estou no mês?"** e **"quanto ainda cabe?"** no
+> dashboard e nas telas de lançamento. Baseada na leitura do código atual e na
+> execução real de `npm test`, `npm run typecheck`, `npm run build` e de um repro
+> do fuso BRT. Nenhum código de produção foi alterado — apenas este documento.
+
+## Fluxos do usuário
+
+- **Login (`/login`)** — formulário "Usuário/Senha", botão vira "Entrando...",
+  distingue erro de configuração (`CONFIG_ERROR`, faixa âmbar acionável) de
+  credencial errada (faixa vermelha) e redireciona para `/` no sucesso. Bom.
+- **Primeiro acesso sem renda (`/`)** — mostra "Sem dados ainda" com CTA
+  "Cadastrar entradas" (`page.tsx:130-150`), em vez do falso `0%` das rodadas
+  anteriores. Resolve o vazio enganoso.
+- **Dashboard mês corrente (`/`)** — `MonthSelector`, `%` gigante + rótulo textual
+  do nível, `invoiceDueLabel` ("Fatura com vencimento em outubro/2026"),
+  "N dias para o fim do mês", feedback comparativo, `QuickExpenseCard`,
+  `DailyAllowanceCard` ("Pode gastar por dia"), dois gráficos, "Avaliação do dia",
+  `MonthReviewPanel` e `PurchaseSimulator`.
+- **Lançamento rápido (no dashboard)** — formulário inline Data/Descrição/Valor,
+  "Salvando..." → "Gasto criado" (verde) ou erro de rede (vermelho) e
+  `router.refresh()` (`QuickExpenseCard.tsx:30-71`). A data inicial vem de
+  `todayISO()`.
+- **Gastos (`/gastos`)** — seletor de mês (12 anteriores/próximos), lista, CRUD;
+  o header usa `today = new Date().toISOString().slice(0,10)` (`gastos/page.tsx:49`)
+  e o mês corrente vem de `currentMonthParam()` (UTC).
+- **Histórico (`/historico`)** — `MonthSelector` e o **mesmo** número `%` em tela
+  cheia (`historico/page.tsx:103-137`); não há tabela/lista dos meses anteriores
+  nem a comparação em destaque.
+- **Entradas/Saídas/Cartões/Configurações** — managers com estado vazio ("Nenhuma
+  entrada cadastrada ainda"), mensagens de salvar/desativar e `SettingsForm` com
+  sucesso temporário e erro acionável.
+- **Erro e carregamento** — dashboard/histórico/gastos mostram `role="alert"` +
+  `RetryButton` ("Tentar novamente"); há `loading.tsx` com skeleton (`aria-busy`).
+
+## Problemas de usabilidade
+
+- **Duas molduras de tempo concorrentes na mesma tela** — o `%`, o rótulo do nível
+  e "N dias para o fim do mês" vêm do **mês calendário** (`computeFinanceStatus`,
+  `finance.ts:297-342`; `monthKey(referenceDate)`, `page.tsx:41-45,185`), enquanto
+  o card "Pode gastar por dia" usa o **ciclo** (`cycleStartDay`) e diz "N dias
+  restantes no ciclo" (`cycle.ts:99-113,257`). Com `cycleStartDay = 20`, o usuário
+  lê "12 dias para o fim do mês" ao lado de "24 dias restantes no ciclo" — não sabe
+  qual janela governa o orçamento. É o núcleo de "me localizar no mês".
+- **O card de diária mistura as duas janelas internamente** — `loadCycleAllowance`
+  soma renda/obrigações do **mês calendário** (`dashboard.ts:185-191`) e divide os
+  gastos por um intervalo diferente (`cycleWindow`). O valor exibido não
+  corresponde nem ao mês nem ao ciclo, sem que o rótulo explique.
+- **"Avaliação do dia" contradiz o orçamento real** — `rateDay` usa
+  `renda / dias_no_mês` **sem descontar obrigações** (`day-rating.ts:36-42`;
+  `dashboard-series.ts:118-119`), enquanto a diária e o `%` subtraem saídas fixas e
+  faturas. Ex.: renda R$ 1.000, obrigações R$ 700, gasto hoje R$ 30 → badge "Ok",
+  mas a diária real é ~R$ 10. Falso alívio contra "me manter dentro da renda".
+- **Não existe "quanto ainda posso gastar" em R$** — `freeBudgetCents` é calculado
+  (`cycle.ts:165-167`) e nunca exposto; `dailyAllowanceCard` só mostra a diária
+  (`cycle.ts:190-259`). O usuário precisa multiplicar dias × diária de cabeça para
+  saber o saldo do ciclo.
+- **Projeção do mês é invisível** — `projectedPercent` é calculado
+  (`finance.ts:326`) e usado só de forma implícita no texto comparativo
+  (`finance.ts:402`); a tela nunca mostra "no ritmo atual você fecha o mês em Z%",
+  justamente o número que permite corrigir a tempo.
+- **Feedback não é acionável** — `compareWithHistory` só compara com meses
+  anteriores (`finance.ts:356-372`); quando estoura, não diz o que fazer ("faltam
+  N dias; ajuste para R$ Y/dia"). Não ajuda a *manter* dentro da renda.
+- **Fuso UTC em `/gastos` e no lançamento rápido** — `todayISO` (`quick-expense.ts:37-39`),
+  `today` (`gastos/page.tsx:49`), `currentMonthParam`/`monthRange`
+  (`variable-expenses.ts:40-58`) usam UTC; o dashboard usa `America/Sao_Paulo`
+  (`time.ts:10`). Repro real em 31/10/2026 23:30 BRT: `todayISO` = `2026-11-01`
+  (amanhã) e `currentMonthParam` = `2026-11`, mas `monthKey` = `2026-10`. Após 21h
+  o formulário abre com data de amanhã e a lista de gastos cai no mês errado.
+- **`/historico` duplica o `%` e não entrega histórico** — a tela repete o número
+  gigante do dashboard (`historico/page.tsx:103-137`) sem lista de meses, sem
+  evolução e sem a frase comparativa em destaque. O usuário não consegue responder
+  "como estive nos últimos meses".
+- **Histórico pode divergir do cálculo atual** — `buildSnapshot` ignora vigência e
+  conta cartão por `purchaseDate` (`snapshots.ts:60-75` vs `dashboard.ts:87-112`); a
+  comparação depende de `db:snapshots` manual. Se divergir, o texto contradiz o `%`
+  e a confiança no número protagonista cai.
+- **"Avaliação do dia" e o rótulo do `%` usam a mesma palavra com bases diferentes**
+  — ambos podem exibir "Ok" calculado de formas distintas (mês calendário vs
+  renda/dias), gerando duas leituras "Ok" que discordam entre si.
+- **Mês futuro navegável sem explicação** — `isCurrentMonth` é
+  `referenceMonthKey >= currentMonthKey` (`page.tsx:43`), então o `input type="month"`
+  permite ir para meses futuros; sem renda vigente cai em "Sem dados ainda /
+  Cadastre suas entradas", mensagem errada para um mês que ainda não chegou.
+- **Onboarding do ciclo sem explicar a consequência** — `SettingsForm.tsx:102-105`
+  diz "Use o dia de fechamento do cartão", mas não avisa que isso separa a janela
+  do card de diária da janela do `%`; o usuário muda o ciclo e vê dois números
+  discordarem sem entender por quê.
+- **Simulador silenciosamente troca por heurística local** — em falha da rota, o
+  `PurchaseSimulator` mostra o resultado local como se fosse a resposta do servidor
+  (`PurchaseSimulator.tsx:96-102`), sem indicar a degradação. Pode minar a confiança.
+
+## Recomendações priorizadas
+
+- **P0 — Corrigir o fuso de `/gastos` e do lançamento rápido** — trocar
+  `toISOString().slice(0,10)` por helper zoned (`time.ts`) e tornar
+  `currentMonthParam`/`monthRange` cientes de `resolveTimeZone`; teste cobrindo
+  23:30 BRT e virada de mês. Benefício: o formulário para de abrir no dia/mês
+  errado após 21h.
+- **P0 — Alinhar `rateDay` ao orçamento livre** — passar a diária já líquida de
+  obrigações; teste com obrigações altas provando que "Ok" só aparece dentro do
+  orçamento real. Benefício: elimina o falso alívio que contraria a ideia.
+- **P0 — Alinhar `buildSnapshot` ao `loadDashboardData`** (vigência + competência
+  de fatura) e automatizar/`documentar db:snapshots`. Benefício: a comparação deixa
+  de contradizer o `%`.
+- **P1 — Unificar a moldura temporal do dashboard** — quando `cycleStartDay ≠ 1`,
+  rotular `%`, "dias" e o card de diária com a **mesma** janela (ou recalcular o `%`
+  sobre o ciclo); teste com `cycleStartDay` 1 e 20. Benefício: o usuário volta a
+  saber em que mês está.
+- **P1 — Exibir o saldo restante do ciclo em R$** — expor `freeBudgetCents` no
+  `DailyAllowanceCard` ("Ainda tem R$ X até o fim do ciclo"). Benefício: responde
+  "quanto ainda cabe" sem cálculo mental.
+- **P1 — Mostrar a projeção do mês** — renderizar `projectedPercent` no card
+  principal ("No ritmo atual: Z% até o fim do mês"). Benefício: permite corrigir
+  antes de estourar.
+- **P1 — Feedback acionável ao estourar** — nível ≥ laranja ou projeção ≥ 100% →
+  plano "faltam N dias; ajuste para R$ Y/dia". Benefício: fecha o ciclo de "me
+  manter dentro".
+- **P2 — `/historico` como lista/evolução de meses** — tabela dos meses com `%` e
+  total, em vez de repetir o número do dashboard. Benefício: responde "como estive".
+- **P2 — Impedir/avisar navegação para mês futuro** e trocar a mensagem de vazio
+  por uma adequada ao contexto. Benefício: menos leitura enganosa.
+- **P2 — Texto de ajuda no `SettingsForm`** explicando o efeito do ciclo sobre o
+  card de diária. Benefício: onboarding do conceito que hoje confunde.
+- **P2 — Sinalizar no `PurchaseSimulator` quando o veredito é local** (degradação).
+  Benefício: preserva a confiança na recomendação.
+
+## Evidência
+
+Comandos e saídas reais desta fase (nenhum arquivo de produção alterado; apenas
+este documento):
+
+```
+$ git branch --show-current
+autoia/task-241
+
+$ git status
+nothing to commit, working tree clean
+
+$ git fsck --full --no-progress ; echo fsck_exit=$?
+fsck_exit=0
+$ ls .git/shallow 2>/dev/null || echo "not shallow"
+not shallow
+$ git rev-list --all --count
+108
+
+$ npm test 2>&1 | tail -6
+ Test Files  40 passed (40)
+      Tests  369 passed (369)
+   Duration  1.73s
+TEST_EXIT=0
+
+$ npm run typecheck 2>&1 | tail -3
+> tsc --noEmit
+TYPECHECK_EXIT=0
+
+$ npm run build 2>&1 | tail -6
+├ ƒ /gastos ...
+├ ƒ /historico ...
+├ ○ /login ...
+└ ƒ /saidas ...
+BUILD_EXIT=0
+
+$ node -e 'const ref=new Date("2026-10-31T23:30:00-03:00"); ...'
+=== 31/10/2026 23:30 BRT ===
+todayISO (UTC): 2026-11-01      # amanhã
+SP day: 2026-10-31
+currentMonthParam (UTC): 2026-11
+monthKey (SP): 2026-10          # dashboard fica em outubro
+```
+
+Leituras-chave: `src/app/(app)/page.tsx:41-45,185` (mês calendário) vs
+`src/components/DailyAllowanceCard.tsx:20-26` + `src/lib/cycle.ts:99-113,257`
+(ciclo); `src/lib/day-rating.ts:36-42` e `src/lib/dashboard-series.ts:118-119`
+(orçamento bruto); `src/lib/finance.ts:297-342,326,356-372,402` (projeção/
+comparação); `src/lib/quick-expense.ts:37-39` e
+`src/app/(app)/gastos/page.tsx:49` (UTC); `src/lib/snapshots.ts:60-75` vs
+`src/lib/dashboard.ts:87-112` (vigência/competência); `src/app/(app)/historico/page.tsx:103-137`
+(histórico duplica o `%`).
+
