@@ -23,9 +23,15 @@ Gráficos (SVG/CSS puro, sem biblioteca; `role="img"` + `aria-label`):
 
 1. **`IncomeVsExpenseChart`** (`src/components/IncomeVsExpenseChart.tsx`) —
    comparação de **totais do mês**: "Entradas" vs "Saídas" (barras proporcionais).
-2. **`DailySpendChart`** (`src/components/DailySpendChart.tsx`) — "Dia a dia":
-   **uma barra por dia** + **linha do acumulado**; dia de hoje destacado, dias
-   futuros atenuados.
+2. **`VariableSpendChart`** (`src/components/VariableSpendChart.tsx`) — "Gasto
+   variável por dia": **uma barra por dia** com apenas os avulsos no orçamento
+   (`variableDailyExpensesCents`) + **linha horizontal da média de consumo**
+   (`consumptionDailyAverageCents`); dia de hoje destacado, dias futuros
+   atenuados. As **obrigações** do mês (`fixedExpensesCents + cardExpensesCents`,
+   rótulo "Obrigações") aparecem em nota separada, **fora do eixo das barras** —
+   assim uma conta fixa ou fatura não esmaga os gastos do dia a dia. O antigo
+   `DailySpendChart` ("Dia a dia", que misturava fixas/avulsos/faturas) foi
+   aposentado.
 
 Mês fechado/`/historico` (`src/app/(app)/historico/page.tsx`, ~180 B de rota):
 hoje é apenas **placeholder** que repete o número do mês; não há tabela de meses
@@ -39,8 +45,11 @@ nem série temporal.
   competência de fatura (`invoices.allocateInstallments`), e chama
   `buildDailySeries` (`src/lib/dashboard-series.ts`).
 - `buildDailySeries` distribui **cada despesa pelo dia em que ocorre**: fixas no
-  `dueDay`, avulsos na `date`, faturas no `dueDay` do cartão. Logo, o "Dia a dia"
-  mistura **despesa fixa + variável** e concentra picos nos vencimentos.
+  `dueDay`, avulsos na `date`, faturas no `dueDay` do cartão. O gráfico atual usa
+  apenas `variableDailyExpensesCents` (avulsos no orçamento) para as barras;
+  fixas e faturas saem do eixo e viram a nota de **obrigações**. A linha de
+  referência usa `consumptionDailyAverageCents` (média diária do consumo
+  disponível no mês).
 - Já existem, mas só para o orçamento/avaliação do dia:
   - `dailyFreeBudgetCents = max(renda − fixas − faturas, 0) / dias_no_mês`
     (`src/lib/dashboard-series.ts:125-136`).
@@ -103,8 +112,9 @@ Leitura para a próxima fase:
 - **Resolvido:** a métrica de média diária baseada em `entradas − fixos` é
   exposta por `buildConsumptionSummary`/`consumptionAverageLabel`
   (`src/lib/dashboard-series.ts`; ver §2).
-- `DailySpendChart` não tem **linha de referência** (média/orçamento diário) e
-  mistura fixas com variáveis.
+- **Resolvido:** `VariableSpendChart` plota só o gasto variável e traz a **linha
+  de referência** (`consumptionDailyAverageCents`), com as obrigações em nota
+  separada (task #254).
 - `%` e `consumedCents` **incluem fixas**; a diretriz separa "consumo" de
   "obrigações".
 - `/historico` é placeholder → falta base para gráficos de **tendência mensal**.

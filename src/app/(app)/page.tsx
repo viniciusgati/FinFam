@@ -32,7 +32,7 @@ import {
 } from "@/lib/ai/month-review";
 import RetryButton from "@/components/RetryButton";
 import MonthSelector from "@/components/MonthSelector";
-import DailySpendChart from "@/components/DailySpendChart";
+import VariableSpendChart from "@/components/VariableSpendChart";
 import IncomeVsExpenseChart from "@/components/IncomeVsExpenseChart";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
 import PurchaseSimulator from "@/components/PurchaseSimulator";
@@ -64,6 +64,7 @@ export default async function DashboardPage({
   let cycleDaysRemaining = 0;
   let level: FinanceLevel = "neutral";
   let series: DailySeries | null = null;
+  let fixedExpensesCents = 0;
   let cardExpensesCents = 0;
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
@@ -82,6 +83,7 @@ export default async function DashboardPage({
     cycleDaysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
     level = status.level;
     series = data.series;
+    fixedExpensesCents = data.fixedExpensesCents;
     cardExpensesCents = data.cardExpensesCents;
     categoryBreakdown = data.categoryBreakdown;
     localMonthSummary = localMonthReview(
@@ -241,9 +243,10 @@ export default async function DashboardPage({
             </section>
 
             <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-              <DailySpendChart
-                dailyExpensesCents={series.dailyExpensesCents}
-                cumulativeExpensesCents={series.cumulativeExpensesCents}
+              <VariableSpendChart
+                variableDailyExpensesCents={series.variableDailyExpensesCents}
+                averageCents={series.consumptionDailyAverageCents}
+                obligationsCents={fixedExpensesCents + cardExpensesCents}
                 elapsedDay={series.elapsedDay}
                 highlightDay={isCalendarMonth ? series.elapsedDay : undefined}
               />
