@@ -178,18 +178,23 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
 - Valores monetários passam a ser exibidos em **R$ (`pt-BR`)**, além do
   percentual (supera o "sem valores monetários" do §7).
 - Gráficos em **SVG/CSS puro** (`role="img"` + `aria-label`), sem biblioteca de
-  charts: "Entradas vs Saídas" e "Gasto variável por dia" (uma barra por dia com
-  os avulsos no orçamento + linha horizontal da **média de consumo**; dia de hoje
-  destacado; dias futuros atenuados). As obrigações (fixas + faturas) ficam em
-  nota separada, fora do eixo das barras.
+  charts:
+  - **"Para onde vai a renda"**: barra empilhada + lista com o destino da renda
+    do mês (contas fixas, fatura do cartão, gastos avulsos e o que sobra); se o
+    consumo passar da renda, mostra "no vermelho" com o excesso.
+  - **"Consumo por dia"**: barras do consumo **variável** do dia (avulsos no
+    orçamento pela `date` + parcelas de cartão de compras do próprio mês pela
+    data da compra) + linha tracejada do **dia típico** (moda; mediana como
+    fallback, `typicalDailySpend`) e marcadores de vencimento (fixas/fatura)
+    abaixo das barras, fora da escala; dia de hoje destacado e dias futuros
+    atenuados (`buildConsumptionChartView`, `src/lib/dashboard-charts.ts`).
 - **Séries diárias** (`src/lib/dashboard-series.ts`, função pura): avulsos no
   orçamento na `date`; fixas ativas no `dueDay` (limitado ao tamanho do mês);
   faturas no `dueDay` do cartão pela competência (`invoices.ts`). Avulsos
   `CREDIT` não entram (evita dupla contagem, §3.3). A soma da série coincide com
   `consumedCents`. Mês corrente acumula até hoje; mês passado cobre o mês todo.
-  `variableDailyExpensesCents` isola só os avulsos no orçamento (sem fixas nem
-  faturas) e `consumptionDailyAverageCents` traz a média diária do consumo
-  disponível (entradas − fixas, §4.5) para a linha de referência.
+  A mesma série expõe `variableDailyCents` (barras do "Consumo por dia") e
+  `obligationDailyCents` (marcadores de vencimento).
 - **Avaliação de mês fechado por IA** (DeepSeek, opcional via
   `DEEPSEEK_API_KEY`): supervisor `src/lib/ai/deepseek.ts`. Somente agregados
   **numéricos** são enviados; o veredito e o fallback são locais. Cache em

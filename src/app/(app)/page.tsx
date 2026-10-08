@@ -32,8 +32,8 @@ import {
 } from "@/lib/ai/month-review";
 import RetryButton from "@/components/RetryButton";
 import MonthSelector from "@/components/MonthSelector";
-import VariableSpendChart from "@/components/VariableSpendChart";
-import IncomeVsExpenseChart from "@/components/IncomeVsExpenseChart";
+import DailyConsumptionChart from "@/components/DailyConsumptionChart";
+import IncomeAllocationCard from "@/components/IncomeAllocationCard";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
 import PurchaseSimulator from "@/components/PurchaseSimulator";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
@@ -64,7 +64,9 @@ export default async function DashboardPage({
   let cycleDaysRemaining = 0;
   let level: FinanceLevel = "neutral";
   let series: DailySeries | null = null;
+  let incomeCents = 0;
   let fixedExpensesCents = 0;
+  let variableExpensesCents = 0;
   let cardExpensesCents = 0;
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
@@ -83,7 +85,9 @@ export default async function DashboardPage({
     cycleDaysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
     level = status.level;
     series = data.series;
+    incomeCents = status.incomeCents;
     fixedExpensesCents = data.fixedExpensesCents;
+    variableExpensesCents = data.variableExpensesCents;
     cardExpensesCents = data.cardExpensesCents;
     categoryBreakdown = data.categoryBreakdown;
     localMonthSummary = localMonthReview(
@@ -235,22 +239,19 @@ export default async function DashboardPage({
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-              <IncomeVsExpenseChart
-                entriesCents={series.entriesCents}
-                expensesCents={series.totalExpensesCents}
-              />
-            </section>
+            <IncomeAllocationCard
+              incomeCents={incomeCents}
+              fixedExpensesCents={fixedExpensesCents}
+              cardExpensesCents={cardExpensesCents}
+              variableExpensesCents={variableExpensesCents}
+            />
 
-            <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
-              <VariableSpendChart
-                variableDailyExpensesCents={series.variableDailyExpensesCents}
-                averageCents={series.consumptionDailyAverageCents}
-                obligationsCents={fixedExpensesCents + cardExpensesCents}
-                elapsedDay={series.elapsedDay}
-                highlightDay={isCalendarMonth ? series.elapsedDay : undefined}
-              />
-            </section>
+            <DailyConsumptionChart
+              variableDailyCents={series.variableDailyCents}
+              obligationDailyCents={series.obligationDailyCents}
+              elapsedDay={series.elapsedDay}
+              highlightDay={isCalendarMonth ? series.elapsedDay : undefined}
+            />
           </div>
 
           {categoryBreakdown !== null && (
