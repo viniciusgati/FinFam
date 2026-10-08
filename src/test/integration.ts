@@ -59,6 +59,7 @@ const TABLES = [
   "card_purchases",
   "variable_expenses",
   "variable_incomes",
+  "monthly_category_snapshots",
   "monthly_snapshots",
   "credit_cards",
   "incomes",

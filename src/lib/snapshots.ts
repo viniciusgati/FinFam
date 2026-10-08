@@ -6,11 +6,19 @@
  * `prisma/snapshots.ts` é quem consulta o banco e faz o upsert.
  */
 
-import { isActiveInMonth, monthKey, shiftMonthKey } from "./finance";
+import { buildCategoryBreakdown } from "./category-breakdown";
+import {
+  consumptionAvailableCents,
+  consumptionDailyAverageCents,
+  isActiveInMonth,
+  monthKey,
+  shiftMonthKey,
+} from "./finance";
 import {
   sumCardExpensesForMonth,
   type CardPurchaseForMonth,
 } from "./invoices";
+import { isCountedInBudget, type PaymentMethod } from "./variable-expenses";
 
 /** Item fixo (entrada/saída) com os campos de vigência do mês. */
 interface FixedItemInput {
@@ -18,6 +26,12 @@ interface FixedItemInput {
   active: boolean;
   startMonth?: string | null;
   endMonth?: string | null;
+  category?: string | null;
+}
+
+/** Compra de cartão com a categoria, usada na quebra por categoria. */
+export interface SnapshotCardPurchase extends CardPurchaseForMonth {
+  category?: string | null;
 }
 
 export interface SnapshotTransactionInput {
@@ -28,9 +42,17 @@ export interface SnapshotTransactionInput {
   variableExpenses: {
     amountCents: number;
     date: Date;
-    paymentMethod: string;
+    paymentMethod: PaymentMethod;
+    category?: string | null;
   }[];
-  cardPurchases: CardPurchaseForMonth[];
+  cardPurchases: SnapshotCardPurchase[];
+}
+
+/** Fatia de gasto por categoria persistida no snapshot mensal. */
+export interface SnapshotCategory {
+  /** Rótulo normalizado exibido (`NO_CATEGORY_LABEL` quando vazio/ausente). */
+  category: string;
+  amountCents: number;
 }
 
 export interface MonthlySnapshotData {
@@ -41,10 +63,27 @@ export interface MonthlySnapshotData {
   cardExpensesCents: number;
   consumedCents: number;
   consumedPercent: number;
+  /** Consumo disponível (`entradas − gastos fixos`), nunca negativo. */
+  consumptionAvailableCents: number;
+  /** Média diária do consumo disponível no mês calendário. */
+  dailyAverageCents: number;
+  /** Dias do mês calendário derivados do `monthKey`. */
+  daysInMonth: number;
+  /** Gastos do mês por categoria; a soma fecha com `consumedCents`. */
+  categories: SnapshotCategory[];
 }
 
 function sum(items: { amountCents: number }[]): number {
   return items.reduce((total, item) => total + item.amountCents, 0);
+}
+
+/**
+ * Dias do mês calendário de um `monthKey` (YYYY-MM). Aritmética pura sobre o
+ * ano/mês (o dia 0 do mês seguinte é o último do mês atual), imune a fusos.
+ */
+export function daysInMonthKey(key: string): number {
+  const [year, month] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 /**
@@ -91,7 +130,7 @@ export function buildSnapshot(
     input.variableExpenses.filter(
       (item) =>
         monthKey(item.date) === input.monthKey &&
-        item.paymentMethod !== "CREDIT",
+        isCountedInBudget(item.paymentMethod),
     ),
   );
   const cardExpensesCents = sumCardExpensesForMonth(
@@ -103,6 +142,24 @@ export function buildSnapshot(
   const consumedPercent =
     incomeCents > 0 ? (consumedCents / incomeCents) * 100 : 0;
 
+  const available = consumptionAvailableCents({
+    monthlyIncomeCents: incomeCents,
+    fixedExpensesCents,
+  });
+  const daysInMonth = daysInMonthKey(input.monthKey);
+
+  // `buildCategoryBreakdown` pressupõe os avulsos já restritos ao mês (a query
+  // do dashboard faz isso); aqui o input pode vir de qualquer mês, então o
+  // filtro por competência é aplicado antes para manter a invariante da soma.
+  const categories = buildCategoryBreakdown({
+    monthKey: input.monthKey,
+    fixedExpenses: input.fixedExpenses,
+    variableExpenses: input.variableExpenses.filter(
+      (item) => monthKey(item.date) === input.monthKey,
+    ),
+    cardPurchases: input.cardPurchases,
+  }).items;
+
   return {
     monthKey: input.monthKey,
     incomeCents,
@@ -111,5 +168,9 @@ export function buildSnapshot(
     cardExpensesCents,
     consumedCents,
     consumedPercent,
+    consumptionAvailableCents: available,
+    dailyAverageCents: consumptionDailyAverageCents(available, daysInMonth),
+    daysInMonth,
+    categories,
   };
 }

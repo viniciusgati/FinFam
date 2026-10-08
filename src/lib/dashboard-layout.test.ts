@@ -84,33 +84,24 @@ describe("QuickExpenseCard em colunas estreitas", () => {
 });
 
 describe("layout do histórico (evolução dos meses)", () => {
-  it("monta lista, resumo e comparação a partir de funções puras", () => {
+  it("monta a view a partir de funções puras e consulta a janela de snapshots", () => {
     const page = readSource("../app/(app)/historico/page.tsx");
 
-    expect(page).toContain("buildMonthHistory");
-    expect(page).toContain("compareWithHistory");
-    expect(page).toContain("Ainda não há meses anteriores registrados.");
-    expect(page).toContain('role="status"');
-    expect(page).toContain('aria-live="polite"');
-    expect(page).toContain("formatCents");
-  });
-
-  it("exibe o resumo compacto do mês e a lista de evolução", () => {
-    const page = readSource("../app/(app)/historico/page.tsx");
-
-    // Resumo compacto usa o rótulo do mês e o nível textual (sem depender de cor).
-    expect(page).toContain("monthLabel");
-    expect(page).toContain("levelLabel");
-    // Lista de meses com seção rotulada.
-    expect(page).toContain('aria-label="Evolução dos meses"');
-    expect(page).toContain("history.map");
-  });
-
-  it("mantém o MonthSelector com isCurrentMonth calculado", () => {
-    const page = readSource("../app/(app)/historico/page.tsx");
-
+    expect(page).toContain("historyView");
+    expect(page).toContain("loadMonthHistory");
     expect(page).toContain("<MonthSelector");
     expect(page).toContain("isCurrentMonth={isCurrentMonth}");
+    expect(page).toContain("isFutureMonth");
+  });
+
+  it("renderiza tabela, gráfico e comparativo no componente de apresentação", () => {
+    const view = readSource("../components/HistoryView.tsx");
+
+    expect(view).toContain("formatCents");
+    expect(view).toContain("Evolução dos meses");
+    expect(view).toContain('role="img"');
+    expect(view).toContain("comparisonTitle");
+    expect(view).toContain("tableHeaders");
   });
 });
 
@@ -158,33 +149,38 @@ describe("seção Gastos por categoria no dashboard", () => {
   });
 });
 
-const PAGES = ["../app/(app)/page.tsx", "../app/(app)/historico/page.tsx"];
+const DASHBOARD_PAGE = "../app/(app)/page.tsx";
+const HISTORY_PAGE = "../app/(app)/historico/page.tsx";
+const HISTORY_VIEW = "../components/HistoryView.tsx";
+
 describe("estados de navegação e onboarding do ciclo", () => {
-  it("renderiza FutureMonthNotice sob o estado future nas duas páginas", () => {
-    for (const path of PAGES) {
-      const page = readSource(path);
+  it("renderiza FutureMonthNotice sob o estado future nas duas telas", () => {
+    const dashboard = readSource(DASHBOARD_PAGE);
+    expect(dashboard).toContain('view.state === "future"');
+    expect(dashboard).toContain("<FutureMonthNotice />");
+    expect(dashboard).toContain("isFutureMonth");
 
-      expect(page).toContain('view.state === "future"');
-      expect(page).toContain("<FutureMonthNotice />");
-      expect(page).toContain("isFutureMonth");
-    }
+    const history = readSource(HISTORY_VIEW);
+    expect(history).toContain('view.state === "future"');
+    expect(history).toContain("<FutureMonthNotice />");
+
+    expect(readSource(HISTORY_PAGE)).toContain("isFutureMonth");
   });
 
-  it("passa isFutureMonth para dashboardView", () => {
-    for (const path of PAGES) {
-      const page = readSource(path);
-
-      expect(page).toMatch(/dashboardView\(\{[\s\S]*?isFutureMonth/);
-    }
+  it("passa isFutureMonth para o view model de cada página", () => {
+    expect(readSource(DASHBOARD_PAGE)).toMatch(
+      /dashboardView\(\{[\s\S]*?isFutureMonth/,
+    );
+    expect(readSource(HISTORY_PAGE)).toMatch(
+      /historyView\(\{[\s\S]*?isFutureMonth/,
+    );
   });
 
-  it("renderiza o vazio por emptyStateCopy(view.reason), sem hardcode de CTA", () => {
-    for (const path of PAGES) {
-      const page = readSource(path);
+  it("renderiza o vazio do dashboard por emptyStateCopy(view.reason), sem hardcode de CTA", () => {
+    const page = readSource(DASHBOARD_PAGE);
 
-      expect(page).toContain("emptyStateCopy(view.reason)");
-      expect(page).not.toContain("Cadastrar entradas");
-      expect(page).not.toContain('href="/entradas"');
-    }
+    expect(page).toContain("emptyStateCopy(view.reason)");
+    expect(page).not.toContain("Cadastrar entradas");
+    expect(page).not.toContain('href="/entradas"');
   });
 });
