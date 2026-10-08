@@ -6,19 +6,31 @@
  * `prisma/snapshots.ts` é quem consulta o banco e faz o upsert.
  */
 
-import { monthKey, shiftMonthKey } from "./finance";
+import { isActiveInMonth, monthKey, shiftMonthKey } from "./finance";
+import {
+  sumCardExpensesForMonth,
+  type CardPurchaseForMonth,
+} from "./invoices";
+
+/** Item fixo (entrada/saída) com os campos de vigência do mês. */
+interface FixedItemInput {
+  amountCents: number;
+  active: boolean;
+  startMonth?: string | null;
+  endMonth?: string | null;
+}
 
 export interface SnapshotTransactionInput {
   monthKey: string;
-  incomes: { amountCents: number; active: boolean }[];
+  incomes: FixedItemInput[];
   variableIncomes: { amountCents: number; date: Date }[];
-  fixedExpenses: { amountCents: number; active: boolean }[];
+  fixedExpenses: FixedItemInput[];
   variableExpenses: {
     amountCents: number;
     date: Date;
     paymentMethod: string;
   }[];
-  cardPurchases: { amountCents: number; purchaseDate: Date }[];
+  cardPurchases: CardPurchaseForMonth[];
 }
 
 export interface MonthlySnapshotData {
@@ -51,23 +63,29 @@ export function monthRange(referenceDate: Date, n: number): string[] {
 /**
  * Agrega as transações de um mês e calcula o snapshot correspondente.
  *
- * Simplificação alinhada ao `loadDashboardData`: entradas/saídas fixas ativas
- * contam integralmente; entradas avulsas e gastos avulsos contam pela `date` no
- * mês (gastos com `paymentMethod != CREDIT`); compras de cartão contam pela
- * `purchaseDate`.
+ * Paridade com o `loadDashboardData`: entradas/saídas fixas respeitam a
+ * vigência (`isActiveInMonth`, não só o flag `active`); entradas avulsas e
+ * gastos avulsos contam pela `date` no mês (gastos com `paymentMethod !=
+ * CREDIT`); compras de cartão contam pela competência da fatura
+ * (`sumCardExpensesForMonth`), inclusive parcelas de compras feitas em meses
+ * anteriores.
  */
 export function buildSnapshot(
   input: SnapshotTransactionInput,
 ): MonthlySnapshotData {
   const incomeCents =
-    sum(input.incomes.filter((item) => item.active)) +
+    sum(
+      input.incomes.filter((item) => isActiveInMonth(item, input.monthKey)),
+    ) +
     sum(
       input.variableIncomes.filter(
         (item) => monthKey(item.date) === input.monthKey,
       ),
     );
   const fixedExpensesCents = sum(
-    input.fixedExpenses.filter((item) => item.active),
+    input.fixedExpenses.filter((item) =>
+      isActiveInMonth(item, input.monthKey),
+    ),
   );
   const variableExpensesCents = sum(
     input.variableExpenses.filter(
@@ -76,10 +94,9 @@ export function buildSnapshot(
         item.paymentMethod !== "CREDIT",
     ),
   );
-  const cardExpensesCents = sum(
-    input.cardPurchases.filter(
-      (item) => monthKey(item.purchaseDate) === input.monthKey,
-    ),
+  const cardExpensesCents = sumCardExpensesForMonth(
+    input.cardPurchases,
+    input.monthKey,
   );
   const consumedCents =
     fixedExpensesCents + variableExpensesCents + cardExpensesCents;

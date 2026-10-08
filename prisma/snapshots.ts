@@ -28,7 +28,8 @@ async function main() {
         where: { date: { gte: rangeStart, lt: currentStart } },
       }),
       prisma.cardPurchase.findMany({
-        where: { purchaseDate: { gte: rangeStart, lt: currentStart } },
+        where: { purchaseDate: { lt: currentStart } },
+        include: { card: true },
       }),
     ]);
 

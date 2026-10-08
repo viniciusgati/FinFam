@@ -70,6 +70,30 @@ npm run dev
 > tudo** e recomeçar use `npm run db:seed -- --reset`, que é o único caminho
 > destrutivo e imprime `Banco reiniciado com dados de exemplo. Seed concluído.`
 
+### Snapshots do histórico (`db:snapshots`)
+
+`npm run db:snapshots` deriva e grava os `monthly_snapshots` a partir das
+transações, com as **mesmas regras do dashboard**: vigência dos itens fixos
+(`startMonth`/`endMonth` além do flag `active`) e competência da fatura do
+cartão (fechamento/vencimento), inclusive parcelas de compras feitas antes do
+mês.
+
+**É passo obrigatório após `npm run db:deploy`/`npm run db:migrate`** (e após
+qualquer mudança de dados: entradas/saídas fixas, gastos avulsos ou compras de
+cartão). Ele é idempotente e pode ser reexecutado sem duplicar nada.
+
+**O que conferir na saída:**
+
+- uma linha por mês, ex.: `Snapshot derivado: 2026-09 (37.42%).` — o `%` de
+  cada mês precisa bater com o `%` exibido pelo dashboard no mês equivalente;
+- a linha final `N mês(es) recalculado(s).` — o mesmo `N` de meses fechados
+  usados na faixa comparativa.
+
+Sem esse passo, o histórico guardado pode ter sido calculado por regras
+antigas e a comparação **histórico × `%`** fica desalinhada: o texto _"Estão
+melhores/piores que os últimos N meses"_ pode contradizer o `%` do mês
+corrente.
+
 ## Se algo falhar
 
 | Erro (código do Prisma) | O que fazer |
@@ -256,6 +280,11 @@ Observações:
 - **Migrations no start:** cada deploy/restart roda
   `npx prisma migrate deploy` antes de `npm run start`; é idempotente (sem
   pendência imprime `No pending migrations to apply.` e termina exit 0).
+- **Snapshots após o deploy (obrigatório):** rode
+  `railway run npm run db:snapshots` depois de aplicar as migrations (ou após
+  mudanças de dados) para recalcular o histórico com as mesmas regras do
+  dashboard; sem isso a faixa comparativa pode contradizer o `%` do mês. Veja
+  [Snapshots do histórico](#snapshots-do-histórico-dbsnapshots).
 - **Seed opcional:** `npm run db:seed` popula dados de exemplo; em produção
   pode ser pulado (`railway run npm run db:seed` quando quiser).
 - **`PORT`** é definida pelo próprio Railway; não é preciso configurar.
