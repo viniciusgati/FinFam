@@ -3,6 +3,7 @@ import CreditCardsManager, {
   type CardPurchaseData,
   type CreditCardData,
 } from "@/components/CreditCardsManager";
+import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import { prisma } from "@/lib/db";
 import { monthKey } from "@/lib/finance";
 import { resolveReferenceDate } from "@/lib/invoices";
@@ -39,12 +40,15 @@ export default async function CartoesPage({
     loadError = "Não foi possível carregar cartões e compras. Tente novamente.";
   }
 
+  const categorySuggestions = await loadCategorySuggestions();
+
   return (
     <CreditCardsManager
       initialCards={cards}
       initialPurchases={purchases}
       referenceMonthKey={referenceMonthKey}
       initialError={loadError}
+      categorySuggestions={categorySuggestions}
     />
   );
 }

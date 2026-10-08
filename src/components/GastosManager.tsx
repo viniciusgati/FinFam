@@ -9,7 +9,11 @@ import {
   type FormEvent,
 } from "react";
 import type { PaymentMethod } from "@/lib/variable-expenses";
+import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
 import MaskedInput from "@/components/MaskedInput";
+import CategoryDatalist, {
+  CATEGORY_DATALIST_ID,
+} from "@/components/CategoryDatalist";
 import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
 
 export interface ExpenseDTO {
@@ -35,6 +39,7 @@ interface GastosManagerProps {
   currentMes: string;
   monthOptions: MonthOption[];
   initialExpenses: ExpenseDTO[];
+  categorySuggestions: string[];
 }
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
@@ -124,6 +129,7 @@ export default function GastosManager({
   currentMes,
   monthOptions,
   initialExpenses,
+  categorySuggestions,
 }: GastosManagerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -194,7 +200,7 @@ export default function GastosManager({
       description: form.description.trim(),
       amountCents: parseAmountInput(form.amount),
       date: isoDate,
-      category: form.category.trim() ? form.category.trim() : undefined,
+      category: normalizeCategoryLabel(form.category),
       paymentMethod: form.paymentMethod,
       paid: form.paid,
     };
@@ -437,6 +443,7 @@ export default function GastosManager({
             <input
               type="text"
               value={form.category}
+              list={CATEGORY_DATALIST_ID}
               onChange={(event) => updateField("category", event.target.value)}
               className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
               placeholder="Ex.: Alimentação"
@@ -470,6 +477,8 @@ export default function GastosManager({
             Pago
           </label>
         </div>
+
+        <CategoryDatalist suggestions={categorySuggestions} />
 
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -532,8 +541,8 @@ export default function GastosManager({
                     </p>
                     <p className="text-sm text-foreground-muted">
                       {formatDate(expense.date)} ·{" "}
-                      {PAYMENT_LABELS[expense.paymentMethod]}
-                      {expense.category ? ` · ${expense.category}` : ""} ·{" "}
+                      {PAYMENT_LABELS[expense.paymentMethod]} ·{" "}
+                      {categoryLabel(expense.category)} ·{" "}
                       {expense.paid ? "Pago" : "Em aberto"}
                     </p>
                   </div>

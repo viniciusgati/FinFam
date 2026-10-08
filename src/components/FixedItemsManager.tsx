@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
 import MaskedInput from "@/components/MaskedInput";
+import CategoryDatalist, {
+  CATEGORY_DATALIST_ID,
+} from "@/components/CategoryDatalist";
 import { formatCents, parseAmountToCents } from "@/lib/money";
 
 export interface FixedItem {
@@ -31,6 +35,7 @@ export interface FixedItemsManagerProps {
   fallbackErrorMessage: string;
   initialItems: FixedItem[];
   initialError?: string | null;
+  categorySuggestions?: string[];
 }
 
 const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -62,6 +67,7 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
     fallbackErrorMessage,
     initialItems,
     initialError,
+    categorySuggestions = [],
   } = props;
 
   const [items, setItems] = useState<FixedItem[]>(initialItems);
@@ -157,7 +163,7 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
       startMonth: startMonth || null,
       endMonth: endMonth || null,
     };
-    if (showCategory) payload.category = category.trim() || null;
+    if (showCategory) payload.category = normalizeCategoryLabel(category);
 
     const editing = editingId;
     const target = editing ? `${endpoint}/${editing}` : endpoint;
@@ -303,7 +309,7 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                   <p className="text-sm text-subtle">
                     {formatCents(item.amountCents)} · {dayVerb} dia{" "}
                     {daysOf(item, dayField)}
-                    {showCategory && item.category ? ` · ${item.category}` : ""}
+                    {showCategory ? ` · ${categoryLabel(item.category)}` : ""}
                   </p>
                   {(item.startMonth || item.endMonth) && (
                     <p className="text-xs text-subtle">
@@ -428,10 +434,12 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
               <input
                 type="text"
                 value={category}
+                list={CATEGORY_DATALIST_ID}
                 onChange={(event) => setCategory(event.target.value)}
                 disabled={disabled}
                 className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong"
               />
+              <CategoryDatalist suggestions={categorySuggestions} />
             </label>
           )}
 

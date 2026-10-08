@@ -158,6 +158,17 @@ describe("createVariableExpenseSchema", () => {
         .success,
     ).toBe(false);
   });
+
+  it("aceita categoria nula (Sem categoria) e rejeita só espaços", () => {
+    expect(
+      createVariableExpenseSchema.safeParse({ ...validPayload, category: null })
+        .success,
+    ).toBe(true);
+    expect(
+      createVariableExpenseSchema.safeParse({ ...validPayload, category: "   " })
+        .success,
+    ).toBe(false);
+  });
 });
 
 describe("updateVariableExpenseSchema", () => {
@@ -172,6 +183,15 @@ describe("updateVariableExpenseSchema", () => {
 
   it("rejeita objeto vazio", () => {
     expect(updateVariableExpenseSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("aceita categoria nula no update", () => {
+    expect(
+      updateVariableExpenseSchema.safeParse({ category: null }).success,
+    ).toBe(true);
+    expect(
+      updateVariableExpenseSchema.safeParse({ category: "Mercado" }).success,
+    ).toBe(true);
   });
 
   it("rejeita campo parcial inválido", () => {

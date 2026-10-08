@@ -7,6 +7,7 @@ import {
   monthRange,
 } from "@/lib/variable-expenses";
 import GastosManager, { type ExpenseDTO } from "@/components/GastosManager";
+import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import RetryButton from "@/components/RetryButton";
 import { todayISO } from "@/lib/quick-expense";
 
@@ -94,6 +95,8 @@ export default async function GastosPage({
     );
   }
 
+  const categorySuggestions = await loadCategorySuggestions();
+
   return (
     <GastosManager
       key={mes}
@@ -102,6 +105,7 @@ export default async function GastosPage({
       currentMes={currentMes}
       monthOptions={monthOptions}
       initialExpenses={expenses}
+      categorySuggestions={categorySuggestions}
     />
   );
 }

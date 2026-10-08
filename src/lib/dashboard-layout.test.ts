@@ -51,11 +51,21 @@ describe("mensagem acionável no MonthSpendCard", () => {
 });
 
 describe("QuickExpenseCard em colunas estreitas", () => {
-  it("empilha os campos antes de lg", () => {
+  it("empilha os campos antes de lg e usa 4 colunas em lg", () => {
     const card = readSource("../components/QuickExpenseCard.tsx");
 
-    expect(card).toContain('className="grid gap-4 lg:grid-cols-3"');
+    expect(card).toContain('className="grid gap-4 lg:grid-cols-4"');
     expect(card).not.toContain('className="grid gap-4 sm:grid-cols-3"');
+    expect(card).not.toContain('className="grid gap-4 lg:grid-cols-3"');
+  });
+
+  it("oferece categoria com input list + datalist e sugestões", () => {
+    const card = readSource("../components/QuickExpenseCard.tsx");
+
+    expect(card).toContain("categorySuggestions");
+    expect(card).toContain("list={CATEGORY_DATALIST_ID}");
+    expect(card).toContain("<CategoryDatalist");
+    expect(card).toContain("setCategory");
   });
 });
 

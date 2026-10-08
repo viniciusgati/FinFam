@@ -7,6 +7,7 @@
  * quick-expense.test.ts.
  */
 
+import { normalizeCategoryLabel } from "./categories";
 import { parseAmountToCents } from "./money";
 import { resolveTimeZone, zonedDateParts } from "./time";
 
@@ -18,6 +19,7 @@ export interface QuickExpenseInput {
   description: string;
   amount: string;
   date: string;
+  category?: string;
 }
 
 export type QuickExpenseErrors = Partial<
@@ -28,6 +30,7 @@ export interface QuickExpensePayload {
   description: string;
   amountCents: number;
   date: string;
+  category: string | null;
   paymentMethod: "PIX";
   paid: true;
 }
@@ -87,6 +90,7 @@ export function buildQuickExpensePayload(
     description,
     amountCents,
     date: input.date,
+    category: normalizeCategoryLabel(input.category),
     paymentMethod: "PIX",
     paid: true,
   };

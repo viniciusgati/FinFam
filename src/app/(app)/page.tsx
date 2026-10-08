@@ -18,6 +18,7 @@ import {
   type FinanceLevel,
 } from "@/lib/finance";
 import { invoiceDueLabel, resolveReferenceDate } from "@/lib/invoices";
+import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import {
   consumptionAverageLabel,
   type DailySeries,
@@ -115,6 +116,12 @@ export default async function DashboardPage({
     });
   }
 
+  // Sugestões de categoria para o lançamento rápido: só fazem sentido no mês
+  // corrente (quando o card aparece); falha de leitura cai para [].
+  const categorySuggestions = isCalendarMonth
+    ? await loadCategorySuggestions()
+    : [];
+
   // Ritmo recente de consumo do ciclo — base do simulador "posso comprar?":
   // avulsos do ciclo + fatura de cartão do mês, ÷ dias decorridos.
   const usualDailySpend =
@@ -208,7 +215,9 @@ export default async function DashboardPage({
               className={isCalendarMonth ? "" : "md:col-span-2"}
             />
 
-            {isCalendarMonth && <QuickExpenseCard />}
+            {isCalendarMonth && (
+              <QuickExpenseCard categorySuggestions={categorySuggestions} />
+            )}
           </div>
 
           {allowance !== null && (

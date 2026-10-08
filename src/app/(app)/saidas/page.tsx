@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import FixedItemsManager, {
   type FixedItem,
 } from "@/components/FixedItemsManager";
+import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ export default async function SaidasPage() {
     loadError = "Não foi possível carregar as saídas. Tente novamente.";
   }
 
+  const categorySuggestions = await loadCategorySuggestions();
+
   return (
     <FixedItemsManager
       endpoint="/api/fixed-expenses"
@@ -36,6 +39,7 @@ export default async function SaidasPage() {
       fallbackErrorMessage="Não foi possível salvar. Tente novamente."
       initialItems={items}
       initialError={loadError}
+      categorySuggestions={categorySuggestions}
     />
   );
 }
