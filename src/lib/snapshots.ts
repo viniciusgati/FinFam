@@ -11,6 +11,7 @@ import { monthKey, shiftMonthKey } from "./finance";
 export interface SnapshotTransactionInput {
   monthKey: string;
   incomes: { amountCents: number; active: boolean }[];
+  variableIncomes: { amountCents: number; date: Date }[];
   fixedExpenses: { amountCents: number; active: boolean }[];
   variableExpenses: {
     amountCents: number;
@@ -51,13 +52,20 @@ export function monthRange(referenceDate: Date, n: number): string[] {
  * Agrega as transações de um mês e calcula o snapshot correspondente.
  *
  * Simplificação alinhada ao `loadDashboardData`: entradas/saídas fixas ativas
- * contam integralmente; gastos avulsos contam pela `date` no mês e com
- * `paymentMethod != CREDIT`; compras de cartão contam pela `purchaseDate`.
+ * contam integralmente; entradas avulsas e gastos avulsos contam pela `date` no
+ * mês (gastos com `paymentMethod != CREDIT`); compras de cartão contam pela
+ * `purchaseDate`.
  */
 export function buildSnapshot(
   input: SnapshotTransactionInput,
 ): MonthlySnapshotData {
-  const incomeCents = sum(input.incomes.filter((item) => item.active));
+  const incomeCents =
+    sum(input.incomes.filter((item) => item.active)) +
+    sum(
+      input.variableIncomes.filter(
+        (item) => monthKey(item.date) === input.monthKey,
+      ),
+    );
   const fixedExpensesCents = sum(
     input.fixedExpenses.filter((item) => item.active),
   );

@@ -42,6 +42,11 @@ vermelho** conforme a situação dos gastos do mês.
 - Campos: nome, valor, dia de recebimento, vigência (início/fim), ativa.
 - Somam-se para formar a **renda mensal** do mês de referência.
 
+**Entradas avulsas** (venda de algo, saldo que sobrou no mês): descrição, valor
+e data, sem recorrência nem vigência. Contam como **renda do mês da data** e
+entram no **orçamento livre do ciclo** que contém a data (mesma janela dos
+gastos avulsos, §4). CRUD em `/entradas` e `/api/variable-incomes`.
+
 ### 3.2 Saídas fixas
 
 - Campos: nome, valor, dia de vencimento, categoria, vigência, ativa.

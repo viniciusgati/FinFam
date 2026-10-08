@@ -8,9 +8,10 @@ situação dos gastos.
 ## Visão geral
 
 - Entradas fixas (salários) e saídas fixas (contas).
+- Entradas avulsas (venda de algo, saldo que sobrou), por data.
 - Gastos avulsos (lançamentos do dia a dia).
 - Cartão de crédito: compras e faturas contam como saída.
-- Dashboard com **% da renda consumida**, **dias para o fim do mês** e um
+- Dashboard com **% da renda consumida**, **dias para o fim do ciclo** e um
   feedback comparativo com os últimos meses (ex.: _"Estão melhores que os
   últimos 4 meses"_).
 - Autenticação simples por variáveis de ambiente (`FINFAM_USER` / `FINFAM_PASS`).
@@ -43,7 +44,7 @@ npm install
 cp .env.example .env
 # edite .env com DATABASE_URL e credenciais FINFAM_*
 
-# 3. criar o schema (6 tabelas + enum PaymentMethod)
+# 3. criar o schema (9 tabelas + enum PaymentMethod)
 npm run db:migrate
 
 # 4. popular dados de exemplo (5 snapshots: 4 meses fechados + mês corrente)
@@ -59,7 +60,7 @@ npm run dev
 | Comando | O que confere |
 | --- | --- |
 | `npm install` | termina com exit 0, sem erro de resolução de pacotes |
-| `npm run db:migrate` | exit 0; na 1ª execução imprime `The following migration(s) have been applied:` com o nome da migration (ex.: `20261006121852_init`) e fecha com `Your database is now in sync with your schema.`; `SELECT to_regclass('public.monthly_snapshots')` retorna valor não nulo e as 6 tabelas (`incomes`, `fixed_expenses`, `credit_cards`, `variable_expenses`, `card_purchases`, `monthly_snapshots`) existem — reexecutar é seguro: com tudo aplicado também termina exit 0 sem alterar o banco, imprimindo `Already in sync, no schema change or pending migration was found.` |
+| `npm run db:migrate` | exit 0; na 1ª execução imprime `The following migration(s) have been applied:` com o nome da migration (ex.: `20261006121852_init`) e fecha com `Your database is now in sync with your schema.`; `SELECT to_regclass('public.monthly_snapshots')` retorna valor não nulo e as 9 tabelas (`incomes`, `variable_incomes`, `fixed_expenses`, `credit_cards`, `variable_expenses`, `card_purchases`, `monthly_snapshots`, `app_settings`, `monthly_reviews`) existem — reexecutar é seguro: com tudo aplicado também termina exit 0 sem alterar o banco, imprimindo `Already in sync, no schema change or pending migration was found.` |
 | `npm run db:seed` | exit 0 e a saída termina com **`Seed concluído.`**; `SELECT count(*) FROM monthly_snapshots` = **5** e `SELECT "monthKey" FROM monthly_snapshots ORDER BY "monthKey";` lista o mês corrente + os 4 anteriores contíguos (sem buracos), com `incomes` = 2, `fixed_expenses` = 3, `credit_cards` = 1, `variable_expenses` = 2, `card_purchases` = 1 |
 | `npm run dev` | a tela `/` autenticada responde 200 e a faixa de feedback traz o **comparativo com os 4 meses fechados do seed**, com o `%` do mês e o fundo colorido — nunca mais "Ainda não há histórico suficiente.". O texto da faixa segue a regra de projeção da SPEC §4.3 (`dashboardView` compara o **% projetado** do mês com os meses fechados): em 06/10/2026, com o seed, o observado foi **"Estão piores que os últimos 4 meses."** (ritmo projetado ≈ 120% > 33–37% dos meses fechados) — perto do fim do mês, com o mesmo seed, a mensagem vira "Estão melhores que os últimos 4 meses.". Com o banco **migrado sem seed**, `/` também responde 200 e mostra o estado vazio desenhado ("Sem dados ainda" + CTA de cadastro), sem tela de erro |
 
@@ -269,11 +270,12 @@ Observações:
 
 ## Status
 
-Fundação de dados pronta: `prisma/migrations/` versionada (6 tabelas + enum
+Fundação de dados pronta: `prisma/migrations/` versionada (9 tabelas + enum
 `PaymentMethod`), seed idempotente com histórico de 5 meses contíguos (4
 fechados + mês corrente) e o dashboard exibindo o feedback comparativo com a
-regra de projeção da SPEC §4.3. Também entregues: CRUD de entradas e saídas
-fixas, de gastos avulsos e de cartões/compras (com competência de fatura),
-shell de navegação interna e os estados vazio/erro/carregando do dashboard.
-`npm test` e `npm run typecheck` verdes. Falta apenas a tela `/historico`
-(hoje placeholder) — ver `docs/SPEC.md`.
+regra de projeção da SPEC §4.3. Também entregues: CRUD de entradas (fixas e
+avulsas — venda/saldo, por data), de saídas fixas, de gastos avulsos e de
+cartões/compras (com competência de fatura), shell de navegação interna e os
+estados vazio/erro/carregando do dashboard. As entradas avulsas contam na
+renda do mês e no orçamento do ciclo. `npm test` e `npm run typecheck` verdes.
+Falta apenas a tela `/historico` (hoje placeholder) — ver `docs/SPEC.md`.

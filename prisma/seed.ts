@@ -201,6 +201,7 @@ async function seedSnapshots(now: Date) {
 async function resetDatabase() {
   await prisma.cardPurchase.deleteMany();
   await prisma.variableExpense.deleteMany();
+  await prisma.variableIncome.deleteMany();
   await prisma.creditCard.deleteMany();
   await prisma.fixedExpense.deleteMany();
   await prisma.income.deleteMany();
