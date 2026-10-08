@@ -11,9 +11,15 @@ function render(overrides: Partial<Parameters<typeof MonthSpendCard>[0]> = {}) {
     invoiceDue: "Vencimento da fatura em 10/04",
     countdownLabel: "8 dias para o fim do ciclo",
     feedback: "Você está gastando abaixo do esperado.",
+    incomeCents: 500000,
+    consumedCents: 210000,
+    projectedCents: 300000,
     ...overrides,
   };
-  return renderToStaticMarkup(createElement(MonthSpendCard, props));
+  return renderToStaticMarkup(createElement(MonthSpendCard, props)).replace(
+    /\u00a0/g,
+    " ",
+  );
 }
 
 describe("MonthSpendCard (renderização)", () => {
@@ -26,18 +32,52 @@ describe("MonthSpendCard (renderização)", () => {
     expect(html).toContain("Vencimento da fatura em 10/04");
     expect(html).toContain("Mês calendário");
     expect(html).toContain("8 dias para o fim do ciclo");
-    expect(html).not.toContain("fim do mês");
   });
 
-  it("renderiza exatamente o rótulo do contador recebido", () => {
-    const lastDay = render({
-      countdownLabel: "Hoje é o último dia do ciclo",
+  it("decompõe o percentual nos valores do mês: renda, consumido, disponível e projeção", () => {
+    const html = render();
+
+    expect(html).toContain("Renda do mês");
+    expect(html).toContain("R$ 5.000,00");
+    expect(html).toContain("Já consumido");
+    expect(html).toContain("R$ 2.100,00");
+    expect(html).toContain("42% da renda");
+    expect(html).toContain("Ainda disponível");
+    expect(html).toContain("R$ 2.900,00");
+    expect(html).toContain("Projeção até o fim do mês");
+    expect(html).toContain("R$ 3.000,00");
+  });
+
+  it("nomeia o estouro quando o consumo passa a renda", () => {
+    const html = render({
+      percent: 120,
+      consumedCents: 600000,
+      projectedCents: 660000,
     });
 
-    expect(lastDay).toContain("Hoje é o último dia do ciclo");
+    expect(html).toContain("Estourado em");
+    expect(html).toContain("R$ 1.000,00");
+    expect(html).not.toContain("Ainda disponível");
   });
 
-  it("aplica as classes compactas de tipografia e padding", () => {
+  it("renderiza a barra de progresso com o percentual consumido", () => {
+    const html = render();
+
+    expect(html).toContain('role="progressbar"');
+    expect(html).toContain('aria-valuenow="42"');
+    expect(html).toContain('aria-valuetext="42% da renda consumida"');
+    expect(html).toContain("width:42%");
+  });
+
+  it("limita a barra a 100% quando a renda já foi estourada", () => {
+    const html = render({ percent: 120, consumedCents: 600000 });
+
+    expect(html).toContain('aria-valuenow="100"');
+    expect(html).toContain("width:100%");
+    expect(html).not.toContain("width:120%");
+  });
+
+  it("aplica as classes de tipografia e padding do hero", () => {
     const html = render();
 
     expect(html).toContain("p-6");
@@ -69,7 +109,7 @@ describe("MonthSpendCard (renderização)", () => {
     expect(html).toContain("R$ 2.000,00");
   });
 
-  it("posiciona o subtítulo de consumo após o contador e antes do feedback", () => {
+  it("posiciona o subtítulo de consumo no rodapé, antes do feedback", () => {
     const html = render({
       consumptionLabel:
         "Consumo de R$ 2.000,00 · R$ 64,52/dia (mês) · não inclui contas fixas",
@@ -122,6 +162,17 @@ describe("MonthSpendCard (renderização)", () => {
   it("expõe o risco em role=status com aria-live=polite", () => {
     const html = render({ projectedPercent: 248, projectedRisk: true });
 
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+  });
+
+  it("expõe a mensagem acionável em role=status com aria-live=polite", () => {
+    const html = render({
+      actionableMessage:
+        "Restam 7 dias no ciclo. Para fechar dentro do orçamento, limite o gasto a R$ 50,00 por dia.",
+    });
+
+    expect(html).toContain("Restam 7 dias no ciclo");
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-live="polite"');
   });

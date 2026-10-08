@@ -106,6 +106,10 @@ O dashboard exibe:
 3. **Feedback comparativo**: mensagem textual comparando o mês atual com os
    últimos `N` meses (padrão `N = 4`).
 4. **Cor de fundo** do dashboard, interpolada do verde ao vermelho.
+5. **Valores em R$ do mês calendário** no card principal — renda, já consumido,
+   ainda disponível (ou estourado em) e projeção de fechamento — para
+   decompor o `%` em dinheiro e responder "quanto ainda cabe" sem cálculo
+   mental.
 
 ### 4.1 Fórmula do consumo
 
