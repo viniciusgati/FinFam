@@ -206,28 +206,26 @@ export default async function DashboardPage({
 
       {view.state === "ok" && series !== null && (
         <>
-          <div className="grid items-stretch gap-6 md:grid-cols-2">
-            <MonthSpendCard
-              backgroundColor={backgroundColor}
-              percent={view.percent}
-              level={level}
-              invoiceDue={invoiceDueLabel(referenceDate)}
-              countdownLabel={cycleEndCountdownLabel(cycleDaysRemaining)}
-              consumptionLabel={consumptionLabel}
-              feedback={view.feedback}
-              actionableMessage={actionableMessage}
-              projectedPercent={view.projectedPercent}
-              projectedRisk={view.projectedRisk}
-              className={isCalendarMonth ? "" : "md:col-span-2"}
-            />
+          <MonthSpendCard
+            backgroundColor={backgroundColor}
+            percent={view.percent}
+            level={level}
+            invoiceDue={invoiceDueLabel(referenceDate)}
+            countdownLabel={cycleEndCountdownLabel(cycleDaysRemaining)}
+            consumptionLabel={consumptionLabel}
+            feedback={view.feedback}
+            actionableMessage={actionableMessage}
+            projectedPercent={view.projectedPercent}
+            projectedRisk={view.projectedRisk}
+          />
 
-            {isCalendarMonth && (
+          {isCalendarMonth && (
+            <div className="grid items-stretch gap-6 md:grid-cols-2">
               <QuickExpenseCard categorySuggestions={categorySuggestions} />
-            )}
-          </div>
-
-          {allowance !== null && (
-            <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />
+              {allowance !== null && (
+                <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />
+              )}
+            </div>
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
