@@ -6,6 +6,8 @@ import {
   resetDatabase,
 } from "../test/integration";
 import { loadDashboardData } from "./dashboard";
+import { computeFinanceStatus } from "./finance";
+import { resolveReferenceDate } from "./invoices";
 import { ensureClosedMonthSnapshots } from "./snapshot-capture";
 
 // Falha de forma explícita sem `TEST_DATABASE_URL`; nunca toca SQLite.
@@ -62,5 +64,21 @@ describe("dashboard de mês fechado (snapshot imutável)", () => {
     expect(after.series.dailyExpensesCents).toEqual(
       before.series.dailyExpensesCents,
     );
+  });
+
+  it("?mes de mês fechado ancora no último dia: ritmo e projeção não estouram (regressão)", async () => {
+    await ensureClosedMonthSnapshots(prisma, { now: NOW, months: 1 });
+    const referenceDate = resolveReferenceDate("2026-09", NOW);
+
+    const data = await loadDashboardData(referenceDate);
+    const status = computeFinanceStatus(data);
+
+    // Regressão: `?mes` de mês fechado vinha como dia 1 → elapsed 1 e projeção
+    // ~30× o mês ("Risco de estouro" em todo mês já encerrado). Com o mês
+    // inteiro decorrido a projeção é o próprio fechamento.
+    expect(status.daysElapsed).toBe(30);
+    expect(status.daysRemaining).toBe(0);
+    expect(status.projectedPercent).toBeCloseTo(status.consumedPercent, 5);
+    expect(status.projectedCents).toBe(status.consumedCents);
   });
 });

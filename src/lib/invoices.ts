@@ -256,17 +256,33 @@ export function invoiceLinesForMonth(
 
 /**
  * Resolve o mês de referência a partir do parâmetro `?mes=YYYY-MM`.
- * Valor ausente ou inválido cai no mês atual (ver SPEC, suposição (h)).
+ *
+ * - Ausente ou inválido → `now`.
+ * - **Mês corrente** → `now`: voltar ao mês atual pelo seletor (`?mes` do mês
+ *   corrente) precisa do dia real para ritmo, projeção e contador do ciclo —
+ *   ancorar no dia 1 explodia a projeção e dobrava o ciclo com início no meio
+ *   do mês.
+ * - **Mês fechado** → último dia do mês: o mês inteiro decorreu, então ritmo,
+ *   projeção e nível refletem o fechamento, não o primeiro dia.
+ * - **Mês futuro** → primeiro dia (a página exibe o aviso de mês futuro).
  */
 export function resolveReferenceDate(
   mes: string | undefined,
   now: Date = new Date(),
 ): Date {
-  if (mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) {
-    const [year, month] = mes.split("-").map(Number);
-    return zonedTimeToUtc(year, month, 1, resolveTimeZone());
+  if (!mes || !/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) return now;
+
+  const timeZone = resolveTimeZone();
+  const { year: nowYear, month: nowMonth } = zonedDateParts(now, timeZone);
+  const currentMonth = `${nowYear}-${String(nowMonth).padStart(2, "0")}`;
+  const [year, month] = mes.split("-").map(Number);
+
+  if (mes === currentMonth) return now;
+  if (mes < currentMonth) {
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return zonedTimeToUtc(year, month, lastDay, timeZone);
   }
-  return now;
+  return zonedTimeToUtc(year, month, 1, timeZone);
 }
 
 /** Rótulo textual da competência exibida no dashboard. */

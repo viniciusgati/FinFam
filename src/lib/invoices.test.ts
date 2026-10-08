@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { remainingCycleDays } from "./cycle";
 import {
   allocateInstallments,
   invoiceDueLabel,
@@ -267,24 +268,39 @@ describe("invoiceLinesForMonth", () => {
 });
 
 describe("resolveReferenceDate", () => {
-  it("interpreta ?mes válido como o primeiro dia do mês no fuso do Brasil", () => {
-    const resolved = resolveReferenceDate(
-      "2026-12",
-      new Date(Date.UTC(2026, 9, 6, 12)),
+  const now = new Date(Date.UTC(2026, 9, 8, 15)); // 08/10/2026 12:00 BRT
+
+  it("mês corrente ancora no agora, nunca no dia 1", () => {
+    expect(resolveReferenceDate("2026-10", now)).toBe(now);
+  });
+
+  it("voltar ao mês corrente pelo seletor não dobra os dias do ciclo (regressão)", () => {
+    // Sintoma reportado: com `?mes` do mês corrente ancorado no dia 1, o
+    // contador "dias para o fim do ciclo" vinha dobrado quando o ciclo começa
+    // no meio do mês (dia 15): 14 dias em vez de 7.
+    const resolved = resolveReferenceDate("2026-10", now);
+
+    expect(remainingCycleDays(resolved, 15)).toBe(
+      remainingCycleDays(now, 15),
     );
+    expect(remainingCycleDays(resolved, 15)).toBe(7);
+  });
+
+  it("mês fechado ancora no último dia do mês no fuso do Brasil", () => {
+    const resolved = resolveReferenceDate("2026-09", now);
 
     expect(invoiceDueLabel(resolved)).toBe(
-      "Fatura com vencimento em dezembro/2026",
+      "Fatura com vencimento em setembro/2026",
     );
     expect(zonedDateParts(resolved, "America/Sao_Paulo")).toEqual({
       year: 2026,
-      month: 12,
-      day: 1,
+      month: 9,
+      day: 30,
     });
   });
 
-  it("respeita o fuso do Brasil mesmo sob TZ=UTC", () => {
-    const resolved = resolveReferenceDate("2026-11");
+  it("mês futuro segue no primeiro dia, no fuso do Brasil", () => {
+    const resolved = resolveReferenceDate("2026-11", now);
 
     expect(invoiceDueLabel(resolved)).toBe(
       "Fatura com vencimento em novembro/2026",
@@ -296,8 +312,23 @@ describe("resolveReferenceDate", () => {
     });
   });
 
+  it("usa o último dia correto em fevereiro e em ano bissexto", () => {
+    const june = new Date("2026-06-10T15:00:00Z");
+    expect(
+      zonedDateParts(resolveReferenceDate("2026-02", june), "America/Sao_Paulo")
+        .day,
+    ).toBe(28);
+
+    const leapYear = new Date("2028-06-10T15:00:00Z");
+    expect(
+      zonedDateParts(
+        resolveReferenceDate("2028-02", leapYear),
+        "America/Sao_Paulo",
+      ).day,
+    ).toBe(29);
+  });
+
   it("cai no mês atual para valor ausente ou inválido", () => {
-    const now = new Date(Date.UTC(2026, 9, 6, 12));
     expect(resolveReferenceDate(undefined, now)).toBe(now);
     expect(resolveReferenceDate("2026-13", now)).toBe(now);
     expect(resolveReferenceDate("abc", now)).toBe(now);

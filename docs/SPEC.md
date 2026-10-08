@@ -213,6 +213,11 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
   IA apenas redige a justificativa; a rota sempre responde `200` com fallback
   local. O card só aparece no mês corrente (depende do ciclo).
 - O seletor de mês do dashboard navega para `/?mes=YYYY-MM` (prop `basePath`).
+- **Data de referência do `?mes`** (`resolveReferenceDate`): mês corrente → o
+  **agora** (ritmo, projeção e "dias para o fim do ciclo" usam o dia real; o
+  seletor sempre leva `?mes`, inclusive de volta ao mês atual); mês fechado → o
+  **último dia** (o mês inteiro decorreu, então projeção = fechamento, sem
+  "risco de estouro" falso); mês futuro → dia 1 (só exibe o aviso de futuro).
 
 ### 4.5 Consumo disponível e média diária
 
