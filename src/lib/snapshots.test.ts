@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { isActiveInMonth, monthKey } from "./finance";
 import { sumCardExpensesForMonth } from "./invoices";
-import { buildSnapshot, monthRange, type SnapshotTransactionInput } from "./snapshots";
+import {
+  buildSnapshot,
+  hasSnapshotData,
+  missingMonthKeys,
+  monthRange,
+  type SnapshotTransactionInput,
+} from "./snapshots";
 
 /** Cartão com fechamento 20 e vencimento 28: competência = mês do ciclo. */
 const card = { closingDay: 20, dueDay: 28 };
@@ -20,8 +26,8 @@ function input(
       { amountCents: 99999, date: new Date(Date.UTC(2026, 8, 15, 12)) },
     ],
     fixedExpenses: [
-      { amountCents: 20000, active: true, category: "Moradia" },
-      { amountCents: 99999, active: false },
+      { amountCents: 20000, active: true, category: "Moradia", dueDay: 10 },
+      { amountCents: 99999, active: false, dueDay: 5 },
     ],
     variableExpenses: [
       {
@@ -84,6 +90,40 @@ describe("monthRange", () => {
   });
 });
 
+describe("missingMonthKeys", () => {
+  it("devolve só os ausentes, preservando a ordem cronológica", () => {
+    expect(
+      missingMonthKeys(
+        ["2026-07", "2026-09"],
+        ["2026-06", "2026-07", "2026-08", "2026-09"],
+      ),
+    ).toEqual(["2026-06", "2026-08"]);
+  });
+
+  it("devolve [] quando todos os meses já existem", () => {
+    expect(
+      missingMonthKeys(["2026-08", "2026-09"], ["2026-08", "2026-09"]),
+    ).toEqual([]);
+  });
+
+  it("devolve todos quando não há nenhum existente", () => {
+    expect(missingMonthKeys([], ["2026-08", "2026-09"])).toEqual([
+      "2026-08",
+      "2026-09",
+    ]);
+  });
+});
+
+describe("hasSnapshotData", () => {
+  it("considera com dados quando há renda ou consumo", () => {
+    expect(hasSnapshotData({ incomeCents: 0, consumedCents: 0 })).toBe(false);
+    expect(hasSnapshotData({ incomeCents: 100000, consumedCents: 0 })).toBe(
+      true,
+    );
+    expect(hasSnapshotData({ incomeCents: 0, consumedCents: 5000 })).toBe(true);
+  });
+});
+
 describe("buildSnapshot", () => {
   it("soma as categorias, inclui entradas avulsas do mês e ignora inativas", () => {
     const snapshot = buildSnapshot(input());
@@ -94,6 +134,33 @@ describe("buildSnapshot", () => {
     expect(snapshot.cardExpensesCents).toBe(30000);
     expect(snapshot.consumedCents).toBe(60000);
     expect(snapshot.consumedPercent).toBeCloseTo(48);
+  });
+
+  it("separa renda fixa/avulsa e monta a série diária do mês", () => {
+    const snapshot = buildSnapshot(input());
+
+    expect(snapshot.fixedIncomeCents).toBe(100000);
+    expect(snapshot.variableIncomeCents).toBe(25000);
+    expect(snapshot.incomeCents).toBe(
+      snapshot.fixedIncomeCents + snapshot.variableIncomeCents,
+    );
+
+    // Outubro/2026 tem 31 dias; a série cobre o mês inteiro.
+    expect(snapshot.variableDailyCents).toHaveLength(31);
+    expect(snapshot.obligationDailyCents).toHaveLength(31);
+
+    // Avulso PIX de 05/10 e compra de cartão do próprio mês (08/10) no dia 8.
+    expect(snapshot.variableDailyCents[4]).toBe(10000);
+    expect(snapshot.variableDailyCents[7]).toBe(30000);
+    // Saída fixa de 20 000 vence no dia 10 (índice 9).
+    expect(snapshot.obligationDailyCents[9]).toBe(20000);
+
+    // Invariante: série + obrigações fecham com o consumido.
+    const total = snapshot.variableDailyCents.reduce(
+      (sum, value, index) => sum + value + snapshot.obligationDailyCents[index],
+      0,
+    );
+    expect(total).toBe(snapshot.consumedCents);
   });
 
   it("calcula o consumo disponível e a média diária do mês", () => {
@@ -143,9 +210,9 @@ describe("buildSnapshot", () => {
           { amountCents: 9000, active: true, startMonth: "2026-11" },
         ],
         fixedExpenses: [
-          { amountCents: 20000, active: true },
-          { amountCents: 5000, active: true, endMonth: "2026-08" },
-          { amountCents: 6000, active: true, startMonth: "2026-10" },
+          { amountCents: 20000, active: true, dueDay: 10 },
+          { amountCents: 5000, active: true, endMonth: "2026-08", dueDay: 10 },
+          { amountCents: 6000, active: true, startMonth: "2026-10", dueDay: 10 },
         ],
       }),
     );

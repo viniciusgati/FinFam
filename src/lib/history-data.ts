@@ -4,9 +4,13 @@
  * A página é só orquestração: esta função consulta o banco e devolve os
  * snapshots da janela já no formato puro de `history.ts` (com categorias). A
  * lógica de apresentação fica nas funções puras, testáveis sem banco.
+ *
+ * Antes de ler, dispara a captura dos meses fechados ausentes (rede de
+ * segurança de leitura — não depende de escrita nem de cron). A captura nunca
+ * lança e nunca sobrescreve snapshots existentes.
  */
 
-import { prisma } from "./db";
+import { captureClosedMonths, prisma } from "./db";
 import type { MonthHistorySnapshot } from "./history";
 import { monthRange } from "./snapshots";
 
@@ -17,6 +21,8 @@ import { monthRange } from "./snapshots";
 export async function loadMonthHistory(
   referenceDate: Date = new Date(),
 ): Promise<MonthHistorySnapshot[]> {
+  await captureClosedMonths();
+
   const keys = monthRange(referenceDate, 4);
 
   const rows = await prisma.monthlySnapshot.findMany({

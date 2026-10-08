@@ -1,102 +1,109 @@
 import { PrismaClient } from "@prisma/client";
-import { categoryKey } from "../src/lib/categories";
-import { buildSnapshot, monthRange } from "../src/lib/snapshots";
+import {
+  ensureClosedMonthSnapshots,
+  type EnsureSnapshotsResult,
+} from "../src/lib/snapshot-capture";
+import { SNAPSHOT_MAX_MONTHS } from "../src/lib/snapshots";
 
-const prisma = new PrismaClient();
+/**
+ * Backfill e correção dos snapshots de meses fechados.
+ *
+ * - Sem flags: cria os snapshots **ausentes** dos últimos `SNAPSHOT_MAX_MONTHS`
+ *   (60) meses fechados. Snapshots existentes nunca são tocados.
+ * - `--force`: recalcula os meses alvo (janela default de 4 meses, ou
+ *   `--months N`). Use para corrigir um mês fechado após ajuste de dados.
+ * - `--month AAAA-MM`: processa um único mês (combinável com `--force`).
+ */
 
-const MONTHS = Number(process.env.SNAPSHOT_MONTHS ?? "4");
+interface CliOptions {
+  force: boolean;
+  month?: string;
+  months: number;
+}
+
+function parseArgs(argv: string[]): CliOptions {
+  const force = argv.includes("--force");
+
+  const monthIndex = argv.indexOf("--month");
+  let month: string | undefined;
+  if (monthIndex >= 0) {
+    month = argv[monthIndex + 1];
+    if (!month) throw new Error("--month exige um valor no formato AAAA-MM.");
+  }
+
+  const monthsIndex = argv.indexOf("--months");
+  const monthsArg = monthsIndex >= 0 ? Number(argv[monthsIndex + 1]) : undefined;
+  if (monthsIndex >= 0 && (!Number.isFinite(monthsArg) || (monthsArg ?? 0) < 1)) {
+    throw new Error("--months exige um inteiro ≥ 1.");
+  }
+
+  const envMonths = Number(process.env.SNAPSHOT_MONTHS);
+  const envDefault =
+    Number.isFinite(envMonths) && envMonths > 0 ? envMonths : undefined;
+  // Sem `--force`, o default é o backfill máximo; com `--force`, uma janela
+  // curta evita recalcular anos de histórico sem intenção.
+  const fallback = envDefault ?? (force ? 4 : SNAPSHOT_MAX_MONTHS);
+
+  return { force, month, months: monthsArg ?? fallback };
+}
+
+function report(options: CliOptions, result: EnsureSnapshotsResult): void {
+  const lines: string[] = [];
+
+  if (result.created.length > 0) {
+    lines.push(`Snapshots criados: ${result.created.join(", ")}`);
+  }
+  if (result.recalculated.length > 0) {
+    lines.push(`Snapshots recalculados: ${result.recalculated.join(", ")}`);
+  }
+  if (result.kept.length > 0) {
+    lines.push(
+      `Mantidos (nunca sobrescritos sem --force): ${result.kept.join(", ")}`,
+    );
+  }
+  if (result.empty.length > 0) {
+    lines.push(
+      `Sem movimentação (sem snapshot): ${result.empty.join(", ")}`,
+    );
+  }
+
+  if (lines.length === 0) {
+    console.log("Nada a fazer: nenhum mês fechado para processar.");
+    return;
+  }
+
+  for (const line of lines) console.log(line);
+  const scope = options.month
+    ? `mês ${options.month}`
+    : `janela de ${options.months} mês(es)`;
+  console.log(
+    `${result.created.length + result.recalculated.length} snapshot(s) gravado(s) (${scope}).`,
+  );
+  console.log(
+    "O histórico é imutável: rode com --force para recalcular um mês após corrigir dados.",
+  );
+}
 
 async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL não está definida.");
   }
 
-  const now = new Date();
-  const months = monthRange(now, Number.isFinite(MONTHS) ? MONTHS : 4);
-  if (months.length === 0) {
-    console.log("Nenhum mês fechado para processar.");
-    return;
-  }
-
-  const [firstYear, firstMonth] = months[0].split("-").map(Number);
-  const rangeStart = new Date(firstYear, firstMonth - 1, 1);
-  const currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const [incomes, variableIncomes, fixedExpenses, variableExpenses, cardPurchases] =
-    await Promise.all([
-      prisma.income.findMany({ where: { active: true } }),
-      prisma.variableIncome.findMany({
-        where: { date: { gte: rangeStart, lt: currentStart } },
-      }),
-      prisma.fixedExpense.findMany({ where: { active: true } }),
-      prisma.variableExpense.findMany({
-        where: { date: { gte: rangeStart, lt: currentStart } },
-      }),
-      prisma.cardPurchase.findMany({
-        where: { purchaseDate: { lt: currentStart } },
-        include: { card: true },
-      }),
-    ]);
-
-  for (const key of months) {
-    const snapshot = buildSnapshot({
-      monthKey: key,
-      incomes,
-      variableIncomes,
-      fixedExpenses,
-      variableExpenses,
-      cardPurchases,
-    });
-
-    const { categories, ...monthly } = snapshot;
-
-    // Idempotente: o upsert sobrescreve o snapshot e as categorias são
-    // recriadas do zero para o mês dentro da mesma transação.
-    await prisma.$transaction(async (tx) => {
-      await tx.monthlySnapshot.upsert({
-        where: { monthKey: key },
-        update: {
-          incomeCents: monthly.incomeCents,
-          fixedExpensesCents: monthly.fixedExpensesCents,
-          variableExpensesCents: monthly.variableExpensesCents,
-          cardExpensesCents: monthly.cardExpensesCents,
-          consumedCents: monthly.consumedCents,
-          consumedPercent: monthly.consumedPercent,
-          consumptionAvailableCents: monthly.consumptionAvailableCents,
-          dailyAverageCents: monthly.dailyAverageCents,
-          daysInMonth: monthly.daysInMonth,
-        },
-        create: monthly,
-      });
-
-      await tx.monthlyCategorySnapshot.deleteMany({
-        where: { monthKey: key },
-      });
-
-      if (categories.length > 0) {
-        await tx.monthlyCategorySnapshot.createMany({
-          data: categories.map((item) => ({
-            monthKey: key,
-            categoryKey: categoryKey(item.category),
-            categoryLabel: item.category,
-            amountCents: item.amountCents,
-          })),
-        });
-      }
-    });
-
-    console.log(
-      `Snapshot derivado: ${key} (${snapshot.consumedPercent.toFixed(2)}%, ${categories.length} categoria(s)).`,
-    );
-  }
-
-  console.log(`${months.length} mês(es) recalculado(s).`);
+  const options = parseArgs(process.argv.slice(2));
+  const result = await ensureClosedMonthSnapshots(prisma, {
+    force: options.force,
+    month: options.month,
+    months: options.months,
+  });
+  report(options, result);
 }
+
+const prisma = new PrismaClient();
 
 main()
   .catch((error) => {
     const reason = error instanceof Error ? error.message : String(error);
-    console.error(`Banco indisponível: ${reason}`);
+    console.error(`Falha ao gerar snapshots: ${reason}`);
     console.error("Verifique DATABASE_URL e rode as migrations.");
     process.exit(1);
   })

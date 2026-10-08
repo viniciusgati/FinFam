@@ -3,6 +3,7 @@ import {
   allocateInstallments,
   invoiceDueLabel,
   invoiceLinesForMonth,
+  invoiceLinesForSeries,
   purchaseInvoice,
   resolveReferenceDate,
   sumCardExpensesForMonth,
@@ -123,6 +124,42 @@ describe("sumCardExpensesForMonth", () => {
 
   it("não duplica a parcela entre meses", () => {
     expect(sumCardExpensesForMonth([purchase], "2026-12")).not.toBe(300000);
+  });
+});
+
+describe("invoiceLinesForSeries", () => {
+  // Fechamento 20 / vencimento 28: competência no mês do ciclo.
+  const card = { closingDay: 20, dueDay: 28 };
+
+  it("marca o dia da compra quando ela é do próprio mês", () => {
+    const purchase = {
+      purchaseDate: new Date(Date.UTC(2026, 9, 12, 12)), // 12/10
+      amountCents: 30000,
+      installmentsTotal: 1,
+      card,
+    };
+
+    expect(invoiceLinesForSeries([purchase], "2026-10")).toEqual([
+      { amountCents: 30000, dueDay: 28, purchaseDay: 12 },
+    ]);
+  });
+
+  it("zera o dia da compra para parcelas de compras de meses anteriores", () => {
+    const purchase = {
+      purchaseDate: new Date(Date.UTC(2026, 7, 10, 12)), // agosto, 3x
+      amountCents: 9000,
+      installmentsTotal: 3,
+      card,
+    };
+
+    // A parcela de outubro é obrigação no vencimento (compra de outro mês).
+    expect(invoiceLinesForSeries([purchase], "2026-10")).toEqual([
+      { amountCents: 3000, dueDay: 28, purchaseDay: null },
+    ]);
+  });
+
+  it("ignora meses sem parcela", () => {
+    expect(invoiceLinesForSeries([], "2026-10")).toEqual([]);
   });
 });
 

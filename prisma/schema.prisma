@@ -121,6 +121,10 @@ model MonthlySnapshot {
   id                   String   @id @default(cuid())
   monthKey             String   @unique // YYYY-MM
   incomeCents          Int
+  /// Entradas fixas vigentes no mês (separadas das avulsas na task #255).
+  fixedIncomeCents     Int      @default(0)
+  /// Entradas avulsas (venda/saldo) do mês.
+  variableIncomeCents  Int      @default(0)
   fixedExpensesCents   Int
   variableExpensesCents Int
   cardExpensesCents    Int
@@ -132,6 +136,10 @@ model MonthlySnapshot {
   dailyAverageCents    Int      @default(0)
   /// Dias do mês calendário usado no cálculo da média diária.
   daysInMonth          Int      @default(0)
+  /// Consumo variável por dia (avulsos + cartão do próprio mês), 1-based.
+  variableDailyCents    Int[]   @default([])
+  /// Obrigações por dia (fixas + parcelas de cartão de meses anteriores).
+  obligationDailyCents  Int[]   @default([])
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

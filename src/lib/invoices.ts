@@ -18,6 +18,7 @@
  *   (`%`) soma-se à 1ª parcela, garantindo soma exata = `amountCents`.
  */
 
+import { monthKey } from "./finance";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 
 export interface PurchaseInvoice {
@@ -141,6 +142,44 @@ export function sumCardExpensesForMonth(
         .reduce((sum, installment) => sum + installment.amountCents, 0)
     );
   }, 0);
+}
+
+/** Parcela do mês no formato do gráfico de consumo diário. */
+export interface SeriesInvoiceLine {
+  amountCents: number;
+  /** Dia do mês em que a fatura vence (obrigação). */
+  dueDay: number;
+  /** Dia da compra quando ela é do próprio mês; `null` para compras anteriores. */
+  purchaseDay: number | null;
+}
+
+/**
+ * Parcelas com competência no mês, com o dia de vencimento e o dia da compra
+ * (consumo real do mês) quando a compra é do próprio mês. Compartilhada entre o
+ * dashboard ao vivo e a captura do snapshot, para as duas rotas distribuírem os
+ * gastos no mesmo dia.
+ */
+export function invoiceLinesForSeries(
+  purchases: CardPurchaseForMonth[],
+  targetMonthKey: string,
+  timeZone: string = resolveTimeZone(),
+): SeriesInvoiceLine[] {
+  return purchases.flatMap((purchase) =>
+    allocateInstallments(
+      purchase,
+      purchase.card.closingDay,
+      purchase.card.dueDay,
+    )
+      .filter((installment) => installment.monthKey === targetMonthKey)
+      .map((installment) => ({
+        amountCents: installment.amountCents,
+        dueDay: purchase.card.dueDay,
+        purchaseDay:
+          monthKey(purchase.purchaseDate) === targetMonthKey
+            ? zonedDateParts(purchase.purchaseDate, timeZone).day
+            : null,
+      })),
+  );
 }
 
 /** Compra persistida, com os dados do cartão necessários à competência. */
