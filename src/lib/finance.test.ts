@@ -9,6 +9,7 @@ import {
   isActiveInMonth,
   levelColor,
   levelLabel,
+  monthEndCountdownLabel,
   monthKey,
   monthLabel,
   previousMonthKeys,
@@ -170,6 +171,48 @@ describe("computeFinanceStatus", () => {
     expect(status.daysInMonth).toBe(30);
     expect(status.daysElapsed).toBe(1);
     expect(status.daysRemaining).toBe(29);
+  });
+});
+
+describe("monthEndCountdownLabel", () => {
+  it("pluraliza os dias para o fim do mês", () => {
+    expect(monthEndCountdownLabel(7)).toBe("7 dias para o fim do mês");
+  });
+
+  it("no último dia (1) e depois do fim (0) usa o singular", () => {
+    expect(monthEndCountdownLabel(1)).toBe("Hoje é o último dia do mês");
+    expect(monthEndCountdownLabel(0)).toBe("Hoje é o último dia do mês");
+  });
+
+  it("integra com computeFinanceStatus: inclusivo e sem off-by-one", () => {
+    // Penúltimo dia de outubro (mês de 31 dias): daysRemaining = 1 (exclusivo),
+    // logo +1 = 2 contando hoje — nunca "Hoje é o último dia do mês".
+    const penultimate = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 0,
+      variableExpensesCents: 0,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 9, 30, 12)),
+    });
+    expect(penultimate.daysRemaining).toBe(1);
+    const penultimateLabel = monthEndCountdownLabel(
+      penultimate.daysRemaining + 1,
+    );
+    expect(penultimateLabel).toBe("2 dias para o fim do mês");
+    expect(penultimateLabel).not.toContain("Hoje é o último dia");
+
+    // Último dia: daysRemaining = 0, +1 = 1 ⇒ "Hoje é o último dia do mês".
+    const lastDay = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 0,
+      variableExpensesCents: 0,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 9, 31, 12)),
+    });
+    expect(lastDay.daysRemaining).toBe(0);
+    expect(monthEndCountdownLabel(lastDay.daysRemaining + 1)).toBe(
+      "Hoje é o último dia do mês",
+    );
   });
 });
 

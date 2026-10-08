@@ -157,6 +157,56 @@ describe("dailyAllowanceCard", () => {
     expect(card.detail).toBe("26 dias restantes no ciclo");
   });
 
+  it("expõe a janela do ciclo a partir do dia de início", () => {
+    const card = dailyAllowanceCard(
+      allowance({ window: cycleWindow(NOW, 20) }),
+    );
+
+    expect(card.periodLabel).toBe("Ciclo financeiro · início dia 20");
+  });
+
+  it("quando o ciclo coincide com o mês, explica no rótulo do período", () => {
+    const card = dailyAllowanceCard(allowance({ window: cycleWindow(NOW, 1) }));
+
+    expect(card.periodLabel).toBe(
+      "Ciclo financeiro · início dia 1 (coincide com o mês)",
+    );
+  });
+
+  it("exibe o saldo restante do ciclo em R$ quando há dados", () => {
+    const card = dailyAllowanceCard(
+      allowance({
+        dailyCents: 12500,
+        freeBudgetCents: 325000,
+        remainingDays: 26,
+        window: cycleWindow(NOW, 20),
+      }),
+    );
+
+    expect(card.freeBudgetLabel.replace(/\u00a0/g, " ")).toBe(
+      "Ainda tem R$ 3.250,00 até o fim do ciclo",
+    );
+  });
+
+  it("no-data não exibe saldo; esgotado e estourado mostram R$ 0,00", () => {
+    const noData = dailyAllowanceCard(allowance({ hasData: false }));
+    expect(noData.freeBudgetLabel).toBe("");
+
+    const exhausted = dailyAllowanceCard(
+      allowance({ freeBudgetCents: 0, remainingDays: 10 }),
+    );
+    expect(exhausted.freeBudgetLabel.replace(/\u00a0/g, " ")).toBe(
+      "Ainda tem R$ 0,00 até o fim do ciclo",
+    );
+
+    const over = dailyAllowanceCard(
+      allowance({ dailyCents: -1250, freeBudgetCents: 0, remainingDays: 8 }),
+    );
+    expect(over.freeBudgetLabel.replace(/\u00a0/g, " ")).toBe(
+      "Ainda tem R$ 0,00 até o fim do ciclo",
+    );
+  });
+
   it("orçamento esgotado mostra R$ 0,00 por dia", () => {
     const card = dailyAllowanceCard(
       allowance({ freeBudgetCents: 0, remainingDays: 10 }),
