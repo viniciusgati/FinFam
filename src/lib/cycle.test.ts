@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cycleAvailabilityLabel,
   cycleEndCountdownLabel,
   cycleWindow,
   dailyAllowanceCents,
@@ -316,5 +317,50 @@ describe("cycleEndCountdownLabel", () => {
 
   it("ciclo encerrado", () => {
     expect(cycleEndCountdownLabel(0)).toBe("Ciclo encerrado");
+  });
+});
+
+describe("cycleAvailabilityLabel", () => {
+  function allowance(overrides: Partial<DailyAllowance>): DailyAllowance {
+    return {
+      dailyCents: 0,
+      freeBudgetCents: 0,
+      remainingDays: 7,
+      variableSpentCents: 0,
+      elapsedDays: 24,
+      hasData: true,
+      window: cycleWindow(NOW, 15),
+      ...overrides,
+    };
+  }
+
+  it("repete o disponível e a diária do ciclo (iguais ao card de diária)", () => {
+    const label = cycleAvailabilityLabel(
+      allowance({
+        dailyCents: 32269,
+        freeBudgetCents: 225885,
+        remainingDays: 7,
+      }),
+    );
+
+    expect(label.replace(/\u00a0/g, " ")).toBe(
+      "Disponível no ciclo: R$ 2.258,85 · R$ 322,69/dia",
+    );
+  });
+
+  it("ciclo estourado mostra a diária negativa", () => {
+    const label = cycleAvailabilityLabel(
+      allowance({ dailyCents: -1250, freeBudgetCents: 0 }),
+    );
+
+    expect(label.replace(/\u00a0/g, " ")).toBe(
+      "Ciclo estourado: -R$ 12,50/dia até o fim do ciclo.",
+    );
+  });
+
+  it("sem dados do ciclo", () => {
+    expect(cycleAvailabilityLabel(allowance({ hasData: false }))).toBe(
+      "Sem dados do ciclo.",
+    );
   });
 });

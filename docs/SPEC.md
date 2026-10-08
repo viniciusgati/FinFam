@@ -214,9 +214,13 @@ media_diaria       = consumo_disponivel / dias_da_janela   (Math.round)
 - `gastos_fixos_ativos` = saídas fixas vigentes no mês (`isActiveInMonth`).
 - **Faturas de cartão e gastos avulsos não entram na subtração** — são
   **consumo variável**, não obrigações fixas (§3.2/§3.4).
-- Janelas: **mês** (dias do mês calendário; única exibida na UI), **dias
-  decorridos** e **ciclo** (esta só quando o mês de referência é o corrente).
-  `dias <= 0` ⇒ média `R$ 0,00`, sem divisão por zero nem `NaN`.
+- Janelas: **mês** (dias do mês calendário), **dias decorridos** e **ciclo**
+  (só quando o mês de referência é o corrente). `dias <= 0` ⇒ média
+  `R$ 0,00`, sem divisão por zero nem `NaN`.
+- UI: no **mês corrente**, o subtítulo do card principal exibe o disponível do
+  ciclo (`cycleAvailabilityLabel`) — os mesmos números do "Pode gastar por
+  dia", já líquidos de faturas e avulsos; em **mês fechado**, exibe a média da
+  janela mês (`consumptionAverageLabel`).
 - Quando `gastos_fixos_ativos >= entradas`, o consumo disponível é `0` e o card
   exibe apenas a mensagem de indisponibilidade, sem valores em R$.
 - Implementação: `consumptionAvailableCents`/`consumptionDailyAverageCents`

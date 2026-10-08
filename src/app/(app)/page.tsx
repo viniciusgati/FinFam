@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { loadCycleAllowance, loadDashboardData } from "@/lib/dashboard";
 import {
+  cycleAvailabilityLabel,
   cycleEndCountdownLabel,
   dailyAllowanceCard,
   remainingCycleDays,
@@ -95,14 +96,19 @@ export default async function DashboardPage({
       previousPercents: data.previousPercents,
     });
 
-    // O subtítulo de consumo só existe no ramo `ok` (com renda e movimentação).
-    if (view.state === "ok") {
-      consumptionLabel = consumptionAverageLabel(data.consumption);
-    }
-
     // O card de diária segue o ciclo real; só faz sentido no mês corrente.
     if (isCalendarMonth) {
       allowance = await loadCycleAllowance();
+    }
+
+    // O subtítulo do card principal só existe no ramo `ok` (com renda e
+    // movimentação). No mês corrente ele repete os números do ciclo (igual ao
+    // "Pode gastar por dia"); em mês fechado, mostra a média do mês.
+    if (view.state === "ok") {
+      consumptionLabel =
+        allowance !== null
+          ? cycleAvailabilityLabel(allowance)
+          : consumptionAverageLabel(data.consumption);
     }
   } catch {
     view = dashboardView({
