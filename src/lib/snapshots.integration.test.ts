@@ -135,6 +135,8 @@ describe("buildSnapshot — paridade com loadDashboardData", () => {
       0,
     );
     expect(categoriasCents).toBe(snapshot.consumedCents);
+    // O dashboard usa a mesma `buildCategoryBreakdown`: total idêntico.
+    expect(data.categoryBreakdown.totalCents).toBe(snapshot.consumedCents);
     expect(snapshot.categories.some((item) => item.category === "Lazer")).toBe(
       false,
     );
