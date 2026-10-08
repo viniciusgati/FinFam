@@ -58,6 +58,13 @@ export interface DailySeries {
   elapsedDay: number;
   dailyExpensesCents: number[];
   cumulativeExpensesCents: number[];
+  /**
+   * Gasto **variável** por dia (avulsos no orçamento), sem fixas nem faturas,
+   * distribuído pela `date`. Mesmo comprimento de `dailyExpensesCents`.
+   */
+  variableDailyExpensesCents: number[];
+  /** Média diária do consumo disponível (entradas − fixas) no mês. */
+  consumptionDailyAverageCents: number;
   entriesCents: number;
   totalExpensesCents: number;
   dailyBudgetCents: number;
@@ -94,6 +101,7 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
   elapsedDay = Math.min(Math.max(elapsedDay, 0), totalDays);
 
   const daily = new Array<number>(totalDays).fill(0);
+  const variableDaily = new Array<number>(totalDays).fill(0);
 
   for (const expense of input.fixedExpenses ?? []) {
     daily[dayIndex(expense.dueDay, totalDays)] += expense.amountCents;
@@ -103,7 +111,9 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
     if (!isCountedInBudget(expense.paymentMethod)) continue;
     if (monthKey(expense.date) !== referenceMonth) continue;
     const day = zonedDateParts(expense.date, timeZone).day;
-    daily[dayIndex(day, totalDays)] += expense.amountCents;
+    const index = dayIndex(day, totalDays);
+    daily[index] += expense.amountCents;
+    variableDaily[index] += expense.amountCents;
   }
 
   for (const line of input.cardInvoiceLines ?? []) {
@@ -127,11 +137,24 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
       ? Math.round((running / elapsedDay) * totalDays)
       : 0;
 
+  const consumptionDailyAverage = consumptionDailyAverageCents(
+    consumptionAvailableCents({
+      monthlyIncomeCents: entriesCents,
+      fixedExpensesCents: (input.fixedExpenses ?? []).reduce(
+        (total, expense) => total + expense.amountCents,
+        0,
+      ),
+    }),
+    totalDays,
+  );
+
   return {
     daysInMonth: totalDays,
     elapsedDay,
     dailyExpensesCents: daily,
     cumulativeExpensesCents: cumulative,
+    variableDailyExpensesCents: variableDaily,
+    consumptionDailyAverageCents: consumptionDailyAverage,
     entriesCents,
     totalExpensesCents,
     dailyBudgetCents,
@@ -202,13 +225,20 @@ export function buildConsumptionSummary(
 }
 
 /**
+ * Mensagem de indisponibilidade quando as contas fixas consomem toda a renda do
+ * mês. Compartilhada entre o rótulo do card e o gráfico de gasto variável.
+ */
+export const CONSUMPTION_UNAVAILABLE_LABEL =
+  "Sem consumo disponível: as contas fixas consomem toda a renda do mês.";
+
+/**
  * Rótulo do consumo disponível e da média diária (janela "mês"). Quando as
  * contas fixas consomem toda a renda, não exibe valores em R$ — apenas a
  * mensagem de indisponibilidade.
  */
 export function consumptionAverageLabel(summary: ConsumptionSummary): string {
   if (summary.overCommitted) {
-    return "Sem consumo disponível: as contas fixas consomem toda a renda do mês.";
+    return CONSUMPTION_UNAVAILABLE_LABEL;
   }
   return `Consumo de ${formatCents(summary.availableCents)} · ${formatCents(
     summary.dailyByMonthCents,

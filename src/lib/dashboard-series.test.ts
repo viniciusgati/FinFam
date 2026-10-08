@@ -67,6 +67,82 @@ describe("buildDailySeries — distribuição por dia", () => {
   });
 });
 
+describe("buildDailySeries — gasto variável e média de consumo", () => {
+  it("coloca só avulsos do orçamento na série variável (sem fixas nem faturas)", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: NOW,
+      variableExpenses: [
+        { amountCents: 5000, date: new Date(Date.UTC(2026, 9, 5, 12)), paymentMethod: "PIX" },
+      ],
+      fixedExpenses: [{ amountCents: 10000, dueDay: 10 }],
+      cardInvoiceLines: [{ amountCents: 7000, dueDay: 31 }],
+    });
+
+    expect(series.variableDailyExpensesCents).toHaveLength(31);
+    expect(series.variableDailyExpensesCents[4]).toBe(5000);
+    expect(series.variableDailyExpensesCents[9]).toBe(0);
+    expect(series.variableDailyExpensesCents[30]).toBe(0);
+  });
+
+  it("ignora avulsos CREDIT e de outro mês na série variável", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: NOW,
+      variableExpenses: [
+        { amountCents: 5000, date: new Date(Date.UTC(2026, 9, 5, 12)), paymentMethod: "CREDIT" },
+        { amountCents: 9999, date: new Date(Date.UTC(2026, 8, 30, 12)), paymentMethod: "PIX" },
+        { amountCents: 1200, date: new Date(Date.UTC(2026, 9, 5, 12)), paymentMethod: "CASH" },
+      ],
+    });
+
+    const sum = series.variableDailyExpensesCents.reduce((a, b) => a + b, 0);
+    expect(sum).toBe(1200);
+    expect(series.variableDailyExpensesCents[4]).toBe(1200);
+  });
+
+  it("soma da série variável igual à soma dos avulsos do orçamento do mês", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: NOW,
+      variableExpenses: [
+        { amountCents: 5000, date: new Date(Date.UTC(2026, 9, 5, 12)), paymentMethod: "PIX" },
+        { amountCents: 3000, date: new Date(Date.UTC(2026, 9, 20, 12)), paymentMethod: "DEBIT" },
+        { amountCents: 8000, date: new Date(Date.UTC(2026, 9, 20, 12)), paymentMethod: "CREDIT" },
+      ],
+    });
+
+    const variableSum = series.variableDailyExpensesCents.reduce(
+      (a, b) => a + b,
+      0,
+    );
+    expect(variableSum).toBe(8000);
+  });
+
+  it("calcula a média diária do consumo disponível e zera quando fixas cobrem a renda", () => {
+    const normal = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: NOW,
+      incomeCents: 310000,
+      fixedExpenses: [{ amountCents: 100000, dueDay: 10 }],
+    });
+
+    expect(normal.consumptionDailyAverageCents).toBe(
+      Math.round((310000 - 100000) / 31),
+    );
+    expect(normal.consumptionDailyAverageCents).toBe(6774);
+
+    const committed = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: NOW,
+      incomeCents: 100000,
+      fixedExpenses: [{ amountCents: 100000, dueDay: 10 }],
+    });
+
+    expect(committed.consumptionDailyAverageCents).toBe(0);
+  });
+});
+
 describe("buildDailySeries — calendário", () => {
   it("mês corrente encerra o acumulado em elapsedDay (dia de hoje)", () => {
     const series = buildDailySeries({
