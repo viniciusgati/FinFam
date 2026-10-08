@@ -38,17 +38,25 @@ export async function POST(request: Request): Promise<NextResponse> {
   const input = parsed.data;
   const simulation = simulatePurchase(input);
   let summary = simulation.summary;
+  let source: "ai" | "local" = "local";
 
   if (isAiConfigured()) {
     try {
       const text = await chatCompletion(
         buildPurchasePrompt(input, simulation.verdict),
       );
-      if (text) summary = text;
+      if (text) {
+        summary = text;
+        source = "ai";
+      }
     } catch {
       // Falha da IA: mantém veredito + justificativa local.
     }
   }
 
-  return NextResponse.json({ verdict: simulation.verdict, summary });
+  return NextResponse.json({
+    verdict: simulation.verdict,
+    summary,
+    source,
+  });
 }

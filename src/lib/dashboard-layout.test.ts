@@ -100,3 +100,35 @@ describe("skeleton de carregamento da rota", () => {
     expect(loading).toContain("Carregando…");
   });
 });
+
+const PAGES = ["../app/(app)/page.tsx", "../app/(app)/historico/page.tsx"];
+
+describe("estados de navegação e onboarding do ciclo", () => {
+  it("renderiza FutureMonthNotice sob o estado future nas duas páginas", () => {
+    for (const path of PAGES) {
+      const page = readSource(path);
+
+      expect(page).toContain('view.state === "future"');
+      expect(page).toContain("<FutureMonthNotice />");
+      expect(page).toContain("isFutureMonth");
+    }
+  });
+
+  it("passa isFutureMonth para dashboardView", () => {
+    for (const path of PAGES) {
+      const page = readSource(path);
+
+      expect(page).toMatch(/dashboardView\(\{[\s\S]*?isFutureMonth/);
+    }
+  });
+
+  it("renderiza o vazio por emptyStateCopy(view.reason), sem hardcode de CTA", () => {
+    for (const path of PAGES) {
+      const page = readSource(path);
+
+      expect(page).toContain("emptyStateCopy(view.reason)");
+      expect(page).not.toContain("Cadastrar entradas");
+      expect(page).not.toContain('href="/entradas"');
+    }
+  });
+});

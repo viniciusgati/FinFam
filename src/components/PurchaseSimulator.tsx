@@ -21,11 +21,13 @@ type Status = "idle" | "loading" | "done";
 interface SimulationResult {
   verdict: PurchaseVerdict;
   summary: string;
+  source: "ai" | "local";
 }
 
 interface SimulatorResponse {
   verdict?: PurchaseVerdict;
   summary?: string;
+  source?: "ai" | "local";
 }
 
 const VERDICT_CLASSES: Record<PurchaseVerdict, string> = {
@@ -59,7 +61,11 @@ export default function PurchaseSimulator({
       purchaseCents,
       previousMonthsCents,
     });
-    return { verdict: simulation.verdict, summary: simulation.summary };
+    return {
+      verdict: simulation.verdict,
+      summary: simulation.summary,
+      source: "local",
+    };
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -91,6 +97,7 @@ export default function PurchaseSimulator({
         setResult({
           verdict: data.verdict,
           summary: data.summary ?? buildLocalResult(cents).summary,
+          source: data.source === "ai" && data.summary ? "ai" : "local",
         });
       }
     } catch {
@@ -168,6 +175,11 @@ export default function PurchaseSimulator({
             {VERDICT_LABELS[result.verdict]}
           </p>
           <p className="text-sm">{result.summary}</p>
+          {result.source === "local" && (
+            <p role="status" aria-live="polite" className="text-xs font-medium">
+              Resultado calculado localmente, sem IA.
+            </p>
+          )}
         </div>
       )}
     </section>

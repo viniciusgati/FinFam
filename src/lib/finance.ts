@@ -453,10 +453,46 @@ export function projectionRiskLabel(projectedPercent: number): string | null {
 
 export interface DashboardViewInput {
   dbError: boolean;
+  /** Mês de referência posterior ao mês corrente (sem dados futuros ainda). */
+  isFutureMonth: boolean;
   incomeCents: number;
+  /** Há qualquer movimentação (despesa fixa/avulsa/cartão ou entrada avulsa)? */
+  hasMovements: boolean;
   consumedPercent: number;
   projectedPercent: number;
   previousPercents: number[];
+}
+
+/** Motivo do estado vazio: sem renda cadastrada ou renda sem movimentação. */
+export type EmptyReason = "no-income" | "no-movements";
+
+export interface EmptyStateCopy {
+  title: string;
+  body: string;
+  ctaLabel: string;
+  ctaHref: string;
+}
+
+/**
+ * Cópia do estado vazio por motivo, para que "sem renda" e "renda sem gastos"
+ * peçam ações diferentes. Função pura, testável sem DOM.
+ */
+export function emptyStateCopy(reason: EmptyReason): EmptyStateCopy {
+  if (reason === "no-movements") {
+    return {
+      title: "Renda cadastrada, sem gastos",
+      body: "Você já cadastrou sua renda. Registre seus gastos para acompanhar o percentual consumido.",
+      ctaLabel: "Registrar gastos",
+      ctaHref: "/gastos",
+    };
+  }
+
+  return {
+    title: "Sem dados ainda",
+    body: "Cadastre suas entradas fixas para ver o percentual de renda consumida.",
+    ctaLabel: "Cadastrar entradas",
+    ctaHref: "/entradas",
+  };
 }
 
 /**
@@ -465,7 +501,8 @@ export interface DashboardViewInput {
  */
 export type DashboardView =
   | { state: "error" }
-  | { state: "empty" }
+  | { state: "future" }
+  | { state: "empty"; reason: EmptyReason }
   | {
       state: "ok";
       percent: number;
@@ -476,10 +513,12 @@ export type DashboardView =
 
 export function dashboardView(input: DashboardViewInput): DashboardView {
   if (input.dbError) return { state: "error" };
-  if (
-    resolveDashboardState({ monthlyIncomeCents: input.incomeCents }) === "empty"
-  ) {
-    return { state: "empty" };
+  if (input.isFutureMonth) return { state: "future" };
+  if (input.incomeCents <= 0) {
+    return { state: "empty", reason: "no-income" };
+  }
+  if (!input.hasMovements) {
+    return { state: "empty", reason: "no-movements" };
   }
 
   const projected = Math.round(input.projectedPercent);

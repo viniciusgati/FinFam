@@ -40,9 +40,14 @@ describe("POST /api/ai/purchase-simulator", () => {
     const response = await POST(jsonRequest(validPayload));
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { verdict: string; summary: string };
+    const body = (await response.json()) as {
+      verdict: string;
+      summary: string;
+      source: string;
+    };
     expect(body.verdict).toBe("ok");
     expect(body.summary).toContain("Pode comprar");
+    expect(body.source).toBe("local");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -62,7 +67,31 @@ describe("POST /api/ai/purchase-simulator", () => {
     expect(await response.json()).toEqual({
       verdict: "ok",
       summary: "Justificativa IA",
+      source: "ai",
     });
+  });
+
+  it("mantém source local quando a resposta da IA vem vazia", async () => {
+    process.env.DEEPSEEK_API_KEY = "chave";
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: "" } }] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(jsonRequest(validPayload));
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      verdict: string;
+      summary: string;
+      source: string;
+    };
+    expect(body.verdict).toBe("ok");
+    expect(body.summary).toContain("Pode comprar");
+    expect(body.source).toBe("local");
   });
 
   it("mantém o fallback local quando a LLM falha (ainda 200)", async () => {
@@ -73,9 +102,14 @@ describe("POST /api/ai/purchase-simulator", () => {
     const response = await POST(jsonRequest(validPayload));
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { verdict: string; summary: string };
+    const body = (await response.json()) as {
+      verdict: string;
+      summary: string;
+      source: string;
+    };
     expect(body.verdict).toBe("ok");
     expect(body.summary).toContain("Pode comprar");
+    expect(body.source).toBe("local");
   });
 
   it("rejeita payload inválido", async () => {

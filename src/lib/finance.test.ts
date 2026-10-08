@@ -6,6 +6,7 @@ import {
   computeFinanceStatus,
   contrastRatio,
   dashboardView,
+  emptyStateCopy,
   heatColor,
   isActiveInMonth,
   levelColor,
@@ -523,7 +524,9 @@ describe("dashboardView", () => {
     expect(
       dashboardView({
         dbError: true,
+        isFutureMonth: false,
         incomeCents: 100000,
+        hasMovements: true,
         consumedPercent: 80,
         projectedPercent: 248,
         previousPercents: [60, 70, 80, 90],
@@ -531,23 +534,55 @@ describe("dashboardView", () => {
     ).toEqual({ state: "error" });
   });
 
-  it("decide estado vazio quando não há renda", () => {
+  it("decide mês futuro antes do vazio, mesmo sem renda", () => {
     expect(
       dashboardView({
         dbError: false,
+        isFutureMonth: true,
         incomeCents: 0,
+        hasMovements: false,
         consumedPercent: 0,
         projectedPercent: 0,
         previousPercents: [],
       }),
-    ).toEqual({ state: "empty" });
+    ).toEqual({ state: "future" });
+  });
+
+  it("decide estado vazio sem renda (no-income)", () => {
+    expect(
+      dashboardView({
+        dbError: false,
+        isFutureMonth: false,
+        incomeCents: 0,
+        hasMovements: false,
+        consumedPercent: 0,
+        projectedPercent: 0,
+        previousPercents: [],
+      }),
+    ).toEqual({ state: "empty", reason: "no-income" });
+  });
+
+  it("decide estado vazio com renda sem movimentação (no-movements)", () => {
+    expect(
+      dashboardView({
+        dbError: false,
+        isFutureMonth: false,
+        incomeCents: 100000,
+        hasMovements: false,
+        consumedPercent: 0,
+        projectedPercent: 0,
+        previousPercents: [],
+      }),
+    ).toEqual({ state: "empty", reason: "no-movements" });
   });
 
   it("usa a projeção na comparação e mantém o percentual parcial", () => {
     expect(
       dashboardView({
         dbError: false,
+        isFutureMonth: false,
         incomeCents: 100000,
+        hasMovements: true,
         consumedPercent: 80,
         projectedPercent: 248,
         previousPercents: [60, 70, 80, 90],
@@ -565,7 +600,9 @@ describe("dashboardView", () => {
     expect(
       dashboardView({
         dbError: false,
+        isFutureMonth: false,
         incomeCents: 100000,
+        hasMovements: true,
         consumedPercent: 80,
         projectedPercent: 99.6,
         previousPercents: [],
@@ -583,7 +620,9 @@ describe("dashboardView", () => {
     expect(
       dashboardView({
         dbError: false,
+        isFutureMonth: false,
         incomeCents: 100000,
+        hasMovements: true,
         consumedPercent: 80,
         projectedPercent: 99.4,
         previousPercents: [],
@@ -600,13 +639,35 @@ describe("dashboardView", () => {
   it("projeta sem risco abaixo do limiar", () => {
     const view = dashboardView({
       dbError: false,
+      isFutureMonth: false,
       incomeCents: 100000,
+      hasMovements: true,
       consumedPercent: 50,
       projectedPercent: 90,
       previousPercents: [],
     });
 
     expect(view).toMatchObject({ projectedPercent: 90, projectedRisk: false });
+  });
+});
+
+describe("emptyStateCopy", () => {
+  it("orienta cadastrar entradas quando não há renda", () => {
+    expect(emptyStateCopy("no-income")).toEqual({
+      title: "Sem dados ainda",
+      body: "Cadastre suas entradas fixas para ver o percentual de renda consumida.",
+      ctaLabel: "Cadastrar entradas",
+      ctaHref: "/entradas",
+    });
+  });
+
+  it("orienta registrar gastos quando há renda sem movimentação", () => {
+    expect(emptyStateCopy("no-movements")).toEqual({
+      title: "Renda cadastrada, sem gastos",
+      body: "Você já cadastrou sua renda. Registre seus gastos para acompanhar o percentual consumido.",
+      ctaLabel: "Registrar gastos",
+      ctaHref: "/gastos",
+    });
   });
 });
 
