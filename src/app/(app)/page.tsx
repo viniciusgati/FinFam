@@ -11,12 +11,14 @@ import {
   actionableBudgetMessage,
   computeFinanceStatus,
   dashboardView,
+  emptyStateCopy,
   monthKey,
   type DashboardView,
   type FinanceLevel,
 } from "@/lib/finance";
 import { invoiceDueLabel, resolveReferenceDate } from "@/lib/invoices";
 import type { DailySeries } from "@/lib/dashboard-series";
+import FutureMonthNotice from "@/components/FutureMonthNotice";
 import {
   buildMonthReviewData,
   localMonthReview,
@@ -45,6 +47,7 @@ export default async function DashboardPage({
   const referenceMonthKey = monthKey(referenceDate);
   const currentMonthKey = monthKey(new Date());
   const isCurrentMonth = referenceMonthKey >= currentMonthKey;
+  const isFutureMonth = referenceMonthKey > currentMonthKey;
   const isCalendarMonth = referenceMonthKey === currentMonthKey;
   const isClosedMonth = referenceMonthKey < currentMonthKey;
 
@@ -76,7 +79,9 @@ export default async function DashboardPage({
     );
     view = dashboardView({
       dbError: false,
+      isFutureMonth,
       incomeCents: status.incomeCents,
+      hasMovements: data.hasMovements,
       consumedPercent: status.consumedPercent,
       projectedPercent: status.projectedPercent,
       previousPercents: data.previousPercents,
@@ -89,7 +94,9 @@ export default async function DashboardPage({
   } catch {
     view = dashboardView({
       dbError: true,
+      isFutureMonth: false,
       incomeCents: 0,
+      hasMovements: false,
       consumedPercent: 0,
       projectedPercent: 0,
       previousPercents: [],
@@ -142,24 +149,28 @@ export default async function DashboardPage({
         </section>
       )}
 
+      {view.state === "future" && <FutureMonthNotice />}
+
       {view.state === "empty" && (
         <section className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl border border-dashed border-border-strong bg-surface p-8 text-center">
           <header className="space-y-1">
             <p className="text-sm font-medium uppercase tracking-widest text-subtle">
               FinFam
             </p>
-            <h1 className="text-3xl font-bold text-foreground">Sem dados ainda</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              {emptyStateCopy(view.reason).title}
+            </h1>
           </header>
 
           <p className="text-lg text-foreground-muted">
-            Cadastre suas entradas fixas para ver o percentual de renda consumida.
+            {emptyStateCopy(view.reason).body}
           </p>
 
           <Link
-            href="/entradas"
+            href={emptyStateCopy(view.reason).ctaHref}
             className="rounded-lg bg-emerald-600 px-6 py-3 text-lg font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
           >
-            Cadastrar entradas
+            {emptyStateCopy(view.reason).ctaLabel}
           </Link>
         </section>
       )}

@@ -9,6 +9,9 @@ export interface SettingsFormProps {
 
 const FALLBACK_ERROR = "Não foi possível salvar. Tente novamente.";
 
+export const CYCLE_START_HELP =
+  "O dia de início do ciclo financeiro define quando seu ciclo começa. A janela do card de diária vai do início do ciclo até hoje; já o percentual consumido usa o mês calendário (do dia 1 ao último dia do mês).";
+
 export default function SettingsForm({
   initialCycleStartDay,
   initialError,
@@ -104,6 +107,8 @@ export default function SettingsForm({
             refletir o seu mês real.
           </span>
         </label>
+
+        <p className="text-xs text-subtle">{CYCLE_START_HELP}</p>
 
         <button
           type="submit"

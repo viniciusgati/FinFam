@@ -27,6 +27,11 @@ export interface DashboardSnapshot {
 }
 
 export interface DashboardData extends FinanceInput {
+  /**
+   * Há qualquer movimentação no mês de referência: despesa fixa, avulsa ou de
+   * cartão, ou entrada avulsa. Distingue "sem renda" de "renda sem gastos".
+   */
+  hasMovements: boolean;
   previousPercents: number[];
   /** Totais gastos nos meses fechados (mais recente por último). */
   previousMonthsCents: number[];
@@ -147,11 +152,19 @@ export async function loadDashboardData(
     cardInvoiceLines,
   });
 
+  // Movimentação = qualquer saída (fixa/avulsa/cartão) ou entrada avulsa no mês.
+  const hasMovements =
+    activeFixedExpenses.length > 0 ||
+    variableExpenses.length > 0 ||
+    cardInvoiceLines.length > 0 ||
+    variableIncomes.length > 0;
+
   return {
     monthlyIncomeCents,
     fixedExpensesCents,
     variableExpensesCents,
     cardExpensesCents,
+    hasMovements,
     previousPercents: snapshots.map((snapshot) => snapshot.consumedPercent),
     previousMonthsCents: snapshots.map((snapshot) => snapshot.consumedCents),
     snapshots: snapshots.map((snapshot) => ({

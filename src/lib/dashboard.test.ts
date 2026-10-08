@@ -228,6 +228,76 @@ describe("loadDashboardData — série diária", () => {
   });
 });
 
+describe("loadDashboardData — hasMovements", () => {
+  it("é falso quando só há renda fixa cadastrada", async () => {
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "1", amountCents: 100000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.hasMovements).toBe(false);
+  });
+
+  it("é verdadeiro com despesa fixa vigente", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      { id: "f", amountCents: 10000, dueDay: 5, active: true, startMonth: null, endMonth: null },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.hasMovements).toBe(true);
+  });
+
+  it("é verdadeiro com despesa avulsa no mês", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      { amountCents: 5000, paymentMethod: "PIX", date: new Date(Date.UTC(2026, 9, 5, 12)) },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.hasMovements).toBe(true);
+  });
+
+  it("é verdadeiro com parcela de cartão no mês", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([
+      {
+        id: "p",
+        description: "Compra",
+        amountCents: 10000,
+        purchaseDate: new Date(Date.UTC(2026, 8, 10, 12)),
+        category: null,
+        installmentNumber: 1,
+        installmentsTotal: 1,
+        card: { id: "c1", name: "Nubank", closingDay: 20, dueDay: 5 },
+      },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.cardExpensesCents).toBe(10000);
+    expect(data.hasMovements).toBe(true);
+  });
+
+  it("é verdadeiro com entrada avulsa no mês", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([
+      { id: "v", amountCents: 5000, date: new Date(Date.UTC(2026, 9, 3, 12)) },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.hasMovements).toBe(true);
+  });
+});
+
 describe("loadCycleAllowance — diária restante (regressão #231)", () => {
   const card = { id: "c1", name: "Nubank", closingDay: 20, dueDay: 5 };
 

@@ -26,11 +26,13 @@ interface SimulationResult {
   verdict: PurchaseVerdict;
   summary: string;
   impactLabel: string;
+  source: "ai" | "local";
 }
 
 interface SimulatorResponse {
   verdict?: PurchaseVerdict;
   summary?: string;
+  source?: "ai" | "local";
 }
 
 const VERDICT_CLASSES: Record<PurchaseVerdict, string> = {
@@ -70,6 +72,7 @@ export default function PurchaseSimulator({
       verdict: simulation.verdict,
       summary: simulation.summary,
       impactLabel: simulation.impactLabel,
+      source: "local",
     };
   }
 
@@ -99,6 +102,7 @@ export default function PurchaseSimulator({
           verdict: data.verdict,
           summary: data.summary ?? local.summary,
           impactLabel: local.impactLabel,
+          source: data.source === "ai" && data.summary ? "ai" : "local",
         });
       }
     } catch {
@@ -181,6 +185,11 @@ export default function PurchaseSimulator({
           </p>
           <p className="text-sm font-medium">{result.impactLabel}</p>
           <p className="text-sm">{result.summary}</p>
+          {result.source === "local" && (
+            <p role="status" aria-live="polite" className="text-xs font-medium">
+              Resultado calculado localmente, sem IA.
+            </p>
+          )}
         </div>
       )}
     </section>
