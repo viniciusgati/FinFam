@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { loadCycleAllowance, loadDashboardData } from "@/lib/dashboard";
-import { dailyAllowanceCard, type DailyAllowance } from "@/lib/cycle";
+import {
+  cycleEndCountdownLabel,
+  dailyAllowanceCard,
+  remainingCycleDays,
+  type DailyAllowance,
+} from "@/lib/cycle";
+import { getSettings } from "@/lib/settings";
 import {
   computeFinanceStatus,
   dashboardView,
@@ -58,7 +64,10 @@ export default async function DashboardPage({
     const data = await loadDashboardData(referenceDate);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
-    daysRemaining = status.daysRemaining;
+    // O contador segue o ciclo financeiro (não o mês calendário): dia 08 com
+    // ciclo fechando no dia 15 ⇒ "8 dias para o fim do ciclo".
+    const { cycleStartDay } = await getSettings();
+    daysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
     level = status.level;
     incomeCents = status.incomeCents;
     series = data.series;
@@ -182,7 +191,7 @@ export default async function DashboardPage({
               </p>
 
               <p className="text-base font-medium opacity-95">
-                {daysRemaining} dias para o fim do mês
+                {cycleEndCountdownLabel(daysRemaining)}
               </p>
 
               <p

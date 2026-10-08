@@ -11,8 +11,9 @@
  * - `d = 1` ⇒ ciclo = mês calendário (comportamento anterior preservado).
  * - `remainingDays` conta o próprio dia corrente e o último dia do ciclo
  *   (inclusive). Ex.: `d = 20` e hoje `2026-03-25` ⇒ `26`.
- * - Diária restante: `max(renda − obrigações − gastos avulsos, 0) / dias`,
- *   arredondada para centavos. Orçamento livre `<= 0` ⇒ diária `0`.
+ * - Diária restante: `(renda − obrigações − gastos avulsos) / dias`,
+ *   arredondada para centavos. **Pode ser negativa**: quando o ciclo já foi
+ *   estourado, o valor negativo diz quanto a mais está sendo gasto por dia.
  */
 import { formatCents } from "./money";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
@@ -114,17 +115,19 @@ export function remainingCycleDays(
 
 /**
  * Divide o orçamento livre em centavos pelos dias restantes, arredondando para
- * centavos. Orçamento livre `<= 0` retorna `0`; `remainingDays <= 0` devolve o
- * próprio orçamento (último dia do ciclo) sem dividir por zero.
+ * centavos. `freeBudgetCents` pode ser negativo (ciclo estourado): nesse caso a
+ * diária também fica negativa e informa o excesso diário. `remainingDays <= 0`
+ * devolve o próprio orçamento (último dia do ciclo) sem dividir por zero.
  */
 export function dailyCentsForBudget(
   freeBudgetCents: number,
   remainingDays: number,
 ): number {
-  const free = Math.max(freeBudgetCents, 0);
-  if (free <= 0) return 0;
-  if (remainingDays <= 0) return free;
-  return Math.round(free / remainingDays);
+  if (remainingDays <= 0) return Math.round(freeBudgetCents);
+  const daily = Math.round(freeBudgetCents / remainingDays);
+  // Normaliza `-0` (sobra de arredondamento) para `0` — comparações estritas
+  // com `Object.is` distinguiriam os dois.
+  return daily === 0 ? 0 : daily;
 }
 
 export interface DailyAllowanceInput {
@@ -137,7 +140,7 @@ export interface DailyAllowanceInput {
 }
 
 export interface DailyAllowance {
-  /** Diária restante em centavos (nunca negativa). */
+  /** Diária do ciclo em centavos. Negativa quando o ciclo foi estourado. */
   dailyCents: number;
   /** Orçamento livre do ciclo em centavos (nunca negativo). */
   freeBudgetCents: number;
@@ -153,6 +156,10 @@ export interface DailyAllowance {
  *
  * `hasData` distingue "sem dados do ciclo" (nenhuma renda/obrigação) de um
  * orçamento realmente esgotado (`freeBudgetCents <= 0` sem ser `hasData`).
+ *
+ * `freeBudgetCents` fica em `0` quando o ciclo estourou (é o orçamento
+ * disponível), mas `dailyCents` segue para negativo: é o excesso diário, que o
+ * card exibe para o usuário ver quanto gasta a mais por dia.
  */
 export function dailyAllowanceCents(
   input: DailyAllowanceInput,
@@ -162,10 +169,9 @@ export function dailyAllowanceCents(
   const obligationsCents = Math.max(input.obligationsCents, 0);
   const variableSpentCents = Math.max(input.variableSpentCents, 0);
 
-  const freeBudgetCents = Math.max(
-    incomeCents - obligationsCents - variableSpentCents,
-    0,
-  );
+  const rawFreeBudgetCents =
+    incomeCents - obligationsCents - variableSpentCents;
+  const freeBudgetCents = Math.max(rawFreeBudgetCents, 0);
   const remainingDays = remainingCycleDays(
     input.now,
     input.cycleStartDay,
@@ -173,7 +179,7 @@ export function dailyAllowanceCents(
   );
 
   return {
-    dailyCents: dailyCentsForBudget(freeBudgetCents, remainingDays),
+    dailyCents: dailyCentsForBudget(rawFreeBudgetCents, remainingDays),
     freeBudgetCents,
     remainingDays,
     hasData: incomeCents > 0 || obligationsCents > 0,
@@ -184,6 +190,7 @@ export function dailyAllowanceCents(
 export type DailyAllowanceCardState =
   | "no-data"
   | "exhausted"
+  | "over-budget"
   | "last-day"
   | "ready";
 
@@ -218,6 +225,21 @@ export function dailyAllowanceCard(
       label: value,
       detail: "",
       ariaLabel: `Pode gastar por dia: ${value}`,
+    };
+  }
+
+  if (allowance.dailyCents < 0) {
+    // Ciclo estourado: a diária negativa diz quanto a mais está sendo gasto
+    // por dia para fechar o ciclo no azul de novo.
+    const value = formatCents(allowance.dailyCents);
+    return {
+      state: "over-budget",
+      dailyCents: allowance.dailyCents,
+      remainingDays: allowance.remainingDays,
+      value,
+      label: `${value} por dia`,
+      detail: "Orçamento do ciclo estourado",
+      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo estourado`,
     };
   }
 
@@ -257,4 +279,15 @@ export function dailyAllowanceCard(
     detail: `${allowance.remainingDays} dias restantes no ciclo`,
     ariaLabel: `Pode gastar por dia: ${value}, ${allowance.remainingDays} dias restantes no ciclo`,
   };
+}
+
+/**
+ * Rótulo do contador do cabeçalho do dashboard: dias até o fim do ciclo,
+ * contando o dia corrente (mesma contagem de `remainingCycleDays`). Ex.: dia
+ * 08 com ciclo terminando em 15 ⇒ "8 dias para o fim do ciclo".
+ */
+export function cycleEndCountdownLabel(days: number): string {
+  if (days <= 0) return "Ciclo encerrado";
+  if (days === 1) return "Hoje é o último dia do ciclo";
+  return `${days} dias para o fim do ciclo`;
 }
