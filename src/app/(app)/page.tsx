@@ -6,7 +6,6 @@ import {
   dashboardView,
   levelLabel,
   monthKey,
-  textColorForBackground,
   type DashboardView,
   type FinanceLevel,
 } from "@/lib/finance";
@@ -26,6 +25,7 @@ import IncomeVsExpenseChart from "@/components/IncomeVsExpenseChart";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
 import PurchaseSimulator from "@/components/PurchaseSimulator";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
+import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
 
 export const dynamic = "force-dynamic";
@@ -101,7 +101,7 @@ export default async function DashboardPage({
       : { level, label: levelLabel(level) };
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <MonthSelector
         monthKey={referenceMonthKey}
         isCurrentMonth={isCurrentMonth}
@@ -151,47 +151,19 @@ export default async function DashboardPage({
 
       {view.state === "ok" && series !== null && (
         <>
-          <section
-            className="flex flex-col items-center justify-center gap-4 rounded-2xl p-8 text-center transition-colors duration-700"
-            style={{
-              backgroundColor,
-              color: textColorForBackground(backgroundColor),
-            }}
-          >
-            <header className="space-y-1">
-              <p className="text-sm font-medium uppercase tracking-widest opacity-80">
-                FinFam
-              </p>
-              <h1 className="text-xl font-semibold opacity-90">
-                Renda do mês consumida
-              </h1>
-            </header>
+          <div className="grid items-stretch gap-6 md:grid-cols-2">
+            <MonthSpendCard
+              backgroundColor={backgroundColor}
+              percent={view.percent}
+              level={level}
+              invoiceDue={invoiceDueLabel(referenceDate)}
+              daysRemaining={daysRemaining}
+              feedback={view.feedback}
+              className={isCalendarMonth ? "" : "md:col-span-2"}
+            />
 
-            <p className="text-7xl font-black tabular-nums sm:text-9xl">
-              {view.percent}
-              <span className="text-4xl align-top sm:text-6xl">%</span>
-            </p>
-
-            <p className="text-2xl font-semibold">{levelLabel(level)}</p>
-
-            <p className="text-sm font-medium uppercase tracking-wide opacity-80">
-              {invoiceDueLabel(referenceDate)}
-            </p>
-
-            <p className="text-2xl font-medium opacity-95">
-              {daysRemaining} dias para o fim do mês
-            </p>
-
-            <p
-              role="status"
-              aria-live="polite"
-              className="max-w-xl rounded-full px-6 py-3 text-lg"
-            >
-              {view.feedback}
-            </p>
-          </section>
-
-          {isCalendarMonth && <QuickExpenseCard />}
+            {isCalendarMonth && <QuickExpenseCard />}
+          </div>
 
           {allowance !== null && (
             <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />
