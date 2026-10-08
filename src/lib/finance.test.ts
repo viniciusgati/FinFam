@@ -50,6 +50,7 @@ describe("computeFinanceStatus", () => {
     expect(status.consumedCents).toBe(80000);
     expect(status.consumedPercent).toBeCloseTo(80);
     // projeção = obrigações 60000 + (20000/10)*31
+    expect(status.projectedCents).toBe(122000);
     expect(status.projectedPercent).toBeCloseTo(122);
   });
 

@@ -67,6 +67,8 @@ export default async function DashboardPage({
   let incomeCents = 0;
   let fixedIncomeCents = 0;
   let variableIncomeCents = 0;
+  let consumedCents = 0;
+  let projectedCents = 0;
   let fixedExpensesCents = 0;
   let variableExpensesCents = 0;
   let cardExpensesCents = 0;
@@ -90,6 +92,8 @@ export default async function DashboardPage({
     incomeCents = status.incomeCents;
     fixedIncomeCents = data.fixedIncomeCents;
     variableIncomeCents = data.variableIncomeCents;
+    consumedCents = status.consumedCents;
+    projectedCents = status.projectedCents;
     fixedExpensesCents = data.fixedExpensesCents;
     variableExpensesCents = data.variableExpensesCents;
     cardExpensesCents = data.cardExpensesCents;
@@ -231,6 +235,9 @@ export default async function DashboardPage({
             actionableMessage={actionableMessage}
             projectedPercent={view.projectedPercent}
             projectedRisk={view.projectedRisk}
+            incomeCents={incomeCents}
+            consumedCents={consumedCents}
+            projectedCents={projectedCents}
           />
 
           {isCalendarMonth && (

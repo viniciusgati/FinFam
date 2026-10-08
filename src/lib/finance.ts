@@ -39,6 +39,12 @@ export interface FinanceStatus {
   /** Percentual da renda consumida (0..∞). 0 quando não há renda. */
   consumedPercent: number;
   /**
+   * Projeção do consumo até o fim do mês em centavos (obrigações conhecidas +
+   * gasto avulso no ritmo diário atual, SPEC §4.3). Arredondado para exibição;
+   * `projectedPercent` é calculado do valor sem arredondar.
+   */
+  projectedCents: number;
+  /**
    * Projeção do percentual da renda comprometido até o fim do mês, somando as
    * obrigações conhecidas ao gasto avulso no ritmo diário atual (SPEC §4.3).
    * 0 quando não há renda cadastrada.
@@ -365,6 +371,7 @@ export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
     incomeCents: income,
     consumedCents: consumed,
     consumedPercent: percent,
+    projectedCents: Math.round(projectedCents),
     projectedPercent: projected,
     elapsedPercent,
     ratio,
