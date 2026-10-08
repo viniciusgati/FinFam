@@ -52,6 +52,10 @@ gastos avulsos, §4). CRUD em `/entradas` e `/api/variable-incomes`.
 - Campos: nome, valor, dia de vencimento, categoria, vigência, ativa.
 - Contam integralmente no mês de competência, independentemente do dia de
   pagamento.
+- São as **obrigações fixas** do mês e as únicas subtraídas na fórmula do
+  consumo disponível (§4.5). **Faturas de cartão e gastos avulsos não são
+  fixas**: contam como **consumo variável** (§3.4, §4.1) e não entram na
+  subtração `entradas − gastos fixos`.
 
 ### 3.3 Gastos avulsos
 
@@ -83,6 +87,8 @@ gastos avulsos, §4). CRUD em `/entradas` e `/api/variable-incomes`.
 - Cada parcela de uma compra parcelada é alocada à fatura do mês
   correspondente (parcela 1 no ciclo da compra; parcela `k` em `k-1` meses
   depois).
+- Para o **consumo disponível** (§4.5), a fatura é **consumo variável**, não
+  obrigação fixa: ela **não** entra na subtração `entradas − gastos fixos`.
 
 > Regra central: o mesmo gasto nunca é contado duas vezes. Gasto pago no
 > cartão substitui o gasto avulso correspondente — por isso um gasto avulso
@@ -194,6 +200,33 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
   aparece no mês corrente (depende do ciclo).
 - O seletor de mês do dashboard navega para `/?mes=YYYY-MM` (prop `basePath`).
 
+### 4.5 Consumo disponível e média diária
+
+Métrica **informativa** exibida como subtítulo do card principal, ao lado (não
+no lugar) do `%` protagonista e do orçamento livre do ciclo:
+
+```
+consumo_disponivel = max(entradas_do_mes − gastos_fixos_ativos, 0)
+media_diaria       = consumo_disponivel / dias_da_janela   (Math.round)
+```
+
+- `entradas_do_mes` = entradas fixas ativas no mês + entradas avulsas do mês.
+- `gastos_fixos_ativos` = saídas fixas vigentes no mês (`isActiveInMonth`).
+- **Faturas de cartão e gastos avulsos não entram na subtração** — são
+  **consumo variável**, não obrigações fixas (§3.2/§3.4).
+- Janelas: **mês** (dias do mês calendário; única exibida na UI), **dias
+  decorridos** e **ciclo** (esta só quando o mês de referência é o corrente).
+  `dias <= 0` ⇒ média `R$ 0,00`, sem divisão por zero nem `NaN`.
+- Quando `gastos_fixos_ativos >= entradas`, o consumo disponível é `0` e o card
+  exibe apenas a mensagem de indisponibilidade, sem valores em R$.
+- Implementação: `consumptionAvailableCents`/`consumptionDailyAverageCents`
+  (`src/lib/finance.ts`), `buildConsumptionSummary`/`consumptionAverageLabel`
+  (`src/lib/dashboard-series.ts`) e `loadDashboardData` (`src/lib/dashboard.ts`).
+- Distinção: o `%` (`consumedCents`, §4.1) inclui fixas, avulsos e faturas; o
+  orçamento livre do ciclo (`dailyAllowanceCents`) subtrai fixas, faturas e
+  avulsos e divide pelos dias **restantes**; esta métrica separa o **consumo
+  variável** das obrigações fixas, sem alterar nenhum desses cálculos.
+
 ## 5. Regras de negócio relevantes
 
 1. **Renda mensal** = soma das entradas fixas ativas no mês.
@@ -206,6 +239,9 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
    orientar o cadastro de entradas.
 7. Não contam para o orçamento: transferências internas, receitas avulsas
    (podem ser adicionadas depois).
+8. **Consumo disponível** = `max(entradas_do_mes − gastos_fixos_ativos, 0)`,
+   nunca negativo. Faturas e avulsos são consumo variável e **não** entram.
+   Métrica informativa, distinta do `%` e do orçamento livre do ciclo (§4.5).
 
 ## 6. Telas (MVP)
 

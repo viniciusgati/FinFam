@@ -59,6 +59,40 @@ describe("MonthSpendCard (renderização)", () => {
     expect(html).toContain("Alerta");
   });
 
+  it("renderiza o subtítulo de consumo quando recebe a prop", () => {
+    const html = render({
+      consumptionLabel:
+        "Consumo de R$ 2.000,00 · R$ 64,52/dia (mês) · não inclui contas fixas",
+    });
+
+    expect(html).toContain("não inclui contas fixas");
+    expect(html).toContain("R$ 2.000,00");
+  });
+
+  it("posiciona o subtítulo de consumo após o contador e antes do feedback", () => {
+    const html = render({
+      consumptionLabel:
+        "Consumo de R$ 2.000,00 · R$ 64,52/dia (mês) · não inclui contas fixas",
+    });
+
+    const countdownIndex = html.indexOf("8 dias para o fim do ciclo");
+    const consumptionIndex = html.indexOf("não inclui contas fixas");
+    const feedbackIndex = html.indexOf(
+      "Você está gastando abaixo do esperado.",
+    );
+
+    expect(countdownIndex).toBeGreaterThanOrEqual(0);
+    expect(consumptionIndex).toBeGreaterThan(countdownIndex);
+    expect(consumptionIndex).toBeLessThan(feedbackIndex);
+  });
+
+  it("não renderiza número nem texto de consumo sem a prop", () => {
+    const html = render();
+
+    expect(html).not.toContain("não inclui contas fixas");
+    expect(html).not.toContain("Consumo de");
+  });
+
   it("aceita className extra (ex.: md:col-span-2)", () => {
     const html = render({ className: "md:col-span-2" });
 

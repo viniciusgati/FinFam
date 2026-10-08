@@ -411,3 +411,36 @@ describe("loadCycleAllowance — diária restante (regressão #231)", () => {
     );
   });
 });
+
+describe("loadDashboardData — consumo disponível", () => {
+  it("expõe entradas − fixas e a média diária do mês", async () => {
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "1", amountCents: 500000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      { id: "f", amountCents: 300000, dueDay: 10, active: true, startMonth: null, endMonth: null },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.consumption.availableCents).toBe(200000);
+    expect(data.consumption.dailyByMonthCents).toBe(6452);
+    expect(data.consumption.overCommitted).toBe(false);
+  });
+
+  it("marca overCommitted e zera as médias quando as fixas cobrem a renda", async () => {
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "1", amountCents: 300000, active: true, startMonth: null, endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      { id: "f", amountCents: 300000, dueDay: 10, active: true, startMonth: null, endMonth: null },
+    ]);
+
+    const data = await loadDashboardData(referenceDate);
+
+    expect(data.consumption.availableCents).toBe(0);
+    expect(data.consumption.overCommitted).toBe(true);
+    expect(data.consumption.dailyByMonthCents).toBe(0);
+    expect(data.consumption.dailyByCycleCents ?? 0).toBe(0);
+  });
+});

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildDailySeries } from "./dashboard-series";
+import {
+  buildConsumptionSummary,
+  buildDailySeries,
+  consumptionAverageLabel,
+} from "./dashboard-series";
 
 // Datas ao meio-dia UTC para que o dia no fuso America/Sao_Paulo seja o mesmo
 // (ver time.ts); evita off-by-one nas asserções.
@@ -109,5 +113,95 @@ describe("buildDailySeries — calendário", () => {
     expect(series.entriesCents).toBe(310000);
     expect(series.dailyBudgetCents).toBe(10000);
     expect(series.projectedMonthEndCents).toBe(Math.round((4000 / 15) * 31));
+  });
+});
+
+describe("buildConsumptionSummary", () => {
+  const base = {
+    incomeCents: 500000,
+    fixedExpensesCents: 300000,
+    daysInMonth: 31,
+    daysElapsed: 15,
+    cycleDays: 31,
+  };
+
+  it("expõe o consumo disponível e as três janelas de média", () => {
+    const summary = buildConsumptionSummary(base);
+
+    expect(summary.availableCents).toBe(200000);
+    expect(summary.overCommitted).toBe(false);
+    expect(summary.dailyByMonthCents).toBe(6452);
+    expect(summary.dailyByElapsedCents).toBe(13333);
+    expect(summary.dailyByCycleCents).toBe(6452);
+    expect(summary.daysInMonth).toBe(31);
+    expect(summary.daysElapsed).toBe(15);
+    expect(summary.cycleDays).toBe(31);
+  });
+
+  it("deixa a janela do ciclo nula quando cycleDays não é informado", () => {
+    const { cycleDays, ...withoutCycle } = base;
+    void cycleDays;
+    const summary = buildConsumptionSummary(withoutCycle);
+
+    expect(summary.cycleDays).toBeNull();
+    expect(summary.dailyByCycleCents).toBeNull();
+    expect(summary.availableCents).toBe(200000);
+    expect(summary.dailyByMonthCents).toBe(6452);
+    expect(summary.dailyByElapsedCents).toBe(13333);
+  });
+
+  it("marca overCommitted e zera tudo quando as fixas cobrem a renda", () => {
+    for (const incomeCents of [300000, 0, -100]) {
+      const summary = buildConsumptionSummary({
+        incomeCents,
+        fixedExpensesCents: 300000,
+        daysInMonth: 31,
+        daysElapsed: 15,
+        cycleDays: 31,
+      });
+
+      expect(summary.availableCents).toBe(0);
+      expect(summary.overCommitted).toBe(true);
+      expect(summary.dailyByMonthCents).toBe(0);
+      expect(summary.dailyByElapsedCents).toBe(0);
+      expect(summary.dailyByCycleCents).toBe(0);
+      expect(Number.isNaN(summary.dailyByMonthCents)).toBe(false);
+      expect(summary.availableCents).not.toBeLessThan(0);
+    }
+  });
+});
+
+describe("consumptionAverageLabel", () => {
+  const normal = buildConsumptionSummary({
+    incomeCents: 500000,
+    fixedExpensesCents: 300000,
+    daysInMonth: 31,
+    daysElapsed: 15,
+    cycleDays: 31,
+  });
+
+  it("rotula o consumo e a média diária do mês", () => {
+    const label = consumptionAverageLabel(normal).replace(/\u00a0/g, " ");
+
+    expect(label).toBe(
+      "Consumo de R$ 2.000,00 · R$ 64,52/dia (mês) · não inclui contas fixas",
+    );
+    expect(label).toContain("não inclui contas fixas");
+  });
+
+  it("não exibe R$ quando as fixas consomem toda a renda", () => {
+    const committed = buildConsumptionSummary({
+      incomeCents: 300000,
+      fixedExpensesCents: 300000,
+      daysInMonth: 31,
+      daysElapsed: 15,
+      cycleDays: 31,
+    });
+    const label = consumptionAverageLabel(committed);
+
+    expect(label).toBe(
+      "Sem consumo disponível: as contas fixas consomem toda a renda do mês.",
+    );
+    expect(label).not.toContain("R$");
   });
 });
