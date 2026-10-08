@@ -58,3 +58,45 @@ describe("QuickExpenseCard em colunas estreitas", () => {
     expect(card).not.toContain('className="grid gap-4 sm:grid-cols-3"');
   });
 });
+
+describe("layout do histórico (evolução dos meses)", () => {
+  it("monta lista, resumo e comparação a partir de funções puras", () => {
+    const page = readSource("../app/(app)/historico/page.tsx");
+
+    expect(page).toContain("buildMonthHistory");
+    expect(page).toContain("compareWithHistory");
+    expect(page).toContain("Ainda não há meses anteriores registrados.");
+    expect(page).toContain('role="status"');
+    expect(page).toContain('aria-live="polite"');
+    expect(page).toContain("formatCents");
+  });
+
+  it("exibe o resumo compacto do mês e a lista de evolução", () => {
+    const page = readSource("../app/(app)/historico/page.tsx");
+
+    // Resumo compacto usa o rótulo do mês e o nível textual (sem depender de cor).
+    expect(page).toContain("monthLabel");
+    expect(page).toContain("levelLabel");
+    // Lista de meses com seção rotulada.
+    expect(page).toContain('aria-label="Evolução dos meses"');
+    expect(page).toContain("history.map");
+  });
+
+  it("mantém o MonthSelector com isCurrentMonth calculado", () => {
+    const page = readSource("../app/(app)/historico/page.tsx");
+
+    expect(page).toContain("<MonthSelector");
+    expect(page).toContain("isCurrentMonth={isCurrentMonth}");
+  });
+});
+
+describe("skeleton de carregamento da rota", () => {
+  it("expõe status acessível e o texto Carregando…", () => {
+    const loading = readSource("../app/(app)/loading.tsx");
+
+    expect(loading).toContain('aria-busy="true"');
+    expect(loading).toContain('role="status"');
+    expect(loading).toContain('aria-live="polite"');
+    expect(loading).toContain("Carregando…");
+  });
+});
