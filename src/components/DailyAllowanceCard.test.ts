@@ -48,6 +48,15 @@ describe("DailyAllowanceCard (renderização)", () => {
     expect(html).toContain("Orçamento do ciclo esgotado");
   });
 
+  it("ciclo estourado mostra a diária negativa", () => {
+    const html = render(
+      makeAllowance({ dailyCents: -1250, freeBudgetCents: 0, remainingDays: 8 }),
+    );
+
+    expect(html).toContain("-R$ 12,50 por dia");
+    expect(html).toContain("Orçamento do ciclo estourado");
+  });
+
   it("remainingDays = 0 mostra Último dia do ciclo", () => {
     const html = render(
       makeAllowance({ dailyCents: 5000, freeBudgetCents: 5000, remainingDays: 0 }),
