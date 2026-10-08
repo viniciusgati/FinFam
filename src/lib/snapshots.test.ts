@@ -20,7 +20,7 @@ function input(
       { amountCents: 99999, date: new Date(Date.UTC(2026, 8, 15, 12)) },
     ],
     fixedExpenses: [
-      { amountCents: 20000, active: true },
+      { amountCents: 20000, active: true, category: "Moradia" },
       { amountCents: 99999, active: false },
     ],
     variableExpenses: [
@@ -28,6 +28,7 @@ function input(
         amountCents: 10000,
         date: new Date(Date.UTC(2026, 9, 5, 12)),
         paymentMethod: "PIX",
+        category: "Mercado",
       },
       {
         amountCents: 7000,
@@ -51,6 +52,7 @@ function input(
         purchaseDate: new Date(Date.UTC(2026, 9, 8, 12)),
         installmentsTotal: 1,
         card,
+        category: "Casa",
       },
       {
         amountCents: 40000,
@@ -92,6 +94,36 @@ describe("buildSnapshot", () => {
     expect(snapshot.cardExpensesCents).toBe(30000);
     expect(snapshot.consumedCents).toBe(60000);
     expect(snapshot.consumedPercent).toBeCloseTo(48);
+  });
+
+  it("calcula o consumo disponível e a média diária do mês", () => {
+    const snapshot = buildSnapshot(input());
+
+    // outubro/2026 tem 31 dias: (125000 − 20000) / 31 = 3387,09… → 3387.
+    expect(snapshot.consumptionAvailableCents).toBe(105000);
+    expect(snapshot.daysInMonth).toBe(31);
+    expect(snapshot.dailyAverageCents).toBe(3387);
+  });
+
+  it("zera consumo disponível e média diária sem renda (sem NaN)", () => {
+    const snapshot = buildSnapshot(input({ incomes: [], variableIncomes: [] }));
+
+    expect(snapshot.consumptionAvailableCents).toBe(0);
+    expect(snapshot.dailyAverageCents).toBe(0);
+    expect(Number.isNaN(snapshot.dailyAverageCents)).toBe(false);
+  });
+
+  it("soma as categorias exatamente igual ao consumedCents", () => {
+    const snapshot = buildSnapshot(input());
+    const totalCategorias = snapshot.categories.reduce(
+      (total, categoria) => total + categoria.amountCents,
+      0,
+    );
+
+    expect(totalCategorias).toBe(snapshot.consumedCents);
+    expect(snapshot.categories.map((item) => item.category)).toEqual(
+      expect.arrayContaining(["Moradia", "Mercado", "Casa"]),
+    );
   });
 
   it("respeita os limites do mês e exclui gastos no crédito", () => {

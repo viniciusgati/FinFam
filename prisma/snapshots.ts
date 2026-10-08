@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { categoryKey } from "../src/lib/categories";
 import { buildSnapshot, monthRange } from "../src/lib/snapshots";
 
 const prisma = new PrismaClient();
@@ -6,6 +7,10 @@ const prisma = new PrismaClient();
 const MONTHS = Number(process.env.SNAPSHOT_MONTHS ?? "4");
 
 async function main() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL não está definida.");
+  }
+
   const now = new Date();
   const months = monthRange(now, Number.isFinite(MONTHS) ? MONTHS : 4);
   if (months.length === 0) {
@@ -43,21 +48,45 @@ async function main() {
       cardPurchases,
     });
 
-    await prisma.monthlySnapshot.upsert({
-      where: { monthKey: key },
-      update: {
-        incomeCents: snapshot.incomeCents,
-        fixedExpensesCents: snapshot.fixedExpensesCents,
-        variableExpensesCents: snapshot.variableExpensesCents,
-        cardExpensesCents: snapshot.cardExpensesCents,
-        consumedCents: snapshot.consumedCents,
-        consumedPercent: snapshot.consumedPercent,
-      },
-      create: snapshot,
+    const { categories, ...monthly } = snapshot;
+
+    // Idempotente: o upsert sobrescreve o snapshot e as categorias são
+    // recriadas do zero para o mês dentro da mesma transação.
+    await prisma.$transaction(async (tx) => {
+      await tx.monthlySnapshot.upsert({
+        where: { monthKey: key },
+        update: {
+          incomeCents: monthly.incomeCents,
+          fixedExpensesCents: monthly.fixedExpensesCents,
+          variableExpensesCents: monthly.variableExpensesCents,
+          cardExpensesCents: monthly.cardExpensesCents,
+          consumedCents: monthly.consumedCents,
+          consumedPercent: monthly.consumedPercent,
+          consumptionAvailableCents: monthly.consumptionAvailableCents,
+          dailyAverageCents: monthly.dailyAverageCents,
+          daysInMonth: monthly.daysInMonth,
+        },
+        create: monthly,
+      });
+
+      await tx.monthlyCategorySnapshot.deleteMany({
+        where: { monthKey: key },
+      });
+
+      if (categories.length > 0) {
+        await tx.monthlyCategorySnapshot.createMany({
+          data: categories.map((item) => ({
+            monthKey: key,
+            categoryKey: categoryKey(item.category),
+            categoryLabel: item.category,
+            amountCents: item.amountCents,
+          })),
+        });
+      }
     });
 
     console.log(
-      `Snapshot derivado: ${key} (${snapshot.consumedPercent.toFixed(2)}%).`,
+      `Snapshot derivado: ${key} (${snapshot.consumedPercent.toFixed(2)}%, ${categories.length} categoria(s)).`,
     );
   }
 
@@ -65,10 +94,10 @@ async function main() {
 }
 
 main()
-  .catch(() => {
-    console.error(
-      "Banco indisponível: verifique DATABASE_URL e rode as migrations.",
-    );
+  .catch((error) => {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(`Banco indisponível: ${reason}`);
+    console.error("Verifique DATABASE_URL e rode as migrations.");
     process.exit(1);
   })
   .finally(async () => {

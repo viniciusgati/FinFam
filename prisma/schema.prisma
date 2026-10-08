@@ -126,10 +126,39 @@ model MonthlySnapshot {
   cardExpensesCents    Int
   consumedCents        Int
   consumedPercent      Float
+  /// Consumo disponível do mês (`entradas − gastos fixos`, nunca negativo).
+  consumptionAvailableCents Int  @default(0)
+  /// Média diária do consumo disponível no mês calendário.
+  dailyAverageCents    Int      @default(0)
+  /// Dias do mês calendário usado no cálculo da média diária.
+  daysInMonth          Int      @default(0)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
+  categories MonthlyCategorySnapshot[]
+
   @@map("monthly_snapshots")
+}
+
+/// Gasto de um mês fechado por categoria, gerado por `buildCategoryBreakdown`.
+/// Invariante: a soma de `amountCents` de um `monthKey` iguala o `consumedCents`
+/// do `MonthlySnapshot` correspondente.
+model MonthlyCategorySnapshot {
+  id            String   @id @default(cuid())
+  monthKey      String // YYYY-MM
+  /// Chave normalizada da categoria (`categoryKey`); `""` = sem categoria.
+  categoryKey   String
+  /// Rótulo exibido (`NO_CATEGORY_LABEL` quando vazio/ausente).
+  categoryLabel String
+  amountCents   Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  monthlySnapshot MonthlySnapshot @relation(fields: [monthKey], references: [monthKey], onDelete: Cascade)
+
+  @@unique([monthKey, categoryKey])
+  @@index([monthKey])
+  @@map("monthly_category_snapshots")
 }
 
 /// Configuração global da família. Linha singleton (id fixo "singleton");
