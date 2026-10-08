@@ -132,7 +132,9 @@ export async function loadDashboardData(
     isActiveInMonth(item, currentMonthKey),
   );
 
-  // Parcelas cuja competência cai no mês, com o dia de vencimento do cartão.
+  // Parcelas cuja competência cai no mês, com o dia de vencimento do cartão e o
+  // dia da compra (só quando a compra é do próprio mês — usada no gráfico de
+  // consumo diário; parcelas anteriores são obrigação no vencimento).
   const cardInvoiceLines = cardPurchases.flatMap((purchase) =>
     allocateInstallments(
       purchase,
@@ -143,6 +145,10 @@ export async function loadDashboardData(
       .map((installment) => ({
         amountCents: installment.amountCents,
         dueDay: purchase.card.dueDay,
+        purchaseDay:
+          monthKey(purchase.purchaseDate) === currentMonthKey
+            ? zonedDateParts(purchase.purchaseDate, timeZone).day
+            : null,
       })),
   );
 

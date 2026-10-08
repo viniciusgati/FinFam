@@ -21,17 +21,14 @@ Card principal e apoio:
 
 Gráficos (SVG/CSS puro, sem biblioteca; `role="img"` + `aria-label`):
 
-1. **`IncomeVsExpenseChart`** (`src/components/IncomeVsExpenseChart.tsx`) —
-   comparação de **totais do mês**: "Entradas" vs "Saídas" (barras proporcionais).
-2. **`VariableSpendChart`** (`src/components/VariableSpendChart.tsx`) — "Gasto
-   variável por dia": **uma barra por dia** com apenas os avulsos no orçamento
-   (`variableDailyExpensesCents`) + **linha horizontal da média de consumo**
-   (`consumptionDailyAverageCents`); dia de hoje destacado, dias futuros
-   atenuados. As **obrigações** do mês (`fixedExpensesCents + cardExpensesCents`,
-   rótulo "Obrigações") aparecem em nota separada, **fora do eixo das barras** —
-   assim uma conta fixa ou fatura não esmaga os gastos do dia a dia. O antigo
-   `DailySpendChart` ("Dia a dia", que misturava fixas/avulsos/faturas) foi
-   aposentado.
+1. **`IncomeAllocationCard`** (`src/components/IncomeAllocationCard.tsx`) —
+   "Para onde vai a renda": barra empilhada + lista com contas fixas, fatura,
+   avulsos e o que sobra.
+2. **`DailyConsumptionChart`** (`src/components/DailyConsumptionChart.tsx`) —
+   "Consumo por dia": barras do consumo variável (avulsos + compras do mês no
+   cartão pela data da compra), linha do dia típico (moda; mediana como
+   fallback) e marcadores de vencimento (fixas/fatura) fora da escala. Os
+   gráficos "Entradas vs Saídas" e "Dia a dia" foram aposentados.
 
 Mês fechado/`/historico` (`src/app/(app)/historico/page.tsx`, ~180 B de rota):
 hoje é apenas **placeholder** que repete o número do mês; não há tabela de meses
@@ -112,9 +109,9 @@ Leitura para a próxima fase:
 - **Resolvido:** a métrica de média diária baseada em `entradas − fixos` é
   exposta por `buildConsumptionSummary`/`consumptionAverageLabel`
   (`src/lib/dashboard-series.ts`; ver §2).
-- **Resolvido:** `VariableSpendChart` plota só o gasto variável e traz a **linha
-  de referência** (`consumptionDailyAverageCents`), com as obrigações em nota
-  separada (task #254).
+- **Resolvido:** "Dia a dia" foi substituído pelo "Consumo por dia" (consumo
+  variável + dia típico + marcadores de vencimento) e "Entradas vs Saídas" pelo
+  "Para onde vai a renda" (`src/lib/dashboard-charts.ts`).
 - `%` e `consumedCents` **incluem fixas**; a diretriz separa "consumo" de
   "obrigações".
 - `/historico` é placeholder → falta base para gráficos de **tendência mensal**.

@@ -40,6 +40,12 @@ export interface SeriesVariableExpense {
 export interface SeriesCardInvoiceLine {
   amountCents: number;
   dueDay: number;
+  /**
+   * Dia da compra (1-based) quando a compra é do próprio mês de referência;
+   * `null`/ausente para parcelas de compras anteriores (consumo de outro mês,
+   * tratado como obrigação).
+   */
+  purchaseDay?: number | null;
 }
 
 export interface BuildDailySeriesInput {
@@ -59,12 +65,16 @@ export interface DailySeries {
   dailyExpensesCents: number[];
   cumulativeExpensesCents: number[];
   /**
-   * Gasto **variável** por dia (avulsos no orçamento), sem fixas nem faturas,
-   * distribuído pela `date`. Mesmo comprimento de `dailyExpensesCents`.
+   * Consumo variável por dia: avulsos no orçamento (pela data) + parcelas de
+   * cartão de compras do próprio mês (pela data da compra). Parcelas de compras
+   * anteriores não entram (são obrigação, ver `obligationDailyCents`).
    */
-  variableDailyExpensesCents: number[];
-  /** Média diária do consumo disponível (entradas − fixas) no mês. */
-  consumptionDailyAverageCents: number;
+  variableDailyCents: number[];
+  /**
+   * Obrigações que vencem em cada dia: fixas ativas + parcelas de compras
+   * anteriores. Ficam fora da escala do consumo (marcadores de vencimento).
+   */
+  obligationDailyCents: number[];
   entriesCents: number;
   totalExpensesCents: number;
   dailyBudgetCents: number;
@@ -101,23 +111,33 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
   elapsedDay = Math.min(Math.max(elapsedDay, 0), totalDays);
 
   const daily = new Array<number>(totalDays).fill(0);
-  const variableDaily = new Array<number>(totalDays).fill(0);
+  const variable = new Array<number>(totalDays).fill(0);
+  const obligations = new Array<number>(totalDays).fill(0);
 
   for (const expense of input.fixedExpenses ?? []) {
-    daily[dayIndex(expense.dueDay, totalDays)] += expense.amountCents;
+    const index = dayIndex(expense.dueDay, totalDays);
+    daily[index] += expense.amountCents;
+    obligations[index] += expense.amountCents;
   }
 
   for (const expense of input.variableExpenses ?? []) {
     if (!isCountedInBudget(expense.paymentMethod)) continue;
     if (monthKey(expense.date) !== referenceMonth) continue;
-    const day = zonedDateParts(expense.date, timeZone).day;
-    const index = dayIndex(day, totalDays);
+    const index = dayIndex(zonedDateParts(expense.date, timeZone).day, totalDays);
     daily[index] += expense.amountCents;
-    variableDaily[index] += expense.amountCents;
+    variable[index] += expense.amountCents;
   }
 
   for (const line of input.cardInvoiceLines ?? []) {
-    daily[dayIndex(line.dueDay, totalDays)] += line.amountCents;
+    const dueIndex = dayIndex(line.dueDay, totalDays);
+    daily[dueIndex] += line.amountCents;
+    if (line.purchaseDay !== undefined && line.purchaseDay !== null) {
+      // Compra do próprio mês: consumo na data da compra, fora da escala das
+      // obrigações.
+      variable[dayIndex(line.purchaseDay, totalDays)] += line.amountCents;
+    } else {
+      obligations[dueIndex] += line.amountCents;
+    }
   }
 
   const totalExpensesCents = daily.reduce((total, value) => total + value, 0);
@@ -137,24 +157,13 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
       ? Math.round((running / elapsedDay) * totalDays)
       : 0;
 
-  const consumptionDailyAverage = consumptionDailyAverageCents(
-    consumptionAvailableCents({
-      monthlyIncomeCents: entriesCents,
-      fixedExpensesCents: (input.fixedExpenses ?? []).reduce(
-        (total, expense) => total + expense.amountCents,
-        0,
-      ),
-    }),
-    totalDays,
-  );
-
   return {
     daysInMonth: totalDays,
     elapsedDay,
     dailyExpensesCents: daily,
     cumulativeExpensesCents: cumulative,
-    variableDailyExpensesCents: variableDaily,
-    consumptionDailyAverageCents: consumptionDailyAverage,
+    variableDailyCents: variable,
+    obligationDailyCents: obligations,
     entriesCents,
     totalExpensesCents,
     dailyBudgetCents,
