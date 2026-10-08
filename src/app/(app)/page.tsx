@@ -11,13 +11,11 @@ import {
   actionableBudgetMessage,
   computeFinanceStatus,
   dashboardView,
-  levelLabel,
   monthKey,
   type DashboardView,
   type FinanceLevel,
 } from "@/lib/finance";
 import { invoiceDueLabel, resolveReferenceDate } from "@/lib/invoices";
-import { rateDay } from "@/lib/day-rating";
 import type { DailySeries } from "@/lib/dashboard-series";
 import {
   buildMonthReviewData,
@@ -26,7 +24,6 @@ import {
 } from "@/lib/ai/month-review";
 import RetryButton from "@/components/RetryButton";
 import MonthSelector from "@/components/MonthSelector";
-import DayRatingBadge from "@/components/DayRatingBadge";
 import DailySpendChart from "@/components/DailySpendChart";
 import IncomeVsExpenseChart from "@/components/IncomeVsExpenseChart";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
@@ -102,15 +99,6 @@ export default async function DashboardPage({
       previousPercents: [],
     });
   }
-
-  const rating =
-    series !== null
-      ? rateDay({
-          dailyFreeBudgetCents: series.dailyFreeBudgetCents,
-          todayExpensesCents: series.todayExpensesCents,
-          incomeCents,
-        })
-      : { level, label: levelLabel(level) };
 
   const actionableMessage =
     view.state === "ok" && allowance !== null
@@ -213,17 +201,6 @@ export default async function DashboardPage({
               />
             </section>
           </div>
-
-          <section className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
-            <h2 className="text-lg font-semibold text-foreground">
-              Avaliação do dia
-            </h2>
-            <DayRatingBadge
-              level={rating.level}
-              label={rating.label}
-              ariaLabel={`Avaliação do dia: ${rating.label}`}
-            />
-          </section>
 
           <MonthReviewPanel
             key={referenceMonthKey}

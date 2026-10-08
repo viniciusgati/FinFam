@@ -179,9 +179,6 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
   faturas no `dueDay` do cartão pela competência (`invoices.ts`). Avulsos
   `CREDIT` não entram (evita dupla contagem, §3.3). A soma da série coincide com
   `consumedCents`. Mês corrente acumula até hoje; mês passado cobre o mês todo.
-- **Avaliação do dia**: heurística determinística (`src/lib/day-rating.ts`),
-  reutilizando `classifyLevel`/`levelLabel` (`<=` orçamento diário → "Ok";
-  acima → no mínimo "Cuidado"; sem renda → "Sem renda cadastrada").
 - **Avaliação de mês fechado por IA** (DeepSeek, opcional via
   `DEEPSEEK_API_KEY`): supervisor `src/lib/ai/deepseek.ts`. Somente agregados
   **numéricos** são enviados; o veredito e o fallback são locais. Cache em

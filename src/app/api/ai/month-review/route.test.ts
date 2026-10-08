@@ -49,7 +49,6 @@ const dashboardData = {
     entriesCents: 500000,
     totalExpensesCents: 170000,
     dailyBudgetCents: 16667,
-    todayExpensesCents: 0,
     projectedMonthEndCents: 170000,
   },
   referenceDate: new Date(),

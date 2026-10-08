@@ -55,12 +55,6 @@ export interface DailySeries {
   entriesCents: number;
   totalExpensesCents: number;
   dailyBudgetCents: number;
-  /**
-   * Orçamento diário livre de obrigações: renda menos saídas fixas e faturas
-   * de cartão, dividida pelos dias do mês. Nunca negativo.
-   */
-  dailyFreeBudgetCents: number;
-  todayExpensesCents: number;
   projectedMonthEndCents: number;
 }
 
@@ -122,20 +116,6 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
   const entriesCents = Math.max(input.incomeCents ?? 0, 0);
   const dailyBudgetCents =
     totalDays > 0 ? Math.round(entriesCents / totalDays) : 0;
-  const obligationsCents =
-    (input.fixedExpenses ?? []).reduce(
-      (total, expense) => total + expense.amountCents,
-      0,
-    ) +
-    (input.cardInvoiceLines ?? []).reduce(
-      (total, line) => total + line.amountCents,
-      0,
-    );
-  const freeBudgetCents = Math.max(entriesCents - obligationsCents, 0);
-  const dailyFreeBudgetCents =
-    totalDays > 0 ? Math.round(freeBudgetCents / totalDays) : 0;
-  const todayExpensesCents =
-    elapsedDay > 0 ? daily[elapsedDay - 1] : 0;
   const projectedMonthEndCents =
     elapsedDay > 0
       ? Math.round((running / elapsedDay) * totalDays)
@@ -149,8 +129,6 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
     entriesCents,
     totalExpensesCents,
     dailyBudgetCents,
-    dailyFreeBudgetCents,
-    todayExpensesCents,
     projectedMonthEndCents,
   };
 }
