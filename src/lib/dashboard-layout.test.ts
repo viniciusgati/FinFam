@@ -71,6 +71,17 @@ describe("layout do histórico (evolução dos meses)", () => {
     expect(page).toContain("formatCents");
   });
 
+  it("exibe o resumo compacto do mês e a lista de evolução", () => {
+    const page = readSource("../app/(app)/historico/page.tsx");
+
+    // Resumo compacto usa o rótulo do mês e o nível textual (sem depender de cor).
+    expect(page).toContain("monthLabel");
+    expect(page).toContain("levelLabel");
+    // Lista de meses com seção rotulada.
+    expect(page).toContain('aria-label="Evolução dos meses"');
+    expect(page).toContain("history.map");
+  });
+
   it("mantém o MonthSelector com isCurrentMonth calculado", () => {
     const page = readSource("../app/(app)/historico/page.tsx");
 
