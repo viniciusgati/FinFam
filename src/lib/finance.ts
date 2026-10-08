@@ -381,6 +381,24 @@ export function monthEndCountdownLabel(days: number): string {
   return `${days} dias para o fim do mês`;
 }
 
+/**
+ * Rótulo textual da projeção de fechamento do mês. Usa `Math.round`, igual ao
+ * percentual consumido exibido, para a leitura exibir o mesmo inteiro que
+ * decide o risco.
+ */
+export function projectionLabel(projectedPercent: number): string {
+  return `No ritmo atual: ${Math.round(projectedPercent)}% até o fim do mês`;
+}
+
+/**
+ * Texto de alerta quando a projeção arredondada alcança ou ultrapassa 100% da
+ * renda. Decidido pelo mesmo valor arredondado exibido, evitando mostrar
+ * "100% até o fim do mês" sem o aviso. Retorna `null` quando não há risco.
+ */
+export function projectionRiskLabel(projectedPercent: number): string | null {
+  return Math.round(projectedPercent) >= 100 ? "Risco de estouro" : null;
+}
+
 export interface DashboardViewInput {
   dbError: boolean;
   incomeCents: number;
@@ -396,7 +414,13 @@ export interface DashboardViewInput {
 export type DashboardView =
   | { state: "error" }
   | { state: "empty" }
-  | { state: "ok"; percent: number; feedback: string };
+  | {
+      state: "ok";
+      percent: number;
+      projectedPercent: number;
+      projectedRisk: boolean;
+      feedback: string;
+    };
 
 export function dashboardView(input: DashboardViewInput): DashboardView {
   if (input.dbError) return { state: "error" };
@@ -406,9 +430,13 @@ export function dashboardView(input: DashboardViewInput): DashboardView {
     return { state: "empty" };
   }
 
+  const projected = Math.round(input.projectedPercent);
+
   return {
     state: "ok",
     percent: Math.round(input.consumedPercent),
+    projectedPercent: projected,
+    projectedRisk: projected >= 100,
     feedback: compareWithHistory(input.projectedPercent, input.previousPercents),
   };
 }

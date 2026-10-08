@@ -69,4 +69,31 @@ describe("MonthSpendCard (renderização)", () => {
 
     expect(html).toContain("md:col-span-2");
   });
+
+  it("mostra a projeção e o risco quando a projeção estoura a renda", () => {
+    const html = render({ projectedPercent: 248, projectedRisk: true });
+
+    expect(html).toContain("No ritmo atual: 248% até o fim do mês");
+    expect(html).toContain("Risco de estouro");
+  });
+
+  it("mostra a projeção sem risco quando abaixo de 100%", () => {
+    const html = render({ projectedPercent: 90, projectedRisk: false });
+
+    expect(html).toContain("No ritmo atual: 90% até o fim do mês");
+    expect(html).not.toContain("Risco de estouro");
+  });
+
+  it("não mostra projeção quando projectedPercent está ausente", () => {
+    const html = render();
+
+    expect(html).not.toContain("No ritmo atual");
+  });
+
+  it("expõe o risco em role=status com aria-live=polite", () => {
+    const html = render({ projectedPercent: 248, projectedRisk: true });
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+  });
 });

@@ -162,6 +162,8 @@ export default async function DashboardPage({
               invoiceDue={invoiceDueLabel(referenceDate)}
               daysRemaining={daysRemaining}
               feedback={view.feedback}
+              projectedPercent={view.projectedPercent}
+              projectedRisk={view.projectedRisk}
               className={isCalendarMonth ? "" : "md:col-span-2"}
             />
 
