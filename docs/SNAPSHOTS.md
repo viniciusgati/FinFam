@@ -32,6 +32,12 @@ monthly_snapshots + monthly_category_snapshots   ← imutáveis após criados
 dashboard de mês fechado / histórico / comparação "últimos N meses"
 ```
 
+A base de comparação ("últimos N meses", médias e alertas) segue a regra da
+SPEC §4.3: só entram meses **válidos** (≥ 1 entrada e ≥ 1 saída) e são
+necessários ao menos **2** meses válidos antes de qualquer comparação —
+`hasComparisonData` filtra em `loadDashboardData` e `comparableMonths` filtra
+de novo no motor de insights.
+
 ## Componentes
 
 | Arquivo | Papel |

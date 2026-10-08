@@ -6,6 +6,7 @@ import {
   CATEGORY_MIN_SURPLUS_CENTS,
   categoryAlerts,
   categoryAverage,
+  comparableMonths,
   DAILY_VARIATION_FACTOR,
   FAMILY_EMPTY_TEXT,
   FAMILY_INCOME_SHORTFALL_TEXT,
@@ -20,11 +21,21 @@ import {
 
 const norm = (value: string): string => value.replace(/\u00a0/g, " ");
 
+/**
+ * Mês fechado válido por padrão (entrada e saída). Use `totals` para criar um
+ * mês incompleto, que não pode entrar na base de comparação.
+ */
 function month(
   monthKey: string,
   categories: { category: string; amountCents: number }[],
+  totals: { incomeCents?: number; consumedCents?: number } = {},
 ): FamilyInsightSnapshot {
-  return { monthKey, categories };
+  return {
+    monthKey,
+    categories,
+    incomeCents: totals.incomeCents ?? 500000,
+    consumedCents: totals.consumedCents ?? 300000,
+  };
 }
 
 function input(overrides: Partial<FamilyInsightInput> = {}): FamilyInsightInput {
@@ -73,6 +84,18 @@ describe("categoryAverage", () => {
       averageCents: 0,
       months: 0,
     });
+  });
+});
+
+describe("comparableMonths", () => {
+  it("mantém só meses com entrada E saída na base", () => {
+    const base = comparableMonths([
+      month("2026-07", []),
+      month("2026-08", [], { consumedCents: 0 }),
+      month("2026-09", [], { incomeCents: 0 }),
+    ]);
+
+    expect(base.map((snapshot) => snapshot.monthKey)).toEqual(["2026-07"]);
   });
 });
 
@@ -125,6 +148,11 @@ describe("categoryAlerts — limites", () => {
 
   it("limita a 2 alertas por desvio desc, desempate por categoryKey", () => {
     const snapshots = [
+      month("2026-05", [
+        { category: "A", amountCents: 25000 },
+        { category: "B", amountCents: 25000 },
+        { category: "C", amountCents: 25000 },
+      ]),
       month("2026-06", [
         { category: "A", amountCents: 25000 },
         { category: "B", amountCents: 25000 },
@@ -144,6 +172,42 @@ describe("categoryAlerts — limites", () => {
     expect(alerts.map((alert) => alert.categoryKey)).toEqual(["a", "b"]);
     expect(alerts[0].surplusCents).toBe(10000);
   });
+
+  it("não dispara com menos de 2 meses válidos (regressão)", () => {
+    const alerts = categoryAlerts(
+      [{ category: "Mercado", amountCents: 90000 }],
+      [month("2026-09", [{ category: "Mercado", amountCents: 25000 }])],
+    );
+
+    expect(alerts).toEqual([]);
+  });
+
+  it("mês sem saída não conta como base mínima", () => {
+    const alerts = categoryAlerts(
+      [{ category: "Mercado", amountCents: 90000 }],
+      [
+        month("2026-08", [{ category: "Mercado", amountCents: 25000 }]),
+        month("2026-09", [{ category: "Mercado", amountCents: 25000 }], {
+          consumedCents: 0,
+        }),
+      ],
+    );
+
+    expect(alerts).toEqual([]);
+  });
+
+  it("dispara a partir de 2 meses válidos", () => {
+    const alerts = categoryAlerts(
+      [{ category: "Mercado", amountCents: 30000 }],
+      [
+        month("2026-08", [{ category: "Mercado", amountCents: 25000 }]),
+        month("2026-09", [{ category: "Mercado", amountCents: 25000 }]),
+      ],
+    );
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].months).toBe(2);
+  });
 });
 
 describe("formatFactor", () => {
@@ -161,6 +225,7 @@ describe("buildFamilyInsights — renda insuficiente", () => {
         fixedExpensesCents: 300000,
         currentCategories: [{ category: "Mercado", amountCents: 30000 }],
         windowSnapshots: [
+          month("2026-08", [{ category: "Mercado", amountCents: 25000 }]),
           month("2026-09", [{ category: "Mercado", amountCents: 25000 }]),
         ],
         todayVariableSpendCents: 15000,
@@ -245,10 +310,11 @@ describe("buildFamilyInsights — categoria", () => {
 });
 
 describe("buildFamilyInsights — positivo e neutro", () => {
-  it("com snapshot na janela e nenhum warning retorna o positivo exato", () => {
+  it("com 2 meses válidos na janela e nenhum warning retorna o positivo exato", () => {
     const insights = buildFamilyInsights(
       input({
         windowSnapshots: [
+          month("2026-08", [{ category: "Mercado", amountCents: 25000 }]),
           month("2026-09", [{ category: "Mercado", amountCents: 25000 }]),
         ],
       }),
@@ -266,6 +332,48 @@ describe("buildFamilyInsights — positivo e neutro", () => {
 
   it("sem snapshot na janela retorna o neutro exato e sem marcador", () => {
     const insights = buildFamilyInsights(input());
+
+    expect(insights).toEqual([
+      {
+        id: "neutral",
+        tone: "neutral",
+        marker: null,
+        text: FAMILY_EMPTY_TEXT,
+      },
+    ]);
+  });
+
+  it("com apenas 1 mês válido não afirma média: cai no neutro (regressão)", () => {
+    const insights = buildFamilyInsights(
+      input({
+        windowSnapshots: [
+          month("2026-09", [{ category: "Mercado", amountCents: 25000 }]),
+        ],
+      }),
+    );
+
+    expect(insights).toEqual([
+      {
+        id: "neutral",
+        tone: "neutral",
+        marker: null,
+        text: FAMILY_EMPTY_TEXT,
+      },
+    ]);
+  });
+
+  it("com 1 mês válido e 1 incompleto também cai no neutro (regressão)", () => {
+    const insights = buildFamilyInsights(
+      input({
+        currentCategories: [{ category: "Mercado", amountCents: 90000 }],
+        windowSnapshots: [
+          month("2026-08", [{ category: "Mercado", amountCents: 25000 }]),
+          month("2026-09", [{ category: "Mercado", amountCents: 25000 }], {
+            incomeCents: 0,
+          }),
+        ],
+      }),
+    );
 
     expect(insights).toEqual([
       {

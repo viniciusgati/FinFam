@@ -88,7 +88,12 @@ Implementada em `src/lib/finance.ts` como funções puras:
 - `computeFinanceStatus(input)` → percentual consumido, ritmo, dias restantes,
   nível e cor.
 - `heatColor(ratio)` → cor HSL interpolada verde→vermelho.
-- `compareWithHistory(current, previous[])` → mensagem comparativa.
+- `hasComparisonData(month)` → mês válido para comparação (entrada **e**
+  saída); `MIN_COMPARISON_MONTHS = 2` é o mínimo de meses válidos.
+- `compareWithHistory(current, previous[])` → mensagem comparativa; sem
+  histórico suficiente (menos de 2 meses válidos): "Ainda não há histórico
+  suficiente.". A filtragem de meses inválidos é de quem monta a lista
+  (`comparableMonths`, `src/lib/family-insights.ts`).
 
 Entrada resumida (`FinanceInput`): renda, saídas fixas, gastos avulsos, faturas
 e data de referência. O percentual nunca é persistido; é sempre calculado.

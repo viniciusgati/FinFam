@@ -204,16 +204,27 @@ describe("loadDashboardData — integração com PostgreSQL", () => {
     );
   });
 
-  it("carrega os percentuais dos meses anteriores a partir dos snapshots", async () => {
+  it("carrega só os meses anteriores válidos (entrada e saída) dos snapshots", async () => {
     await prisma.monthlySnapshot.createMany({
       data: [
-        { monthKey: "2026-08", incomeCents: 1, fixedExpensesCents: 0, variableExpensesCents: 0, cardExpensesCents: 0, consumedCents: 0, consumedPercent: 20 },
-        { monthKey: "2026-09", incomeCents: 1, fixedExpensesCents: 0, variableExpensesCents: 0, cardExpensesCents: 0, consumedCents: 0, consumedPercent: 30 },
+        // Válido: entra na base de comparação.
+        { monthKey: "2026-06", incomeCents: 100000, fixedExpensesCents: 0, variableExpensesCents: 60000, cardExpensesCents: 0, consumedCents: 60000, consumedPercent: 60 },
+        // Sem saída registrada: não é base de comparação.
+        { monthKey: "2026-07", incomeCents: 100000, fixedExpensesCents: 0, variableExpensesCents: 0, cardExpensesCents: 0, consumedCents: 0, consumedPercent: 0 },
+        // Sem entrada registrada: não é base de comparação.
+        { monthKey: "2026-08", incomeCents: 0, fixedExpensesCents: 0, variableExpensesCents: 60000, cardExpensesCents: 0, consumedCents: 60000, consumedPercent: 0 },
+        // Válido: entra na base de comparação.
+        { monthKey: "2026-09", incomeCents: 100000, fixedExpensesCents: 0, variableExpensesCents: 90000, cardExpensesCents: 0, consumedCents: 90000, consumedPercent: 90 },
       ],
     });
 
     const data = await loadDashboardData(referenceDate);
 
-    expect(data.previousPercents).toEqual([20, 30]);
+    expect(data.previousPercents).toEqual([60, 90]);
+    expect(data.previousMonthsCents).toEqual([60000, 90000]);
+    expect(data.snapshots.map((snapshot) => snapshot.monthKey)).toEqual([
+      "2026-06",
+      "2026-09",
+    ]);
   });
 });

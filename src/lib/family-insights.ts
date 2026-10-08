@@ -13,6 +13,7 @@
  */
 
 import { categoryKey, categoryLabel } from "./categories";
+import { hasComparisonData, MIN_COMPARISON_MONTHS } from "./finance";
 import { formatCents } from "./money";
 
 export type FamilyInsightTone = "warning" | "positive" | "neutral";
@@ -35,6 +36,10 @@ export interface FamilyCategoryAmount {
 export interface FamilyInsightSnapshot {
   monthKey: string;
   categories: FamilyCategoryAmount[];
+  /** Renda total do mês (0 quando sem entrada registrada). */
+  incomeCents: number;
+  /** Consumo total do mês (0 quando sem saída registrada). */
+  consumedCents: number;
 }
 
 export interface FamilyInsightInput {
@@ -42,7 +47,10 @@ export interface FamilyInsightInput {
   referenceMonthKey: string;
   /** Categorias do mês de referência. */
   currentCategories: FamilyCategoryAmount[];
-  /** Meses fechados estritamente anteriores (janela de comparação). */
+  /**
+   * Meses fechados estritamente anteriores (janela de comparação). Meses sem
+   * entrada ou sem saída são descartados por {@link comparableMonths}.
+   */
   windowSnapshots: FamilyInsightSnapshot[];
   monthlyIncomeCents: number;
   fixedExpensesCents: number;
@@ -71,6 +79,17 @@ export const FAMILY_EMPTY_TEXT =
 /** Marcadores textuais acessíveis por tom. */
 export const FAMILY_WARNING_MARKER = "Atenção";
 export const FAMILY_POSITIVE_MARKER = "Tudo certo";
+
+/**
+ * Meses **válidos** para comparação e média: só entram meses com entrada **e**
+ * saída registradas ({@link hasComparisonData}). Mês vazio ou pela metade
+ * derruba a média e gera alerta falso, então fica de fora da base.
+ */
+export function comparableMonths(
+  snapshots: FamilyInsightSnapshot[],
+): FamilyInsightSnapshot[] {
+  return snapshots.filter(hasComparisonData);
+}
 
 export interface CategoryAverage {
   /** Média da categoria na janela (pode ser fracionária). */
@@ -124,13 +143,16 @@ export interface CategoryAlert {
  * excesso, agrupadas por `categoryKey`. Retorna no máximo
  * {@link MAX_CATEGORY_ALERTS}, ordenadas por desvio absoluto desc, desempate
  * por `categoryKey` asc e, por fim, rótulo asc (`pt-BR`). Média `0` não gera
- * alerta. Reutilizada pela IA para derivar desvios anônimos.
+ * alerta. **Exige ao menos {@link MIN_COMPARISON_MONTHS} meses válidos**
+ * (entrada e saída) na janela — abaixo disso não há média confiável e a lista
+ * vem vazia. Reutilizada pela IA para derivar desvios anônimos.
  */
 export function categoryAlerts(
   currentCategories: FamilyCategoryAmount[],
   windowSnapshots: FamilyInsightSnapshot[],
 ): CategoryAlert[] {
-  if (windowSnapshots.length === 0) return [];
+  const base = comparableMonths(windowSnapshots);
+  if (base.length < MIN_COMPARISON_MONTHS) return [];
 
   const currentByKey = new Map<
     string,
@@ -151,7 +173,7 @@ export function categoryAlerts(
 
   const alerts: CategoryAlert[] = [];
   for (const [key, current] of currentByKey) {
-    const { averageCents, months } = categoryAverage(key, windowSnapshots);
+    const { averageCents, months } = categoryAverage(key, base);
     if (averageCents <= 0) continue;
     if (current.amountCents < CATEGORY_ABOVE_FACTOR * averageCents) continue;
     const surplusCents = current.amountCents - averageCents;
@@ -186,7 +208,9 @@ export function formatFactor(value: number): string {
 /**
  * Monta a lista de insights na ordem da história: renda insuficiente →
  * alertas de categoria → variação diária. Se nada disparou, devolve o
- * `positive` (há snapshot na janela) ou o `neutral` de falta de base.
+ * `positive` quando há ao menos {@link MIN_COMPARISON_MONTHS} meses **válidos**
+ * na janela (entrada e saída) — abaixo disso nenhum texto que dependa de
+ * média histórica aparece, e o card cai no `neutral` de falta de base.
  */
 export function buildFamilyInsights(
   input: FamilyInsightInput,
@@ -235,7 +259,9 @@ export function buildFamilyInsights(
 
   if (insights.length > 0) return insights;
 
-  if (input.windowSnapshots.length > 0) {
+  // "Tudo certo, nada acima da média" também é uma afirmação sobre média:
+  // só com base suficiente (meses válidos ≥ 2).
+  if (comparableMonths(input.windowSnapshots).length >= MIN_COMPARISON_MONTHS) {
     return [
       {
         id: "positive",

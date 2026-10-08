@@ -35,8 +35,16 @@ describe("buildFamilyHelpData", () => {
         currentCategories: [{ category: "Mercado", amountCents: 30000 }],
         windowSnapshots: [
           {
+            monthKey: "2026-08",
+            categories: [{ category: "Mercado", amountCents: 25000 }],
+            incomeCents: 500000,
+            consumedCents: 300000,
+          },
+          {
             monthKey: "2026-09",
             categories: [{ category: "Mercado", amountCents: 25000 }],
+            incomeCents: 500000,
+            consumedCents: 300000,
           },
         ],
         todayVariableSpendCents: 15000,
@@ -45,10 +53,36 @@ describe("buildFamilyHelpData", () => {
     );
 
     expect(data.overCommitted).toBe(1);
-    expect(data.windowSnapshotCount).toBe(1);
+    expect(data.windowSnapshotCount).toBe(2);
     expect(data.dailyVariationFactor).toBe(1.5);
     expect(data.categoryDeviationPercents).toEqual([20]);
     expect(JSON.stringify(data)).not.toContain("Mercado");
+  });
+
+  it("conta apenas meses com entrada e saída (regressão)", () => {
+    const data = buildFamilyHelpData(
+      input({
+        currentCategories: [{ category: "Mercado", amountCents: 90000 }],
+        windowSnapshots: [
+          {
+            monthKey: "2026-08",
+            categories: [{ category: "Mercado", amountCents: 25000 }],
+            incomeCents: 500000,
+            consumedCents: 300000,
+          },
+          {
+            monthKey: "2026-09",
+            categories: [{ category: "Mercado", amountCents: 25000 }],
+            incomeCents: 500000,
+            consumedCents: 0,
+          },
+        ],
+      }),
+    );
+
+    expect(data.windowSnapshotCount).toBe(1);
+    // Com base insuficiente não há desvio para a IA comentar.
+    expect(data.categoryDeviationPercents).toEqual([]);
   });
 });
 
@@ -61,6 +95,8 @@ describe("buildFamilyHelpPrompt", () => {
           {
             monthKey: "2026-09",
             categories: [{ category: "Alimentação", amountCents: 25000 }],
+            incomeCents: 500000,
+            consumedCents: 300000,
           },
         ],
       }),

@@ -16,6 +16,7 @@ import {
   historyView,
   type MonthHistorySnapshot,
 } from "@/lib/history";
+import { FAMILY_EMPTY_TEXT } from "@/lib/family-insights";
 import HistoryView from "./HistoryView";
 
 function render(view: Parameters<typeof HistoryView>[0]["view"]): string {
@@ -62,6 +63,15 @@ const september = snapshot({
     { category: "Moradia", amountCents: 100000 },
     { category: "Casa", amountCents: 20000 },
   ],
+});
+
+const july = snapshot({
+  monthKey: "2026-07",
+  consumedCents: 95000,
+  consumedPercent: 48,
+  consumptionAvailableCents: 120000,
+  dailyAverageCents: 3065,
+  categories: [{ category: "Moradia", amountCents: 80000 }],
 });
 
 function okView(snapshots: MonthHistorySnapshot[]) {
@@ -140,10 +150,18 @@ describe("HistoryView — estado ok (markup estático)", () => {
   });
 
   it("mostra a seção de ajuda à família com mensagem acionável", () => {
+    const html = render(okView([july, august, september]));
+
+    expect(html).toContain("Ajuda à família");
+    expect(html).toContain("acima da média dos últimos 2 meses");
+  });
+
+  it("esconde o alerta da ajuda com menos de 2 meses válidos (regressão)", () => {
     const html = render(okView([august, september]));
 
     expect(html).toContain("Ajuda à família");
-    expect(html).toContain("acima da média dos últimos 1 meses");
+    expect(html).toContain(FAMILY_EMPTY_TEXT);
+    expect(html).not.toContain("acima da média");
   });
 });
 

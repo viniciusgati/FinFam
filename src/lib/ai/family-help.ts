@@ -9,6 +9,7 @@
 
 import {
   categoryAlerts,
+  comparableMonths,
   type FamilyInsightInput,
 } from "../family-insights";
 import type { ChatMessage } from "./deepseek";
@@ -19,7 +20,7 @@ export interface FamilyHelpData {
   fixedExpensesCents: number;
   /** `1` quando as contas fixas cobrem/ultrapassam a renda; `0` caso contrário. */
   overCommitted: number;
-  /** Nº de snapshots da janela de comparação. */
+  /** Nº de meses **válidos** da janela (entrada e saída). */
   windowSnapshotCount: number;
   todayVariableSpendCents: number;
   dailyReferenceCents: number;
@@ -41,7 +42,7 @@ export function buildFamilyHelpData(
     fixedExpensesCents: input.fixedExpensesCents,
     overCommitted:
       input.fixedExpensesCents >= input.monthlyIncomeCents ? 1 : 0,
-    windowSnapshotCount: input.windowSnapshots.length,
+    windowSnapshotCount: comparableMonths(input.windowSnapshots).length,
     todayVariableSpendCents: today,
     dailyReferenceCents: reference,
     dailyVariationFactor:

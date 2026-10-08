@@ -36,6 +36,14 @@ describe("buildMonthReviewData", () => {
     expect(data.previousMonthsCount).toBe(0);
     expect(data.previousMonthsAverageCents).toBe(0);
   });
+
+  it("não calcula média com apenas 1 mês anterior (regressão)", () => {
+    const data = buildMonthReviewData(snapshot, [100000]);
+
+    expect(data.previousMonthsCount).toBe(0);
+    expect(data.previousMonthsAverageCents).toBe(0);
+    expect(localMonthReview(data)).not.toContain("média");
+  });
 });
 
 describe("buildMonthReviewPrompt", () => {

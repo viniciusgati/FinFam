@@ -392,12 +392,35 @@ export function resolveDashboardState(input: {
   return input.monthlyIncomeCents <= 0 ? "empty" : "ready";
 }
 
-/** Mensagem comparativa com os meses anteriores (SPEC §4.3). */
+/** Mínimo de meses anteriores com dados para comparações e médias. */
+export const MIN_COMPARISON_MONTHS = 2;
+
+/**
+ * Mês válido para comparação: precisa ter pelo menos uma entrada **e** uma
+ * saída registradas (agregados positivos). Meses só com renda ou só com gasto
+ * não entram na média, no contador de "últimos N meses" nem no mínimo de
+ * histórico para alertas.
+ */
+export function hasComparisonData(item: {
+  incomeCents: number;
+  consumedCents: number;
+}): boolean {
+  return item.incomeCents > 0 && item.consumedCents > 0;
+}
+
+/**
+ * Mensagem comparativa com os meses anteriores (SPEC §4.3).
+ *
+ * Exige ao menos {@link MIN_COMPARISON_MONTHS} meses com dados; abaixo disso o
+ * texto é o mesmo de "sem histórico" para não comparar contra uma base de um
+ * mês só. A filtragem de meses sem dados é responsabilidade de quem monta a
+ * lista (ver `comparableMonths` em family-insights).
+ */
 export function compareWithHistory(
   currentPercent: number,
   previousPercents: number[],
 ): string {
-  if (previousPercents.length === 0) {
+  if (previousPercents.length < MIN_COMPARISON_MONTHS) {
     return "Ainda não há histórico suficiente.";
   }
   const better = previousPercents.filter((p) => currentPercent <= p).length;

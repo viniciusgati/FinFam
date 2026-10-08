@@ -166,11 +166,19 @@ está em `src/lib/finance.ts`.
 
 - Guarda-se, por mês, o percentual consumido (pode ser derivado das transações).
 - Compara-se o mês corrente com os últimos `N` meses fechados.
-- Mensagens possíveis:
+- **Mês válido para comparação**: só entra na base (média, contador "últimos N
+  meses" e alertas) um mês com **pelo menos 1 entrada e 1 saída** registradas.
+  Meses vazios ou pela metade (só renda, ou só gasto) são ignorados.
+- **Mínimo de 2 meses válidos** antes de qualquer comparação ou média
+  histórica (`MIN_COMPARISON_MONTHS`). Abaixo disso não há base estatística:
+  - o feedback do card é _"Ainda não há histórico suficiente."_;
+  - os alertas de categoria ("acima da média dos últimos N meses") e o texto
+    _"Tudo certo: nenhuma categoria ficou acima da média…"_ não aparecem;
+  - a avaliação de mês fechado pela IA não envia média de meses anteriores.
+- Mensagens possíveis (com base suficiente):
   - _"Estão melhores que os últimos N meses."_
   - _"Estão melhores que X dos últimos N meses."_
   - _"Estão piores que os últimos N meses."_
-  - Sem meses anteriores: _"Ainda não há histórico suficiente."_
 - Critério padrão de "melhor": percentual do mês corrente menor que o dos
   meses comparados. A fase de implementação pode refinar com projeção do mês
   (percentual projetado até o fim do mês).

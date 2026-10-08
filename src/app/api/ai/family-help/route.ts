@@ -45,6 +45,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       windowSnapshots: data.snapshots.map((snapshot) => ({
         monthKey: snapshot.monthKey,
         categories: snapshot.categories,
+        incomeCents: snapshot.incomeCents,
+        consumedCents: snapshot.consumedCents,
       })),
       monthlyIncomeCents: data.monthlyIncomeCents,
       fixedExpensesCents: data.fixedExpensesCents,

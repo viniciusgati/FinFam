@@ -363,6 +363,8 @@ export function historyView(input: HistoryViewInput): HistoryViewState {
     windowSnapshots: windowSnapshots.map((snapshot) => ({
       monthKey: snapshot.monthKey,
       categories: snapshot.categories,
+      incomeCents: snapshot.incomeCents,
+      consumedCents: snapshot.consumedCents,
     })),
     monthlyIncomeCents: reference.incomeCents,
     fixedExpensesCents: reference.fixedExpensesCents,

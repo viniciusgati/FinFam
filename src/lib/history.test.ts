@@ -291,18 +291,28 @@ describe("historyChartView", () => {
 });
 
 describe("historyView — ajuda à família", () => {
-  it("gera ao menos um insight para um mês fechado com base de comparação", () => {
+  it("gera alerta de categoria com 2 meses válidos na janela", () => {
     const view = historyView({
       dbError: false,
       isFutureMonth: false,
       referenceMonthKey: "2026-10",
       snapshots: [
         snapshot({
+          monthKey: "2026-07",
+          consumedCents: 90000,
+          consumedPercent: 45,
+          categories: [{ category: "Mercado", amountCents: 25000 }],
+        }),
+        snapshot({
           monthKey: "2026-08",
+          consumedCents: 90000,
+          consumedPercent: 45,
           categories: [{ category: "Mercado", amountCents: 25000 }],
         }),
         snapshot({
           monthKey: "2026-09",
+          consumedCents: 90000,
+          consumedPercent: 45,
           categories: [{ category: "Mercado", amountCents: 30000 }],
         }),
       ],
@@ -312,9 +322,41 @@ describe("historyView — ajuda à família", () => {
     expect(view.insights.length).toBeGreaterThan(0);
     expect(
       view.insights.some((insight) =>
-        insight.text.includes("acima da média dos últimos 1 meses"),
+        insight.text.includes("acima da média dos últimos 2 meses"),
       ),
     ).toBe(true);
+  });
+
+  it("com apenas 1 mês anterior válido suprime o alerta e cai no neutro (regressão)", () => {
+    const view = historyView({
+      dbError: false,
+      isFutureMonth: false,
+      referenceMonthKey: "2026-10",
+      snapshots: [
+        snapshot({
+          monthKey: "2026-08",
+          consumedCents: 90000,
+          consumedPercent: 45,
+          categories: [{ category: "Mercado", amountCents: 25000 }],
+        }),
+        snapshot({
+          monthKey: "2026-09",
+          consumedCents: 90000,
+          consumedPercent: 45,
+          categories: [{ category: "Mercado", amountCents: 90000 }],
+        }),
+      ],
+    });
+
+    if (view.state !== "ok") throw new Error("estado esperado: ok");
+    expect(view.insights).toEqual([
+      {
+        id: "neutral",
+        tone: "neutral",
+        marker: null,
+        text: FAMILY_EMPTY_TEXT,
+      },
+    ]);
   });
 
   it("sem snapshot anterior exibe exatamente o neutro", () => {

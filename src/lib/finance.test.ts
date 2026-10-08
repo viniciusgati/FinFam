@@ -10,9 +10,11 @@ import {
   dashboardView,
   emptyStateCopy,
   heatColor,
+  hasComparisonData,
   isActiveInMonth,
   levelColor,
   levelLabel,
+  MIN_COMPARISON_MONTHS,
   monthEndCountdownLabel,
   monthKey,
   monthLabel,
@@ -401,11 +403,35 @@ describe("compareWithHistory", () => {
     );
   });
 
+  it("não compara com apenas 1 mês de histórico (mínimo de 2)", () => {
+    expect(MIN_COMPARISON_MONTHS).toBe(2);
+    expect(compareWithHistory(50, [60])).toBe(
+      "Ainda não há histórico suficiente.",
+    );
+  });
+
   it("trata empate como favorável, nunca como piora", () => {
     const message = compareWithHistory(50, [50, 60, 70, 80]);
 
     expect(message).toBe("Estão melhores que os últimos 4 meses.");
     expect(message).not.toContain("piores");
+  });
+});
+
+describe("hasComparisonData", () => {
+  it("só conta mês com entrada E saída registradas", () => {
+    expect(hasComparisonData({ incomeCents: 100000, consumedCents: 50000 })).toBe(
+      true,
+    );
+    // Regressão: mês só com renda (sem saída) ou só com gasto não é base de
+    // comparação — média sobre ele distorce alertas e feedback.
+    expect(hasComparisonData({ incomeCents: 100000, consumedCents: 0 })).toBe(
+      false,
+    );
+    expect(hasComparisonData({ incomeCents: 0, consumedCents: 50000 })).toBe(
+      false,
+    );
+    expect(hasComparisonData({ incomeCents: 0, consumedCents: 0 })).toBe(false);
   });
 });
 

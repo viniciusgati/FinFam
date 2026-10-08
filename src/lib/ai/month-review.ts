@@ -6,6 +6,7 @@
  * — nunca descrições, nomes, categorias ou qualquer texto do usuário.
  */
 
+import { MIN_COMPARISON_MONTHS } from "../finance";
 import { formatCents } from "../money";
 import type { ChatMessage } from "./deepseek";
 
@@ -65,15 +66,19 @@ export function monthReviewSnapshotFrom(
 
 /**
  * Monta o agregado anônimo do mês + a média dos meses fechados anteriores.
- * Todos os valores são numéricos; nenhum texto entra aqui.
+ * Todos os valores são numéricos; nenhum texto entra aqui. A média só existe
+ * com ao menos {@link MIN_COMPARISON_MONTHS} meses anteriores **válidos**
+ * (entrada e saída) — abaixo disso `previousMonthsCount` e a média ficam em
+ * `0`, para o texto local e a IA não inventarem comparação com base de um mês.
  */
 export function buildMonthReviewData(
   snapshot: MonthReviewSnapshot,
   previousMonthsCents: number[] = [],
 ): MonthReviewData {
   const closed = previousMonthsCents.filter((value) => Number.isFinite(value));
+  const hasBase = closed.length >= MIN_COMPARISON_MONTHS;
   const averageCents =
-    closed.length > 0
+    hasBase
       ? Math.round(closed.reduce((sum, value) => sum + value, 0) / closed.length)
       : 0;
 
@@ -88,7 +93,7 @@ export function buildMonthReviewData(
     elapsedDay: snapshot.elapsedDay,
     dailyBudgetCents: snapshot.dailyBudgetCents,
     projectedMonthEndCents: snapshot.projectedMonthEndCents,
-    previousMonthsCount: closed.length,
+    previousMonthsCount: hasBase ? closed.length : 0,
     previousMonthsAverageCents: averageCents,
   };
 }
@@ -119,7 +124,8 @@ export function localMonthReview(data: MonthReviewData): string {
       `(${formatCents(data.consumedCents)} de ${formatCents(data.incomeCents)}).`,
   ];
 
-  if (data.previousMonthsCount > 0) {
+  // Média histórica só com base suficiente (meses válidos ≥ 2).
+  if (data.previousMonthsCount >= MIN_COMPARISON_MONTHS) {
     sentences.push(
       `A média dos últimos ${data.previousMonthsCount} meses fechados foi ` +
         `${formatCents(data.previousMonthsAverageCents)}.`,

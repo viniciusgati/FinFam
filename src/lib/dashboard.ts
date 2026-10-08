@@ -15,7 +15,12 @@ import {
   type CategoryBreakdown,
 } from "./category-breakdown";
 import type { FinanceInput } from "./finance";
-import { isActiveInMonth, monthKey, shiftMonthKey } from "./finance";
+import {
+  hasComparisonData,
+  isActiveInMonth,
+  monthKey,
+  shiftMonthKey,
+} from "./finance";
 import {
   invoiceLinesForSeries,
   sumCardExpensesForMonth,
@@ -51,10 +56,14 @@ export interface DashboardData extends FinanceInput {
    * cartão, ou entrada avulsa. Distingue "sem renda" de "renda sem gastos".
    */
   hasMovements: boolean;
+  /**
+   * Percentuais dos meses fechados anteriores **com dados** (entrada e saída),
+   * mais recente por último. Meses só com renda ou só com gasto ficam de fora.
+   */
   previousPercents: number[];
-  /** Totais gastos nos meses fechados (mais recente por último). */
+  /** Totais gastos nos meses fechados com dados (mais recente por último). */
   previousMonthsCents: number[];
-  /** Snapshots dos meses fechados já carregados (ordem cronológica). */
+  /** Snapshots (com categorias) dos meses fechados com dados, em ordem. */
   snapshots: DashboardSnapshot[];
   /** Série diária do mês de referência (gráficos e avaliação do dia). */
   series: DailySeries;
@@ -107,6 +116,20 @@ async function loadClosedMonthData(
 
   if (!snapshot || !isCompleteSnapshot(snapshot)) return null;
 
+  // Comparações e médias só usam meses com dados (entrada e saída).
+  const previousSnapshots = previous
+    .map((row) => ({
+      monthKey: row.monthKey,
+      incomeCents: row.incomeCents,
+      consumedCents: row.consumedCents,
+      consumedPercent: row.consumedPercent,
+      categories: row.categories.map((category) => ({
+        category: category.categoryLabel,
+        amountCents: category.amountCents,
+      })),
+    }))
+    .filter(hasComparisonData);
+
   const monthData = buildDashboardDataFromSnapshot(
     {
       monthKey: snapshot.monthKey,
@@ -133,18 +156,9 @@ async function loadClosedMonthData(
 
   return {
     ...monthData,
-    previousPercents: previous.map((row) => row.consumedPercent),
-    previousMonthsCents: previous.map((row) => row.consumedCents),
-    snapshots: previous.map((row) => ({
-      monthKey: row.monthKey,
-      incomeCents: row.incomeCents,
-      consumedCents: row.consumedCents,
-      consumedPercent: row.consumedPercent,
-      categories: row.categories.map((category) => ({
-        category: category.categoryLabel,
-        amountCents: category.amountCents,
-      })),
-    })),
+    previousPercents: previousSnapshots.map((row) => row.consumedPercent),
+    previousMonthsCents: previousSnapshots.map((row) => row.consumedCents),
+    snapshots: previousSnapshots,
   };
 }
 
@@ -238,6 +252,20 @@ export async function loadDashboardData(
     isActiveInMonth(item, currentMonthKey),
   );
 
+  // Comparações e médias só usam meses fechados com dados (entrada e saída).
+  const previousSnapshots = snapshots
+    .map((snapshot) => ({
+      monthKey: snapshot.monthKey,
+      incomeCents: snapshot.incomeCents,
+      consumedCents: snapshot.consumedCents,
+      consumedPercent: snapshot.consumedPercent,
+      categories: snapshot.categories.map((category) => ({
+        category: category.categoryLabel,
+        amountCents: category.amountCents,
+      })),
+    }))
+    .filter(hasComparisonData);
+
   // Parcelas cuja competência cai no mês, com o dia de vencimento do cartão e o
   // dia da compra (só quando a compra é do próprio mês — usada no gráfico de
   // consumo diário; parcelas anteriores são obrigação no vencimento).
@@ -309,18 +337,13 @@ export async function loadDashboardData(
     variableExpensesCents,
     cardExpensesCents,
     hasMovements,
-    previousPercents: snapshots.map((snapshot) => snapshot.consumedPercent),
-    previousMonthsCents: snapshots.map((snapshot) => snapshot.consumedCents),
-    snapshots: snapshots.map((snapshot) => ({
-      monthKey: snapshot.monthKey,
-      incomeCents: snapshot.incomeCents,
-      consumedCents: snapshot.consumedCents,
-      consumedPercent: snapshot.consumedPercent,
-      categories: snapshot.categories.map((category) => ({
-        category: category.categoryLabel,
-        amountCents: category.amountCents,
-      })),
-    })),
+    previousPercents: previousSnapshots.map(
+      (snapshot) => snapshot.consumedPercent,
+    ),
+    previousMonthsCents: previousSnapshots.map(
+      (snapshot) => snapshot.consumedCents,
+    ),
+    snapshots: previousSnapshots,
     series,
     consumption,
     categoryBreakdown: buildCategoryBreakdown({
