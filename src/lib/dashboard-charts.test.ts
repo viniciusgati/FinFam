@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildConsumptionChartView,
   buildIncomeAllocationView,
+  narrowDayLabels,
   typicalDailySpend,
 } from "./dashboard-charts";
 
@@ -53,6 +54,34 @@ describe("typicalDailySpend", () => {
   it("sem nenhum dia com consumo retorna null", () => {
     expect(typicalDailySpend([0, 0, 0])).toBeNull();
     expect(typicalDailySpend([])).toBeNull();
+  });
+});
+
+describe("narrowDayLabels", () => {
+  it("marca 1, hoje, último e múltiplos de 5 como marcos", () => {
+    expect(narrowDayLabels(31, 8)).toEqual([1, 5, 8, 10, 15, 20, 25, 31]);
+  });
+
+  it("nunca deixa dois rótulos consecutivos de duas casas (30 colado em 31)", () => {
+    // Sem hoje: o último (31) tem prioridade sobre o múltiplo de 5 (30).
+    expect(narrowDayLabels(31)).toEqual([1, 5, 10, 15, 20, 25, 31]);
+    // Hoje = 30 ganha do último; hoje = 31 já é o último.
+    expect(narrowDayLabels(31, 30)).toEqual([1, 5, 10, 15, 20, 25, 30]);
+    expect(narrowDayLabels(31, 31)).toEqual([1, 5, 10, 15, 20, 25, 31]);
+  });
+
+  it("hoje vizinho de um múltiplo de 5 esconde o múltiplo (10 e 11)", () => {
+    expect(narrowDayLabels(31, 11)).toEqual([1, 5, 11, 15, 20, 25, 31]);
+  });
+
+  it("mês de 28 dias mantém o último e ignora hoje fora do intervalo", () => {
+    expect(narrowDayLabels(28, 15)).toEqual([1, 5, 10, 15, 20, 25, 28]);
+    expect(narrowDayLabels(28, 99)).toEqual([1, 5, 10, 15, 20, 25, 28]);
+  });
+
+  it("mês curto sem sobreposição devolve todos os marcos", () => {
+    expect(narrowDayLabels(7, 3)).toEqual([1, 3, 5, 7]);
+    expect(narrowDayLabels(7)).toEqual([1, 5, 7]);
   });
 });
 

@@ -44,6 +44,28 @@ describe("DailyConsumptionChart (renderização)", () => {
     expect(html).toContain("1 dia acima");
   });
 
+  it("mostra o número de cada dia sob as barras (regressão: só havia barras e rodapé)", () => {
+    const html = render();
+    const cell = (day: number, classes: string) =>
+      `<span class="flex-1 text-center"><span class="${classes}">${day}</span></span>`;
+
+    // Uma célula por dia, com a mesma largura dos slots das barras; o card é
+    // container (@container) para alternar por largura, não por viewport.
+    expect(html).toContain('@container rounded-2xl');
+    expect(html).toContain(
+      'aria-hidden="true" class="mt-1.5 flex text-[10px] leading-none"',
+    );
+    expect(html.match(/class="flex-1 text-center"/g)).toHaveLength(7);
+    expect(html).toContain(cell(1, "text-subtle"));
+    // Hoje (dia 3) em destaque; vencimento (dia 5) em âmbar.
+    expect(html).toContain(cell(3, "font-semibold text-emerald-400"));
+    expect(html).toContain(cell(5, "text-amber-400"));
+    // Dias futuros (após elapsedDay=5) atenuados; dia 6 não é marco, então
+    // some no card estreito sem tirar a célula da conta.
+    expect(html).toContain(cell(6, "text-subtle opacity-50 hidden @lg:inline"));
+    expect(html).toContain(cell(7, "text-subtle opacity-50"));
+  });
+
   it("inclui consumo, dia típico e vencimentos em R$ no aria-label", () => {
     const html = render();
 
@@ -65,5 +87,7 @@ describe("DailyConsumptionChart (renderização)", () => {
     expect(html).toContain('href="/gastos"');
     expect(html).toContain("Registrar gastos");
     expect(html).not.toContain("Hoje:");
+    // Sem barras não há eixo de dias.
+    expect(html).not.toContain("flex-1 text-center");
   });
 });

@@ -185,6 +185,33 @@ export function buildConsumptionChartView(
   };
 }
 
+/**
+ * Dias com o número visível quando o card do gráfico é estreito (container
+ * abaixo de `@lg`/512px, em que a célula tem ~10px e duas casas quase se
+ * tocam): **1, hoje, último dia e múltiplos de 5** — prioridade nessa ordem.
+ * Nunca dois rótulos **consecutivos com duas casas** (ex.: "30 31" colado
+ * viraria "3031"); em colisão, o rótulo de menor prioridade sai. Em cards
+ * largos o componente mostra todos os dias.
+ */
+export function narrowDayLabels(totalDays: number, today?: number): number[] {
+  const labels: number[] = [];
+  const add = (day: number) => {
+    if (day < 1 || day > totalDays || labels.includes(day)) return;
+    const twoWide = day >= 10;
+    const collides = labels.some(
+      (used) => twoWide && used >= 10 && Math.abs(used - day) === 1,
+    );
+    if (!collides) labels.push(day);
+  };
+
+  if (today !== undefined) add(today);
+  add(1);
+  add(totalDays);
+  for (let day = 5; day <= totalDays; day += 5) add(day);
+
+  return labels.sort((a, b) => a - b);
+}
+
 export const INCOME_ALLOCATION_TITLE = "Para onde vai a renda";
 export const INCOME_ALLOCATION_EMPTY_MESSAGE =
   "Sem renda cadastrada neste mês";
