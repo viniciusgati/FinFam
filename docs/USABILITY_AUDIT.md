@@ -748,3 +748,209 @@ faturas; `dailyFreeBudgetCents` desconta fixas **e** cartão);
 `src/components/DailyAllowanceCard.tsx:18-32` (diária do ciclo) e
 `src/lib/cycle.ts:230-315` (rótulos da diária); `docs/DASHBOARD_CHARTS.md` (diretriz).
 
+# Rodada 5 — Propostas independentes de usabilidade (task #259)
+
+> Fase 2 (auditor-ux) da task #259 ("propostas de melhorias de usabilidade que
+> agreguem valor e facilidade à família, **sem encadear**: cada proposta completa
+> por si só"). Avaliação dos fluxos, feedback visual, clareza de textos,
+> consistência e onboarding do estado atual (branch `autoia/task-259`, após as
+> tasks #241/#250/#257/#258). Toda recomendação abaixo foi validada no código e é
+> **autocontida** — nenhuma depende de outra. Rodadas 1–4 são histórico; os itens
+> que elas apontam e que já foram entregues **não** são repetidos aqui. Baseada na
+> leitura do código e na execução real de `typecheck`, `lint`, `test` e `build`.
+> Nenhum código de produção foi alterado — apenas este documento.
+
+## Fluxos do usuário
+
+- **Login (`/login`)** — "Usuário/Senha" com `autoComplete="username"` e
+  `autoComplete="current-password"` (`src/app/login/page.tsx:81,93`), botão que
+  vira "Entrando...", erro em faixa `role="alert"`. Funciona e os gerenciadores de
+  senha preenchem (corrige a tarefa 7 da Fase 1: a checagem de lá foi
+  case-sensitive e não achou `autoComplete`).
+- **Dashboard (`/`)** — `%` + rótulo textual do nível, projeção, contador do ciclo,
+  `QuickExpenseCard` (com "Gasto criado" em `role="status"`), gráficos com legenda,
+  `FamilyHelpCard` (insights + resumo IA com fallback local), estados
+  vazio/erro/carregando próprios com CTA (`emptyStateCopy`, `finance.ts:706+`).
+  Mês futuro mostra `FutureMonthNotice` (`page.tsx:244`).
+- **Navegar o mês em `/gastos` e `/entradas`** — `<select>` montado por
+  `buildMonthOptions` com 25 opções (−12…+12 meses). Para um mês futuro o usuário
+  vê "Nenhum gasto em <mês futuro>. Lance o primeiro." (`GastosManager.tsx:521`) /
+  "Nenhuma entrada avulsa em <mês futuro>." (`ExtraIncomesManager.tsx:415`) e o
+  formulário de lançamento liberado — **sem** `FutureMonthNotice`, que só existe em
+  `/` e `/historico`.
+- **Lançar gasto com data em outro mês** — o formulário sempre pré-preenche
+  `date = hoje` (`GastosManager.tsx:69`), independentemente do mês selecionado. Em
+  `/entradas` o save fora do mês visível avisa ("Entrada criada para outro mês
+  (…)", `ExtraIncomesManager.tsx:200-204`) e faz `router.refresh()`; em `/gastos` o
+  item é filtrado da lista e a faixa mostra só **"Gasto criado"**
+  (`GastosManager.tsx:250-259`) — ele não aparece e o usuário não sabe onde foi.
+- **Excluir lançamentos** — `/gastos` (`GastosManager.tsx:292,563`) e entradas
+  avulsas (`ExtraIncomesManager.tsx:215,440`) excluem **sem confirmação** no clique
+  (não há undo). `/saidas` e entradas fixas usam desativação reversível
+  (`FixedItemsManager.tsx:345 "Desativar"`); compras de cartão confirmam
+  (`CreditCardsManager.tsx:530`). Há **1** `window.confirm` em todo `src/`.
+- **Feedback de CRUD** — todos os managers têm faixa `role="status"`/`role="alert"`,
+  botão "Salvando..."/"Excluindo..." com `aria-busy`, sucesso que some em 4 s, erro
+  com "Tentar novamente" (`RetryButton`). Padrão consistente e bom.
+- **Onboarding/glossário** — inexistente como tela. O único texto conceitual é o
+  microtexto `CYCLE_START_HELP` (`SettingsForm.tsx:12-13`). "Competência da fatura",
+  "% da renda consumida" × "consumo disponível" e o significado dos níveis de cor
+  não têm explicação acessível em nenhuma rota (não há `/ajuda`).
+- **Atualização do PWA** — `ServiceWorkerRegister.tsx:8` só chama `register()`; não
+  há listener de `updatefound`/`controllerchange` nem prompt "Nova versão
+  disponível". O `sw.js` faz `skipWaiting()` no install (`:97`), `clients.claim()`
+  no activate (`:111`) e **apaga os caches antigos** (`:108-110`) — abas abertas com
+  HTML antigo perdem os chunks lazy e recebem 404 até o reload.
+- **Qualidade da entrega** — o gate `typecheck && lint && test && build` (AGENTS.md)
+  só roda manualmente: `.github/` não existe e as 9 suítes
+  `*.integration.test.ts` nunca rodaram (sem `TEST_DATABASE_URL` em pipeline).
+
+## Problemas de usabilidade
+
+- **P0 — Exclusão irreversível sem confirmação em `/gastos` e entradas avulsas** —
+  o clique em "Excluir" (`GastosManager.tsx:563`, `ExtraIncomesManager.tsx:440`)
+  dispara `DELETE` na hora; no tablet, toque acidental apaga lançamento sem volta
+  e sem undo. Inconsistente com `/cartoes` (confirma) e `/saidas` (desativa).
+- **P0 — Mês futuro em `/gastos`/`/entradas` convida a lançar em mês que não
+  começou** — o vazio "Lance o primeiro." não explica o estado (padrão entregue em
+  `/` e `/historico` não foi replicado); o usuário cria dado em mês futuro achando
+  que a tela está quebrada.
+- **P0 — "Gasto criado" enganoso quando a data cai em outro mês** — com o mês
+  selecionado ≠ mês da data (padrão: data = hoje), `/gastos` filtra o item salvo da
+  lista e só anuncia sucesso (`GastosManager.tsx:250-259`); `ExtraIncomesManager`
+  já resolve com mensagem própria (`:200-204`). Mesma situação, feedbacks
+  diferentes — a família não encontra o gasto que acabou de criar.
+- **P1 — Sem glossário/onboarding dos conceitos** — ciclo × mês calendário,
+  "competência da fatura", "% da renda consumida" × "consumo disponível" e níveis de
+  cor só existem implícitos no código (`CYCLE_START_HELP`, `finance.ts`,
+  `dashboard-series.ts`). Sem explicação, os rótulos do dashboard parecem
+  contraditores — maior atrito de interpretação para a família.
+- **P1 — Navegação de mês duplicada e sem teste** — `addMonths`/`buildMonthOptions`
+  copiados em `gastos/page.tsx:23-39` e `entradas/page.tsx:26-34`, e `gastos` ainda
+  reimplementa a virada de ano que já existe testada em `shiftMonthKey`
+  (`finance.ts:90`). Viola o AGENTS.md; as duas telas podem divergir (uma com aviso
+  de mês futuro, outra sem) — é dívida que gera bug de UI.
+- **P2 — PWA sem fluxo de atualização** — com `skipWaiting`+`claim` forçados e
+  caches antigos apagados, deploy novo + aba antiga = chunk 404 e erro em runtime,
+  sem nenhum prompt de recarregar; o usuário vê a tela "quebrar" após atualização.
+- **P2 — Sem CI versionada** — `.github/` ausente; nenhum gate automático protege
+  os 682 testes e as 9 suítes de integração (que exigem Postgres) nunca rodam.
+- **P3 — Dívidas de documentação/higiene** — `docs/USABILITY_AUDIT.md` acumulava 4
+  rodadas com constatações superadas (esta rodada corrige isso); warning de lint
+  pré-existente `env.test.ts:17` (`_omitted`).
+- **Verificado e NÃO é problema (corrige a Fase 1)** — login **já** tem
+  `autoComplete` (`login/page.tsx:81,93`); a checagem da Fase 1 foi case-sensitive
+  (`grep "autocomplete"` não acha `autoComplete`). A tarefa 7 da Fase 1 deve ser
+  descartada; opcionalmente só adicionar `name` nos inputs.
+
+## Recomendações priorizadas
+
+Cada item abaixo é **independente** (nenhum depende de outro), com escopo fechado
+e critério de aceite testável — nesta ordem por impacto × esforço.
+
+- **R1 (P0) — Confirmação de exclusão em `/gastos` e entradas avulsas** — função
+  pura `deleteConfirmMessage()` em `src/lib` (pt-BR, com a descrição do item) +
+  `window.confirm` em `GastosManager` e `ExtraIncomesManager` no padrão de
+  `CreditCardsManager.tsx:530`; teste unitário dos textos + `renderToStaticMarkup`.
+  Benefício: elimina perda de dado irreversível no toque acidental do tablet.
+- **R2 (P0) — Aviso de mês futuro em `/gastos` e `/entradas`** — quando
+  `mes > currentMonthParam()`, renderizar `FutureMonthNotice` (já existente e
+  testado) com a frase "Este mês ainda não começou."; condição em função pura
+  testada. Benefício: para de convidar lançamento em mês que não começou e torna as
+  telas consistentes com `/` e `/historico`.
+- **R3 (P0) — Mensagem de "criado em outro mês" em `/gastos`** — reaproveitar o
+  padrão já entregue em `ExtraIncomesManager.tsx:200-204` (extrair para função pura
+  compartilhada, ex.: `savedInOtherMonthMessage(mesSalvo, label)`, com teste dos
+  textos exatos) e aplicar em `GastosManager`. Benefício: sucesso nunca aparece sem
+  o item visível; elimina a inconsistência entre as duas telas de lançamento.
+- **R4 (P1) — Glossário in-app** — página `/ajuda` (ou seção em `/configuracoes`)
+  cujo conteúdo é função pura em `src/lib/glossary.ts` (ciclo × mês calendário,
+  competência de fatura, "% da renda consumida" × "consumo disponível", níveis de
+  cor) com teste dos textos exatos; a página server component só renderiza.
+  Benefício: resolve o eixo de onboarding mais frágil sem tocar em nenhuma outra
+  tela — "facilidade para a família" direta.
+- **R5 (P1) — Extrair `addMonths`/`buildMonthOptions` para
+  `src/lib/month-navigation.ts`** — remover a duplicação das duas páginas,
+  reaproveitando `shiftMonthKey` já testado; testar virada de ano e as 25 opções.
+  Benefício: impede divergência futura entre as telas (é o que torna R2 barato de
+  manter), sem mudar comportamento visível hoje.
+- **R6 (P2) — Fluxo de atualização do service worker** — em
+  `ServiceWorkerRegister.tsx` escutar `updatefound`/`controllerchange` e mostrar
+  "Nova versão disponível — Atualizar" (mensagem via função pura testada; no clique,
+  `skipWaiting` + reload). Benefício: fecha o ciclo do PWA e evita tela quebrada
+  pós-deploy no tablet.
+- **R7 (P2) — Pipeline de verificação CI** — `.github/workflows/ci.yml` com
+  `typecheck && lint && test && build` + job de integração com serviço Postgres e
+  `TEST_DATABASE_URL` rodando `npm run test:integration`. Benefício: protege os 682
+  testes e finalmente executa as 9 suítes de banco.
+- **R8 (P3) — Higiene** — corrigir o warning `src/lib/env.test.ts:17` (`_omitted`)
+  e manter este documento marcando o que já foi entregue por rodada. Benefício:
+  lint limpo e auditorias futuras que não reabrem itens resolvidos.
+
+**Sugestões opcionais (só quando nenhuma concreta estiver aberta):** entrada rápida
+de receita no dashboard (hoje só há despesa via `QuickExpenseCard`), card
+"Próximos vencimentos" (fixas + fatura ordenadas pelo dia do ciclo), busca/filtro
+por descrição em `/gastos`, tabela alternativa para `DailyConsumptionChart`
+(padrão já existe em `CategoryBreakdownCard.tsx`), leitura offline do último
+dashboard com carimbo de horário (muda decisão de privacidade do `sw.js` — exige
+decisão de produto).
+
+## Evidência
+
+Comandos e saídas reais desta fase (nenhum código de produção alterado; apenas este
+documento):
+
+```
+$ git branch --show-current && git status --short
+autoia/task-259            # (vazio antes deste documento)
+
+$ npm run typecheck   → TYPECHECK_EXIT=0
+$ npm run lint        → 0 errors, 1 warning (src/lib/env.test.ts:17 '_omitted') | LINT_EXIT=0
+$ npm test            → Test Files 68 passed (68) | Tests 682 passed (682) | TEST_EXIT=0
+$ npm run build       → BUILD_EXIT=0 (rotas / /cartoes /configuracoes /entradas
+                         /gastos /historico /login /offline /saidas; Middleware 39.7 kB;
+                         First Load JS 103 kB)
+```
+
+Checagens-chave desta rodada:
+
+```
+$ grep -rn "confirm(" src | wc -l
+1                                   # só CreditCardsManager.tsx:530 (compra)
+$ grep -ni "autocomplete" src/app/login/page.tsx
+81:  autoComplete="username"
+93:  autoComplete="current-password"  # Fase 1 dizia "ausente" (grep case-sensitive)
+$ grep -rn "FutureMonthNotice" src | grep -v test
+→ HistoryView.tsx:2,42 · FutureMonthNotice.tsx:1 · (app)/page.tsx:27,244
+$ grep -n "FutureMonthNotice" "src/app/(app)/gastos/page.tsx" "src/app/(app)/entradas/page.tsx"
+→ (nenhum)
+$ grep -n "buildMonthOptions\|function addMonths" "src/app/(app)/gastos/page.tsx" "src/app/(app)/entradas/page.tsx"
+→ gastos:23 addMonths, 31 buildMonthOptions | entradas:26 buildMonthOptions
+$ grep -n "export function shiftMonthKey" src/lib/finance.ts
+90: já existe e é testado (finance.test.ts) — gastos/page.tsx reimplementa
+$ sed -n '250,259p' src/components/GastosManager.tsx
+→ filtra item fora do mês e mostra só "Gasto criado"
+$ sed -n '194,204p' src/components/ExtraIncomesManager.tsx
+→ "Entrada criada para outro mês (…)" + router.refresh()
+$ grep -n "skipWaiting\|clients.claim\|CACHE_NAME" public/sw.js
+→ 15 CACHE_NAME | 97 skipWaiting() | 108-111 apaga caches antigos + claim()
+$ grep -n "register(" src/components/ServiceWorkerRegister.tsx
+8: só register(); sem updatefound/controllerchange
+$ ls .github
+ls: não foi possível acessar '.github': Arquivo ou diretório inexistente
+$ grep -rn "window.confirm\|Desativar" src/components
+→ 1 confirm (CreditCardsManager:530) · FixedItemsManager:345 usa "Desativar"
+$ grep -rn "/ajuda" src/app → (rota não existe; único texto conceitual:
+  sed -n '12,13p' src/components/SettingsForm.tsx → CYCLE_START_HELP)
+```
+
+Leituras-chave desta rodada: `src/components/GastosManager.tsx:69,250-259,292,521,563`;
+`src/components/ExtraIncomesManager.tsx:194-204,215,415,440`;
+`src/components/FixedItemsManager.tsx:345`;
+`src/components/CreditCardsManager.tsx:530`;
+`src/app/(app)/gastos/page.tsx:23-39` · `src/app/(app)/entradas/page.tsx:26-34`;
+`src/lib/finance.ts:90` (`shiftMonthKey`) · `src/lib/finance.ts:706+` (`emptyStateCopy`);
+`src/app/login/page.tsx:81,93`; `src/components/ServiceWorkerRegister.tsx:8`;
+`public/sw.js:97,108-111`; `src/components/SettingsForm.tsx:12-13`;
+`src/lib/env.test.ts:17`.
+
