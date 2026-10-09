@@ -76,7 +76,6 @@ describe("buildConsumptionChartView", () => {
       label: "Mediana",
       cents: 3500,
     });
-    expect(view.typicalPercent).toBe(70);
     expect(view.todayCents).toBe(5000);
     expect(view.aboveTypicalCount).toBe(1);
     expect(plain(view.summaryLabel)).toContain("Hoje: R$ 50,00");

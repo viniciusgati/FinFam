@@ -12,17 +12,16 @@ const MARKER_HEIGHT = 1.6;
 
 /**
  * Gráfico "Consumo por dia": barras do consumo **variável** (avulsos + compras
- * do mês no cartão, pela data da compra), linha tracejada do **dia típico**
- * (moda; mediana como fallback) e marcadores de vencimento (fixas/fatura) abaixo
- * das barras, fora da escala.
+ * do mês no cartão, pela data da compra) e marcadores de vencimento (fixas/
+ * fatura) no rodapé, fora da escala. O **dia típico** (moda; mediana como
+ * fallback) só aparece no resumo textual: a linha de referência no plot cortava
+ * o gráfico no meio e confundia a leitura (feedback do usuário).
  *
  * Todo o texto/número vem de `buildConsumptionChartView` (testável sem DOM).
  */
 export default function DailyConsumptionChart(props: ConsumptionChartInput) {
   const view = buildConsumptionChartView(props);
   const slot = view.days.length > 0 ? WIDTH / view.days.length : 0;
-  const typicalY =
-    PADDING_TOP + (1 - view.typicalPercent / 100) * CHART_HEIGHT;
 
   return (
     <section
@@ -85,18 +84,6 @@ export default function DailyConsumptionChart(props: ConsumptionChartInput) {
                 </g>
               );
             })}
-
-            {view.typical !== null && view.maxVariableCents > 0 && (
-              <line
-                x1={0}
-                x2={WIDTH}
-                y1={typicalY}
-                y2={typicalY}
-                stroke="#60a5fa"
-                strokeWidth={0.8}
-                strokeDasharray="2 1.5"
-              />
-            )}
           </svg>
 
           <div className="mt-2 space-y-1 text-sm text-subtle">
@@ -116,15 +103,6 @@ export default function DailyConsumptionChart(props: ConsumptionChartInput) {
                 />
                 Vencimento (fixas/fatura)
               </li>
-              {view.typical !== null && (
-                <li className="flex items-center gap-1.5">
-                  <span
-                    aria-hidden="true"
-                    className="h-0.5 w-4 border-t-2 border-dashed border-sky-400"
-                  />
-                  Dia típico ({view.typical.label})
-                </li>
-              )}
             </ul>
           </div>
         </>

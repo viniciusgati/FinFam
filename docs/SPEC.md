@@ -196,10 +196,12 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
     consumo passar da renda, mostra "no vermelho" com o excesso.
   - **"Consumo por dia"**: barras do consumo **variável** do dia (avulsos no
     orçamento pela `date` + parcelas de cartão de compras do próprio mês pela
-    data da compra) + linha tracejada do **dia típico** (moda; mediana como
-    fallback, `typicalDailySpend`) e marcadores de vencimento (fixas/fatura)
-    abaixo das barras, fora da escala; dia de hoje destacado e dias futuros
-    atenuados (`buildConsumptionChartView`, `src/lib/dashboard-charts.ts`).
+    data da compra) + marcadores de vencimento (fixas/fatura) no rodapé, fora
+    da escala; dia de hoje destacado e dias futuros atenuados
+    (`buildConsumptionChartView`, `src/lib/dashboard-charts.ts`). O **dia
+    típico** (moda; mediana como fallback, `typicalDailySpend`) aparece **só
+    no resumo** ("Dia típico (Moda): R$ X · N dias acima") — sem linha no plot,
+    pois a linha de referência cruzava o gráfico no meio e confundia a leitura.
 - **Séries diárias** (`src/lib/dashboard-series.ts`, função pura): avulsos no
   orçamento na `date`; fixas ativas no `dueDay` (limitado ao tamanho do mês);
   faturas no `dueDay` do cartão pela competência (`invoices.ts`). Avulsos

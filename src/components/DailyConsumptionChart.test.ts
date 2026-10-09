@@ -28,10 +28,20 @@ describe("DailyConsumptionChart (renderização)", () => {
     expect(html).toContain("Dia típico (Mediana): R$ 35,00");
     expect(html).toContain("Consumo do dia");
     expect(html).toContain("Vencimento (fixas/fatura)");
-    // Cada série (barra, marcador e linha do dia típico) tem rótulo textual
-    // próprio, sem depender da cor/`fill`.
+    // O dia típico continua com rótulo textual no resumo (sem linha no plot).
     expect(html).toContain("Dia típico (Mediana)");
     expect(html).toContain('role="img"');
+  });
+
+  it("não desenha linha tracejada no meio do gráfico (regressão)", () => {
+    const html = render();
+
+    // A linha do dia típico cruzava o gráfico no meio e confundia a leitura.
+    expect(html).not.toContain("stroke-dasharray");
+    expect(html).not.toContain("<line");
+    // Some a linha, mas o valor do dia típico segue no resumo.
+    expect(html).toContain("Dia típico (Mediana): R$ 35,00");
+    expect(html).toContain("1 dia acima");
   });
 
   it("inclui consumo, dia típico e vencimentos em R$ no aria-label", () => {

@@ -2,8 +2,9 @@
  * Views puras dos gráficos do dashboard (história #254):
  *
  * - **"Consumo por dia"**: barras do consumo variável (avulsos + compras do mês
- *   no cartão, pela data da compra) + linha do **dia típico** (moda; mediana
- *   como fallback) e marcadores de vencimento (fixas/fatura) fora da escala.
+ *   no cartão, pela data da compra) + marcadores de vencimento (fixas/fatura)
+ *   fora da escala. O **dia típico** (moda; mediana como fallback) entra só no
+ *   resumo textual — sem linha no plot, que cortava o gráfico no meio.
  * - **"Para onde vai a renda"**: composição da renda em contas fixas, fatura,
  *   avulsos e restante.
  *
@@ -87,8 +88,6 @@ export interface ConsumptionChartView {
   /** Maior barra (escala do gráfico). */
   maxVariableCents: number;
   typical: TypicalDailySpend | null;
-  /** Altura da linha do dia típico em % da área do gráfico (0 = base). */
-  typicalPercent: number;
   /** Consumo de hoje (só quando `highlightDay` é informado). */
   todayCents: number | null;
   /** Dias com consumo acima do dia típico. */
@@ -121,10 +120,6 @@ export function buildConsumptionChartView(
     0,
   );
   const typical = typicalDailySpend(input.variableDailyCents);
-  const typicalPercent =
-    typical !== null && maxVariableCents > 0
-      ? Math.min((typical.cents / maxVariableCents) * 100, 100)
-      : 0;
   const todayCents =
     input.highlightDay !== undefined && input.highlightDay >= 1
       ? (input.variableDailyCents[input.highlightDay - 1] ?? 0)
@@ -176,7 +171,6 @@ export function buildConsumptionChartView(
     days,
     maxVariableCents,
     typical,
-    typicalPercent,
     todayCents,
     aboveTypicalCount,
     totalVariableCents,
