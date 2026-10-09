@@ -11,6 +11,7 @@ import {
 import MaskedInput from "@/components/MaskedInput";
 import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
 import { savedElsewhereMessage } from "@/lib/saved-elsewhere";
+import { deleteConfirmMessage } from "@/lib/delete-confirm";
 
 export interface VariableIncomeDTO {
   id: string;
@@ -216,6 +217,10 @@ export default function ExtraIncomesManager({
   }
 
   async function handleDelete(income: VariableIncomeDTO) {
+    if (!window.confirm(deleteConfirmMessage(income.description))) {
+      return;
+    }
+
     setDeletingId(income.id);
     try {
       const response = await fetch(`/api/variable-incomes/${income.id}`, {

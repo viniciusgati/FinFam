@@ -16,6 +16,7 @@ import CategoryDatalist, {
 } from "@/components/CategoryDatalist";
 import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
 import { savedElsewhereMessage } from "@/lib/saved-elsewhere";
+import { deleteConfirmMessage } from "@/lib/delete-confirm";
 
 export interface ExpenseDTO {
   id: string;
@@ -296,6 +297,10 @@ export default function GastosManager({
   }
 
   async function handleDelete(expense: ExpenseDTO) {
+    if (!window.confirm(deleteConfirmMessage(expense.description))) {
+      return;
+    }
+
     setDeletingId(expense.id);
     try {
       const response = await fetch(`/api/variable-expenses/${expense.id}`, {
