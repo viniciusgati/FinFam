@@ -102,6 +102,16 @@ export function monthLabel(monthKey: string): string {
 }
 
 /**
+ * Indica se `mes` (YYYY-MM) é posterior a `currentMes` (YYYY-MM).
+ * Pré-condição: ambos já passaram por `isValidMonthParam`/`currentMonthParam` —
+ * para chaves validadas `YYYY-MM`, a comparação lexicográfica equivale à ordem
+ * cronológica (inclusive na virada de ano), sem usar `Date`.
+ */
+export function isFutureMonth(mes: string, currentMes: string): boolean {
+  return mes > currentMes;
+}
+
+/**
  * Os 4 `monthKey` (YYYY-MM) imediatamente anteriores ao mês de `reference`,
  * do mais recente para o mais antigo. Cruza o ano natural (jan/2026 →
  * dez/2025, nov/2025, ...). Reutilizado pelo seed (prisma/seed.ts) para
