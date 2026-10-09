@@ -2,8 +2,9 @@
  * Views puras dos gráficos do dashboard (história #254):
  *
  * - **"Consumo por dia"**: barras do consumo variável (avulsos + compras do mês
- *   no cartão, pela data da compra) + linha do **dia típico** (moda; mediana
- *   como fallback) e marcadores de vencimento (fixas/fatura) fora da escala.
+ *   no cartão, pela data da compra) + marcadores de vencimento (fixas/fatura)
+ *   fora da escala. O **dia típico** (moda; mediana como fallback) entra só no
+ *   resumo textual — sem linha no plot, que cortava o gráfico no meio.
  * - **"Para onde vai a renda"**: composição da renda em contas fixas, fatura,
  *   avulsos e restante.
  *
@@ -87,8 +88,6 @@ export interface ConsumptionChartView {
   /** Maior barra (escala do gráfico). */
   maxVariableCents: number;
   typical: TypicalDailySpend | null;
-  /** Altura da linha do dia típico em % da área do gráfico (0 = base). */
-  typicalPercent: number;
   /** Consumo de hoje (só quando `highlightDay` é informado). */
   todayCents: number | null;
   /** Dias com consumo acima do dia típico. */
@@ -121,10 +120,6 @@ export function buildConsumptionChartView(
     0,
   );
   const typical = typicalDailySpend(input.variableDailyCents);
-  const typicalPercent =
-    typical !== null && maxVariableCents > 0
-      ? Math.min((typical.cents / maxVariableCents) * 100, 100)
-      : 0;
   const todayCents =
     input.highlightDay !== undefined && input.highlightDay >= 1
       ? (input.variableDailyCents[input.highlightDay - 1] ?? 0)
@@ -176,7 +171,6 @@ export function buildConsumptionChartView(
     days,
     maxVariableCents,
     typical,
-    typicalPercent,
     todayCents,
     aboveTypicalCount,
     totalVariableCents,
@@ -189,6 +183,33 @@ export function buildConsumptionChartView(
     emptyCtaLabel: CONSUMPTION_CHART_EMPTY_CTA_LABEL,
     emptyCtaHref: CONSUMPTION_CHART_EMPTY_CTA_HREF,
   };
+}
+
+/**
+ * Dias com o número visível quando o card do gráfico é estreito (container
+ * abaixo de `@lg`/512px, em que a célula tem ~10px e duas casas quase se
+ * tocam): **1, hoje, último dia e múltiplos de 5** — prioridade nessa ordem.
+ * Nunca dois rótulos **consecutivos com duas casas** (ex.: "30 31" colado
+ * viraria "3031"); em colisão, o rótulo de menor prioridade sai. Em cards
+ * largos o componente mostra todos os dias.
+ */
+export function narrowDayLabels(totalDays: number, today?: number): number[] {
+  const labels: number[] = [];
+  const add = (day: number) => {
+    if (day < 1 || day > totalDays || labels.includes(day)) return;
+    const twoWide = day >= 10;
+    const collides = labels.some(
+      (used) => twoWide && used >= 10 && Math.abs(used - day) === 1,
+    );
+    if (!collides) labels.push(day);
+  };
+
+  if (today !== undefined) add(today);
+  add(1);
+  add(totalDays);
+  for (let day = 5; day <= totalDays; day += 5) add(day);
+
+  return labels.sort((a, b) => a - b);
 }
 
 export const INCOME_ALLOCATION_TITLE = "Para onde vai a renda";

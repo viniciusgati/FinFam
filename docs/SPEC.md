@@ -196,10 +196,19 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
     consumo passar da renda, mostra "no vermelho" com o excesso.
   - **"Consumo por dia"**: barras do consumo **variável** do dia (avulsos no
     orçamento pela `date` + parcelas de cartão de compras do próprio mês pela
-    data da compra) + linha tracejada do **dia típico** (moda; mediana como
-    fallback, `typicalDailySpend`) e marcadores de vencimento (fixas/fatura)
-    abaixo das barras, fora da escala; dia de hoje destacado e dias futuros
-    atenuados (`buildConsumptionChartView`, `src/lib/dashboard-charts.ts`).
+    data da compra) + marcadores de vencimento (fixas/fatura) no rodapé, fora
+    da escala; dia de hoje destacado e dias futuros atenuados
+    (`buildConsumptionChartView`, `src/lib/dashboard-charts.ts`). Abaixo do
+    plot, **eixo de dias**: uma célula por dia (mesma largura do slot da barra)
+    com o número do dia — hoje em destaque (negrito/verde), vencimento em
+    âmbar, futuro atenuado. O card é `@container`: com **container < 512px**
+    (`@lg`) só os marcos de `narrowDayLabels` aparecem (1, hoje, último e
+    múltiplos de 5; nunca dois consecutivos de dois dígitos, senão "30 31" fica
+    colado como "3031"), e com card largo vêm **todos os dias**. O **dia
+    típico** (moda; mediana como
+    fallback, `typicalDailySpend`) aparece **só no resumo** ("Dia típico (Moda):
+    R$ X · N dias acima") — sem linha no plot, pois a linha de referência
+    cruzava o gráfico no meio e confundia a leitura.
 - **Séries diárias** (`src/lib/dashboard-series.ts`, função pura): avulsos no
   orçamento na `date`; fixas ativas no `dueDay` (limitado ao tamanho do mês);
   faturas no `dueDay` do cartão pela competência (`invoices.ts`). Avulsos
