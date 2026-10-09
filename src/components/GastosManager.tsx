@@ -15,6 +15,7 @@ import CategoryDatalist, {
   CATEGORY_DATALIST_ID,
 } from "@/components/CategoryDatalist";
 import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
+import { savedElsewhereMessage } from "@/lib/saved-elsewhere";
 
 export interface ExpenseDTO {
   id: string;
@@ -256,8 +257,13 @@ export default function GastosManager({
       resetForm();
       setFeedback({
         type: "success",
-        message: editing ? "Alterações salvas" : "Gasto criado",
+        message: savedElsewhereMessage({
+          baseMessage: editing ? "Alterações salvas" : "Gasto criado",
+          savedMonthKey: saved.date.slice(0, 7),
+          selectedMonthKey: mes,
+        }),
       });
+      router.refresh();
     } catch {
       setFeedback({
         type: "error",

@@ -10,6 +10,7 @@ import {
 } from "react";
 import MaskedInput from "@/components/MaskedInput";
 import { dateMaskToIso, isoToDateMask } from "@/lib/mask";
+import { savedElsewhereMessage } from "@/lib/saved-elsewhere";
 
 export interface VariableIncomeDTO {
   id: string;
@@ -197,9 +198,11 @@ export default function ExtraIncomesManager({
       setForm(emptyForm(today));
       setFeedback({
         type: "success",
-        message: isInMonth(saved.date, mes)
-          ? "Entrada criada"
-          : `Entrada criada para outro mês (${monthOptions.find((option) => option.value === saved.date.slice(0, 7))?.label ?? saved.date.slice(0, 7)}).`,
+        message: savedElsewhereMessage({
+          baseMessage: "Entrada criada",
+          savedMonthKey: saved.date.slice(0, 7),
+          selectedMonthKey: mes,
+        }),
       });
       router.refresh();
     } catch {
