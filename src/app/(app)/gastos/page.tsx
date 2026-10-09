@@ -7,7 +7,9 @@ import {
   monthRange,
 } from "@/lib/variable-expenses";
 import GastosManager, { type ExpenseDTO } from "@/components/GastosManager";
+import FutureMonthNotice from "@/components/FutureMonthNotice";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
+import { isFutureMonth } from "@/lib/finance";
 import RetryButton from "@/components/RetryButton";
 import { todayISO } from "@/lib/quick-expense";
 
@@ -48,6 +50,11 @@ export default async function GastosPage({
   const rawMes = Array.isArray(params.mes) ? params.mes[0] : params.mes;
   const mes = isValidMonthParam(rawMes) ? rawMes : currentMonthParam();
   const currentMes = currentMonthParam();
+
+  if (isFutureMonth(mes, currentMes)) {
+    return <FutureMonthNotice />;
+  }
+
   const today = todayISO();
   const monthOptions = buildMonthOptions(currentMes, mes);
 

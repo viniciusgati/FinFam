@@ -12,6 +12,7 @@ import {
   heatColor,
   hasComparisonData,
   isActiveInMonth,
+  isFutureMonth,
   levelColor,
   levelLabel,
   MIN_COMPARISON_MONTHS,
@@ -789,6 +790,22 @@ describe("shiftMonthKey", () => {
   it("preserva o zero à esquerda do mês", () => {
     expect(shiftMonthKey("2026-09", 1)).toBe("2026-10");
     expect(shiftMonthKey("2026-10", -1)).toBe("2026-09");
+  });
+});
+
+describe("isFutureMonth", () => {
+  it("mês igual ao corrente não é futuro", () => {
+    expect(isFutureMonth("2026-10", "2026-10")).toBe(false);
+  });
+
+  it("mês seguinte é futuro e o anterior não é", () => {
+    expect(isFutureMonth("2026-11", "2026-10")).toBe(true);
+    expect(isFutureMonth("2026-09", "2026-10")).toBe(false);
+  });
+
+  it("cobre a virada de ano", () => {
+    expect(isFutureMonth("2027-01", "2026-12")).toBe(true);
+    expect(isFutureMonth("2026-12", "2027-01")).toBe(false);
   });
 });
 

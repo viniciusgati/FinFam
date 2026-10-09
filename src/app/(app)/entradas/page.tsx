@@ -5,8 +5,9 @@ import FixedItemsManager, {
 import ExtraIncomesManager, {
   type VariableIncomeDTO,
 } from "@/components/ExtraIncomesManager";
+import FutureMonthNotice from "@/components/FutureMonthNotice";
 import { prisma } from "@/lib/db";
-import { monthLabel, shiftMonthKey } from "@/lib/finance";
+import { isFutureMonth, monthLabel, shiftMonthKey } from "@/lib/finance";
 import { todayISO } from "@/lib/quick-expense";
 import {
   currentMonthParam,
@@ -59,22 +60,24 @@ export default async function EntradasPage({
     loadError = "Não foi possível carregar as entradas. Tente novamente.";
   }
 
-  try {
-    const { gte, lt } = monthRange(mes);
-    const rows = await prisma.variableIncome.findMany({
-      where: { date: { gte, lt } },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    });
-    extraIncomes = rows.map((row) => ({
-      id: row.id,
-      description: row.description,
-      amountCents: row.amountCents,
-      date: row.date.toISOString(),
-      createdAt: row.createdAt.toISOString(),
-    }));
-  } catch {
-    extraLoadError =
-      "Não foi possível carregar as entradas avulsas. Tente novamente.";
+  if (!isFutureMonth(mes, currentMes)) {
+    try {
+      const { gte, lt } = monthRange(mes);
+      const rows = await prisma.variableIncome.findMany({
+        where: { date: { gte, lt } },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      });
+      extraIncomes = rows.map((row) => ({
+        id: row.id,
+        description: row.description,
+        amountCents: row.amountCents,
+        date: row.date.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+      }));
+    } catch {
+      extraLoadError =
+        "Não foi possível carregar as entradas avulsas. Tente novamente.";
+    }
   }
 
   return (
@@ -96,15 +99,19 @@ export default async function EntradasPage({
         initialError={loadError}
       />
 
-      <ExtraIncomesManager
-        key={mes}
-        mes={mes}
-        today={today}
-        currentMes={currentMes}
-        monthOptions={monthOptions}
-        initialIncomes={extraIncomes}
-        initialError={extraLoadError}
-      />
+      {isFutureMonth(mes, currentMes) ? (
+        <FutureMonthNotice />
+      ) : (
+        <ExtraIncomesManager
+          key={mes}
+          mes={mes}
+          today={today}
+          currentMes={currentMes}
+          monthOptions={monthOptions}
+          initialIncomes={extraIncomes}
+          initialError={extraLoadError}
+        />
+      )}
     </div>
   );
 }
