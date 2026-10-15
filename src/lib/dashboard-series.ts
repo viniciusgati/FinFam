@@ -6,9 +6,12 @@
  * vencimento e faturas no vencimento do cartão), o que a torna facilmente
  * testável (ver dashboard-series.test.ts).
  *
- * Consequência importante: `sum(dailyExpensesCents) === totalExpensesCents`
- * que, por construção em `loadDashboardData`, coincide com o `consumedCents`
- * de `computeFinanceStatus`. Avulsos no crédito não entram (SPEC §3.3) para não
+ * Consequência importante: `sum(dailyExpensesCents) === totalExpensesCents`,
+ * que com `cycleStartDay = 1` coincide com o `consumedCents` de
+ * `computeFinanceStatus`. A invariante é **relaxada** quando `cycleStartDay ≠ 1`
+ * no período corrente: a série segue o mês civil (gráfico no eixo do mês) e o
+ * `consumedCents` a janela do ciclo para avulsos (SPEC §4.1), então os dois
+ * totais podem divergir. Avulsos no crédito não entram (SPEC §3.3) para não
  * duplicar a fatura.
  */
 
@@ -91,8 +94,10 @@ function dayIndex(day: number, totalDays: number): number {
  * Monta a série diária do mês de `referenceDate`.
  *
  * `dailyExpensesCents` cobre o mês inteiro (dias futuros inclusive) para que a
- * soma bata com o total consumido; `cumulativeExpensesCents` é truncado em
- * `elapsedDay`, refletindo apenas o que já ocorreu.
+ * soma corresponda aos gastos do mês civil; `cumulativeExpensesCents` é
+ * truncado em `elapsedDay`, refletindo apenas o que já ocorreu. Com
+ * `cycleStartDay ≠ 1`, o total civil da série pode divergir do `consumedCents`
+ * do `%` (que segue a janela do ciclo — ver o cabeçalho do arquivo).
  */
 export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
   const timeZone = resolveTimeZone();
