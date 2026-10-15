@@ -20,6 +20,7 @@ TEST_DATABASE_URL="postgresql://user:pass@host:5432/finfam_test" npm run test:in
 
 Nunca commitar com `npm test` vermelho. Se a tarefa tocar banco/migrations,
 rode também a suíte de integração.
+Os mesmos comandos (gate e integração) também rodam no CI a cada push/PR em `.github/workflows/ci.yml`.
 
 ## Onde cada teste mora (e o que precisa cobrir)
 
