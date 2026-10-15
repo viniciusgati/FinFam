@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, captureClosedMonthsMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -19,7 +19,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { loadCycleAllowance, loadDashboardData } from "./dashboard";
-import { computeFinanceStatus } from "./finance";
+import { computeFinanceStatus, dashboardView } from "./finance";
+import { buildMonthSpendStats } from "./month-spend";
 
 const referenceDate = new Date(Date.UTC(2026, 9, 15, 12)); // outubro/2026
 
@@ -636,5 +637,314 @@ describe("loadDashboardData — mês fechado lê o snapshot imutável", () => {
     expect(captureClosedMonthsMock).toHaveBeenCalled();
     expect(prismaMock.income.findMany).toHaveBeenCalled();
     expect(data.monthlyIncomeCents).toBe(0);
+  });
+});
+
+describe("loadDashboardData — janela do ciclo para avulsos (ciclo ≠ mês)", () => {
+  // Relógio fixado: o gate "mês corrente" (`monthKey(referenceDate) ===
+  // monthKey(new Date())`) não pode depender do relógio real de CI.
+  const day15 = new Date("2026-10-15T12:00:00.000Z");
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(day15);
+    prismaMock.appSettings.findUnique.mockResolvedValue({
+      id: "singleton",
+      cycleStartDay: 15,
+    });
+    prismaMock.income.findMany.mockResolvedValue([
+      {
+        id: "i",
+        amountCents: 300000,
+        active: true,
+        startMonth: null,
+        endMonth: null,
+      },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("no dia 15 conta só o avulso lançado no dia 15, não o do dia 10", async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        amountCents: 70000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 10, 12)),
+      },
+      {
+        amountCents: 15000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 15, 12)),
+      },
+    ]);
+
+    const data = await loadDashboardData(day15);
+
+    expect(data.variableExpensesCents).toBe(15000);
+  });
+
+  it("no dia 5 conta os avulsos do ciclo 15/09–05/10 e exclui o do dia 6 (amanhã)", async () => {
+    vi.setSystemTime(new Date("2026-10-05T12:00:00.000Z"));
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        amountCents: 1000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 8, 20, 12)),
+      },
+      {
+        amountCents: 2000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 1, 12)),
+      },
+      {
+        amountCents: 4000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 5, 12)),
+      },
+      {
+        amountCents: 8000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 6, 12)),
+      },
+    ]);
+
+    const data = await loadDashboardData(new Date("2026-10-05T12:00:00.000Z"));
+
+    // 20/09 + 01/10 + 05/10 entram; o avulso do dia 06/10 é posterior a hoje.
+    expect(data.variableExpensesCents).toBe(7000);
+    // A consulta cobre a união: começa no início do ciclo (mês anterior).
+    const [args] = prismaMock.variableExpense.findMany.mock.calls[0];
+    expect(args.where.date.gte.toISOString()).toBe("2026-09-15T03:00:00.000Z");
+    expect(args.where.date.lt.toISOString()).toBe("2026-11-01T03:00:00.000Z");
+  });
+
+  it("venda lançada antes do ciclo não dilui a renda (denominador segue o ciclo)", async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([
+      {
+        id: "v1",
+        amountCents: 50000,
+        date: new Date(Date.UTC(2026, 9, 10, 12)),
+      },
+    ]);
+
+    const data = await loadDashboardData(day15);
+
+    expect(data.variableIncomeCents).toBe(0);
+    expect(data.monthlyIncomeCents).toBe(300000);
+  });
+
+  it("venda lançada no dia 1 do ciclo entra no denominador da renda", async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([
+      {
+        id: "v1",
+        amountCents: 50000,
+        date: new Date(Date.UTC(2026, 9, 10, 12)),
+      },
+      {
+        id: "v2",
+        amountCents: 20000,
+        date: new Date(Date.UTC(2026, 9, 15, 12)),
+      },
+    ]);
+
+    const data = await loadDashboardData(day15);
+
+    expect(data.variableIncomeCents).toBe(20000);
+    expect(data.monthlyIncomeCents).toBe(320000);
+  });
+
+  it("hasMovements fica true só com avulso de 10/10 (fora do ciclo) e nenhuma fixa", async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        amountCents: 70000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 10, 12)),
+      },
+    ]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+
+    const data = await loadDashboardData(day15);
+
+    expect(data.hasMovements).toBe(true);
+    expect(data.variableExpensesCents).toBe(0);
+  });
+
+  it("série diária segue o eixo civil: outubro inclui o avulso do dia 10 e exclui o de 20/09", async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        amountCents: 70000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 10, 12)),
+      },
+      {
+        amountCents: 9000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 8, 20, 12)),
+      },
+    ]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+
+    const data = await loadDashboardData(day15);
+
+    expect(data.series.variableDailyCents[9]).toBe(70000);
+    const seriesSum = data.series.variableDailyCents.reduce(
+      (total, value) => total + value,
+      0,
+    );
+    expect(seriesSum).toBe(70000);
+    // Nenhum dos dois está no ciclo iniciado em 15/10: o `%` zera.
+    expect(data.variableExpensesCents).toBe(0);
+  });
+
+  it("com cycleStartDay = 1 a janela continua sendo o mês calendário", async () => {
+    prismaMock.appSettings.findUnique.mockResolvedValue({
+      id: "singleton",
+      cycleStartDay: 1,
+    });
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        amountCents: 70000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 10, 12)),
+      },
+      {
+        amountCents: 15000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 15, 12)),
+      },
+    ]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+
+    const data = await loadDashboardData(day15);
+
+    expect(data.variableExpensesCents).toBe(85000);
+    const [args] = prismaMock.variableExpense.findMany.mock.calls[0];
+    expect(args.where.date.gte.toISOString()).toBe("2026-10-01T03:00:00.000Z");
+    expect(args.where.date.lt.toISOString()).toBe("2026-11-01T03:00:00.000Z");
+  });
+});
+
+describe("loadDashboardData — regressão: dia 1 do ciclo não herda o consumo do mês anterior", () => {
+  // Relógio fixado: 15/10/2026 é o dia 1 do ciclo (`cycleStartDay = 15`).
+  const day1OfCycle = new Date("2026-10-15T12:00:00.000Z");
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(day1OfCycle);
+    prismaMock.appSettings.findUnique.mockResolvedValue({
+      id: "singleton",
+      cycleStartDay: 15,
+    });
+    prismaMock.income.findMany.mockResolvedValue([
+      {
+        id: "i",
+        amountCents: 300000,
+        active: true,
+        startMonth: null,
+        endMonth: null,
+      },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('sintoma "a virada de mês não aconteceu": no dia 1 do ciclo (15/10) o card zera e fica verde em vez de herdar o consumo de 01–14/10', async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        amountCents: 70000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 10, 12)),
+      },
+    ]);
+
+    const data = await loadDashboardData(day1OfCycle);
+    const status = computeFinanceStatus(data);
+
+    expect(data.hasMovements).toBe(true);
+    expect(status.consumedCents).toBe(0);
+    expect(status.consumedPercent).toBe(0);
+    expect(status.level).toBe("green");
+    expect(status.color).toBe("hsl(120 65% 42%)");
+
+    const consumed = buildMonthSpendStats({
+      incomeCents: status.incomeCents,
+      consumedCents: status.consumedCents,
+      projectedCents: status.projectedCents,
+      consumedPercent: status.consumedPercent,
+    }).find((stat) => stat.key === "consumed");
+    expect(consumed?.label).toBe("Já consumido");
+    expect(consumed?.value.replace(/\u00a0/g, " ")).toBe("R$ 0,00");
+
+    // O gráfico diário de outubro ainda exibe o avulso do dia 10 (eixo civil).
+    expect(data.series.variableDailyCents[9]).toBe(70000);
+
+    // Não cai no estado vazio "Renda cadastrada, sem gastos".
+    const view = dashboardView({
+      dbError: false,
+      isFutureMonth: false,
+      incomeCents: status.incomeCents,
+      hasMovements: data.hasMovements,
+      consumedPercent: status.consumedPercent,
+      projectedPercent: status.projectedPercent,
+      previousPercents: data.previousPercents,
+    });
+    expect(view.state).toBe("ok");
+  });
+
+  it("com avulso de R$ 150 lançado no dia 15, 'Já consumido' mostra R$ 150,00 com detalhe '5% da renda'", async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        amountCents: 15000,
+        paymentMethod: "PIX",
+        date: new Date(Date.UTC(2026, 9, 15, 12)),
+      },
+    ]);
+
+    const data = await loadDashboardData(day1OfCycle);
+    const status = computeFinanceStatus(data);
+
+    expect(status.consumedCents).toBe(15000);
+    expect(status.consumedPercent).toBe(5);
+
+    const consumed = buildMonthSpendStats({
+      incomeCents: status.incomeCents,
+      consumedCents: status.consumedCents,
+      projectedCents: status.projectedCents,
+      consumedPercent: status.consumedPercent,
+    }).find((stat) => stat.key === "consumed");
+    expect(consumed?.value.replace(/\u00a0/g, " ")).toBe("R$ 150,00");
+    expect(consumed?.detail).toBe("5% da renda");
+  });
+
+  it("com despesa fixa de R$ 900 e nenhum avulso no ciclo, o percentual é 30% e o nível verde (fixas valem 100%, SPEC §5)", async () => {
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      {
+        id: "f",
+        amountCents: 90000,
+        dueDay: 5,
+        active: true,
+        startMonth: null,
+        endMonth: null,
+      },
+    ]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+
+    const data = await loadDashboardData(day1OfCycle);
+    const status = computeFinanceStatus(data);
+
+    expect(status.consumedCents).toBe(90000);
+    expect(status.consumedPercent).toBe(30);
+    expect(status.level).toBe("green");
   });
 });

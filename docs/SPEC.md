@@ -101,8 +101,10 @@ O dashboard exibe:
 1. **% da renda mensal consumida** — número grande, é o protagonista.
 2. **Dias para o fim do ciclo financeiro**, contando o dia corrente (o ciclo
    começa em `cycleStartDay`; ex.: dia 08 com o ciclo fechando no dia 15 ⇒
-   "8 dias para o fim do ciclo"). O `%` e a projeção continuam no mês
-   calendário.
+   "8 dias para o fim do ciclo"). No período corrente com `cycleStartDay ≠ 1`,
+   o `%`, a projeção e os valores em R$ do card usam a **janela do ciclo** para
+   os avulsos (§4.1); despesas fixas, vigência e faturas permanecem no mês
+   calendário (§5). Com `cycleStartDay = 1`, tudo segue o mês calendário.
 3. **Feedback comparativo**: mensagem textual comparando o mês atual com os
    últimos `N` meses (padrão `N = 4`).
 4. **Cor de fundo** do dashboard, interpolada do verde ao vermelho.
@@ -115,11 +117,28 @@ O dashboard exibe:
 
 ```
 consumido_mes = saidas_fixas_ativas
-              + gastos_avulsos_do_mes (não pagos no cartão)
+              + gastos_avulsos_da_janela (não pagos no cartão)
               + faturas_de_cartao_do_mes (vencimento no mês)
 
 percentual_consumido = consumido_mes / renda_mensal * 100
 ```
+
+A **janela dos avulsos** (gastos **e** entradas, que também formam a
+`renda_mensal` denominadora do `%`) é:
+
+- no período corrente com `cycleStartDay ≠ 1`, a do **ciclo financeiro** —
+  `[início do ciclo, min(amanhã, próximo início))`, os mesmos limites da
+  diária do ciclo —, de modo que no dia 1 do ciclo o consumo zera; despesas
+  fixas, vigência e faturas continuam valendo 100% no mês calendário (§5);
+- com `cycleStartDay = 1`, ou em mês fechado/snapshot, o **mês calendário**
+  (`[1º, 1º do mês seguinte)`), como sempre.
+
+**Exceção do gráfico:** a série diária (`DailyConsumptionChart`) permanece no
+eixo do mês civil — avulsos entre o dia 1 e o `cycleStartDay` continuam
+aparecendo no gráfico do mês (avulsos de meses civis anteriores seguem fora do
+gráfico, mesmo contando no `%`). Por isso a invariante
+`sum(dailyExpensesCents) === consumido` é **relaxada** quando `cycleStartDay ≠ 1`
+no período corrente: o gráfico é civil, o `%` é do ciclo.
 
 ### 4.2 Regra de situação (cor)
 

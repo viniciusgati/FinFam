@@ -29,7 +29,7 @@ import {
   buildDashboardDataFromSnapshot,
   isCompleteSnapshot,
 } from "./snapshot-month";
-import { getSettings } from "./settings";
+import { defaultSettings, getSettings } from "./settings";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
 
@@ -49,7 +49,11 @@ export interface DashboardSnapshot {
 export interface DashboardData extends FinanceInput {
   /** Entradas fixas vigentes no mês. */
   fixedIncomeCents: number;
-  /** Entradas avulsas (venda/saldo) do mês. */
+  /**
+   * Entradas avulsas (venda/saldo) que formam a renda: no período corrente com
+   * `cycleStartDay ≠ 1`, as da janela do ciclo (SPEC §4.1); nos demais casos,
+   * as do mês calendário.
+   */
   variableIncomeCents: number;
   /**
    * Há qualquer movimentação no mês de referência: despesa fixa, avulsa ou de
@@ -84,6 +88,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 function sumByAmount(items: { amountCents: number }[]): number {
   return items.reduce((total, item) => total + item.amountCents, 0);
+}
+
+/**
+ * Mantém apenas os itens cuja `date` cai em `[start, end)`. `window` nulo
+ * devolve a lista intacta — é o caminho do mês calendário, sem particionamento.
+ */
+function withinWindow<T extends { date: Date }>(
+  items: T[],
+  window: { start: Date; end: Date } | null,
+): T[] {
+  if (window === null) return items;
+  return items.filter(
+    (item) => item.date >= window.start && item.date < window.end,
+  );
 }
 
 /**
@@ -170,7 +188,8 @@ async function loadClosedMonthData(
  * sempre ao vivo.
  *
  * As entradas e saídas fixas respeitam a vigência (startMonth/endMonth) além
- * do flag `active`. Entradas avulsas (venda/saldo) do mês somam à renda mensal.
+ * do flag `active`. Entradas avulsas (venda/saldo) da janela aplicável somam à
+ * renda mensal (ver "Janela dos avulsos" abaixo).
  *
  * As compras de cartão são alocadas pela regra de fechamento/vencimento
  * (SPEC §3.4, `sumCardExpensesForMonth`), de modo que cada mês de referência
@@ -179,6 +198,15 @@ async function loadClosedMonthData(
  *
  * Além dos agregados, monta a `series` diária via `buildDailySeries` (função
  * pura), distribuindo cada despesa pelo dia em que ocorre.
+ *
+ * Janela dos avulsos (SPEC §4.1): no mês corrente com `cycleStartDay ≠ 1`, os
+ * gastos **e** entradas avulsos são particionados pela janela do ciclo — a
+ * partição do ciclo alimenta `variableExpensesCents`/`variableIncomeCents` (e
+ * portanto `monthlyIncomeCents`) e o `categoryBreakdown`; a do mês calendário
+ * alimenta `hasMovements` e a `series` diária, que permanece no eixo civil.
+ * Fixas, vigência e faturas seguem o mês calendário (SPEC §5). Com
+ * `cycleStartDay = 1` ou fora do mês corrente, os avulsos seguem o mês
+ * calendário, como antes.
  */
 export async function loadDashboardData(
   referenceDate: Date = new Date(),
@@ -208,6 +236,45 @@ export async function loadDashboardData(
   const currentMonthKey = monthKey(referenceDate);
   const startMonthKey = shiftMonthKey(currentMonthKey, -4);
 
+  // Ciclo financeiro no mês corrente: usado para particionar os avulsos e para
+  // o total de dias do ciclo. Fora do mês corrente (mês fechado sem snapshot),
+  // a janela de avulsos permanece a do mês calendário.
+  const isCurrentMonth = currentMonthKey === monthKey(new Date());
+  const { cycleStartDay } = isCurrentMonth
+    ? await getSettings()
+    : defaultSettings();
+  const cycle = isCurrentMonth
+    ? cycleWindow(referenceDate, cycleStartDay, timeZone)
+    : null;
+
+  // No mês corrente com ciclo ≠ mês, a consulta de avulsos cobre a união da
+  // janela do ciclo com a do mês calendário; em memória, `cycleVariableWindow`
+  // (limites idênticos aos de `loadCycleAllowance`: do início do ciclo até
+  // min(amanhã, próximo início), derivados de `referenceDate`) alimenta o `%`,
+  // a renda e o breakdown, e `civilVariableWindow` alimenta `hasMovements` e a
+  // série diária (gráfico no eixo civil). Com `cycleStartDay = 1`, as duas
+  // janelas são a do mês — caminho anterior, inalterado.
+  let variableQuery: { start: Date; end: Date } = { start, end };
+  let cycleVariableWindow: { start: Date; end: Date } | null = null;
+  if (cycle !== null && cycleStartDay !== 1) {
+    const today = zonedDateParts(referenceDate, timeZone);
+    const tomorrow = zonedTimeToUtc(
+      today.year,
+      today.month,
+      today.day + 1,
+      timeZone,
+    );
+    const upperBound =
+      tomorrow.getTime() < cycle.nextStart.getTime()
+        ? tomorrow
+        : cycle.nextStart;
+    cycleVariableWindow = { start: cycle.start, end: upperBound };
+    variableQuery = {
+      start: cycle.start < start ? cycle.start : start,
+      end: upperBound > end ? upperBound : end,
+    };
+  }
+
   const [
     incomes,
     fixedExpenses,
@@ -220,11 +287,13 @@ export async function loadDashboardData(
     prisma.fixedExpense.findMany({ where: { active: true } }),
     prisma.variableExpense.findMany({
       where: {
-        date: { gte: start, lt: end },
+        date: { gte: variableQuery.start, lt: variableQuery.end },
         paymentMethod: { in: budgetPaymentMethods },
       },
     }),
-    prisma.variableIncome.findMany({ where: { date: { gte: start, lt: end } } }),
+    prisma.variableIncome.findMany({
+      where: { date: { gte: variableQuery.start, lt: variableQuery.end } },
+    }),
     prisma.cardPurchase.findMany({
       where: { purchaseDate: { lt: end } },
       include: { card: true },
@@ -275,12 +344,35 @@ export async function loadDashboardData(
     timeZone,
   );
 
-  // Entradas avulsas do mês (venda/saldo) somam à renda, como as fixas.
+  // Partição dos avulsos entre a janela do ciclo e a do mês calendário. Sem
+  // janela de ciclo as duas coincidem com a consulta do mês (caminho
+  // anterior); com ciclo ≠ mês, fixas e faturas seguem o mês civil (SPEC §5).
+  const civilVariableWindow =
+    cycleVariableWindow === null ? null : { start, end };
+  const cycleVariableExpenses = withinWindow(
+    variableExpenses,
+    cycleVariableWindow,
+  );
+  const civilVariableExpenses = withinWindow(
+    variableExpenses,
+    civilVariableWindow,
+  );
+  const cycleVariableIncomes = withinWindow(
+    variableIncomes,
+    cycleVariableWindow,
+  );
+  const civilVariableIncomes = withinWindow(
+    variableIncomes,
+    civilVariableWindow,
+  );
+
+  // Entradas avulsas da janela do ciclo (venda/saldo) somam à renda, como as
+  // fixas; sem ciclo distinto do mês, é a janela do próprio mês.
   const fixedIncomeCents = sumByAmount(activeIncomes);
-  const variableIncomeCents = sumByAmount(variableIncomes);
+  const variableIncomeCents = sumByAmount(cycleVariableIncomes);
   const monthlyIncomeCents = fixedIncomeCents + variableIncomeCents;
   const fixedExpensesCents = sumByAmount(activeFixedExpenses);
-  const variableExpensesCents = sumByAmount(variableExpenses);
+  const variableExpensesCents = sumByAmount(cycleVariableExpenses);
   const cardExpensesCents = sumCardExpensesForMonth(
     cardPurchases,
     currentMonthKey,
@@ -293,7 +385,7 @@ export async function loadDashboardData(
       amountCents: item.amountCents,
       dueDay: item.dueDay,
     })),
-    variableExpenses: variableExpenses.map((item) => ({
+    variableExpenses: civilVariableExpenses.map((item) => ({
       amountCents: item.amountCents,
       date: item.date,
       paymentMethod: item.paymentMethod,
@@ -301,25 +393,24 @@ export async function loadDashboardData(
     cardInvoiceLines,
   });
 
-  // Movimentação = qualquer saída (fixa/avulsa/cartão) ou entrada avulsa no mês.
+  // Movimentação = qualquer saída (fixa/avulsa/cartão) ou entrada avulsa no
+  // mês calendário corrente — é o gatilho do estado vazio "renda sem gastos".
   const hasMovements =
     activeFixedExpenses.length > 0 ||
-    variableExpenses.length > 0 ||
+    civilVariableExpenses.length > 0 ||
     cardInvoiceLines.length > 0 ||
-    variableIncomes.length > 0;
+    civilVariableIncomes.length > 0;
 
   // Total de dias do ciclo (entre `start` e `nextStart`) só faz sentido no mês
   // corrente; fora dele a janela do ciclo é omitida (`cycleDays: null`).
   // Atenção: `remainingCycleDays` devolve apenas os dias restantes e daria
   // divisor errado — usamos a janela completa.
-  let cycleDays: number | null = null;
-  if (currentMonthKey === monthKey(new Date())) {
-    const { cycleStartDay } = await getSettings();
-    const cycle = cycleWindow(referenceDate, cycleStartDay, timeZone);
-    cycleDays = Math.round(
-      (cycle.nextStart.getTime() - cycle.start.getTime()) / DAY_MS,
-    );
-  }
+  const cycleDays: number | null =
+    cycle === null
+      ? null
+      : Math.round(
+          (cycle.nextStart.getTime() - cycle.start.getTime()) / DAY_MS,
+        );
 
   const consumption = buildConsumptionSummary({
     incomeCents: monthlyIncomeCents,
@@ -349,7 +440,7 @@ export async function loadDashboardData(
     categoryBreakdown: buildCategoryBreakdown({
       monthKey: currentMonthKey,
       fixedExpenses,
-      variableExpenses,
+      variableExpenses: cycleVariableExpenses,
       cardPurchases,
     }),
     referenceDate,
