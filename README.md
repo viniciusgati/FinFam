@@ -121,6 +121,7 @@ deploy`), sem o passo interativo do `db:migrate`; com tudo já aplicado imprime
 | `npm run lint` | análise estática com ESLint (`eslint .`) |
 | `npm test` | testes unitários (Vitest); não executa `*.integration.test.ts` |
 | `npm run test:integration` | testes de integração contra um PostgreSQL de teste (`TEST_DATABASE_URL`) |
+| CI | gate e integração rodam a cada push/PR em `.github/workflows/ci.yml` |
 | `npm run db:migrate` | cria/aplica migrations em dev (`prisma/migrations/`) |
 | `npm run db:deploy` | aplica migrations em produção |
 | `npm run db:seed` | popula o banco com dados de exemplo (idempotente no mesmo mês) |
