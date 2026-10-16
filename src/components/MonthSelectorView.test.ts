@@ -44,4 +44,16 @@ describe("MonthSelectorView (markup estático)", () => {
     const html = render({ isCurrentMonth: true });
     expect(html).toContain('disabled=""');
   });
+
+  it("mostra o intervalo da janela quando informado (moldura do ciclo)", () => {
+    const html = render({ monthKey: "2026-09", rangeLabel: "15/09 a 14/10" });
+
+    expect(html).toContain("setembro de 2026");
+    expect(html).toContain("15/09 a 14/10");
+  });
+
+  it("sem intervalo não renderiza a linha extra", () => {
+    const html = render({ monthKey: "2026-09" });
+    expect(html).not.toContain("15/09 a 14/10");
+  });
 });

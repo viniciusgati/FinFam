@@ -4,6 +4,7 @@ import {
   cycleDayNumber,
   cycleEndCountdownLabel,
   cycleLengthDays,
+  cycleRangeLabel,
   cycleWindow,
   cycleWindowForKey,
   dailyAllowanceCents,
@@ -418,5 +419,17 @@ describe("janela do ciclo por chave e ocorrências de vencimento", () => {
     expect(cycleLengthDays(cycleWindowForKey("2026-09", 15))).toBe(30);
     expect(cycleLengthDays(cycleWindowForKey("2026-02", 15))).toBe(28);
     expect(cycleLengthDays(cycleWindowForKey("2026-02", 1))).toBe(28);
+  });
+
+  it("cycleRangeLabel mostra o intervalo da janela sem o ano", () => {
+    expect(cycleRangeLabel(cycleWindowForKey("2026-09", 15))).toBe(
+      "15/09 a 14/10",
+    );
+    expect(cycleRangeLabel(cycleWindowForKey("2026-10", 15))).toBe(
+      "15/10 a 14/11",
+    );
+    expect(cycleRangeLabel(cycleWindowForKey("2026-02", 1))).toBe(
+      "01/02 a 28/02",
+    );
   });
 });

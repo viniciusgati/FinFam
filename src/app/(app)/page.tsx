@@ -6,6 +6,7 @@ import {
 import {
   cycleAvailabilityLabel,
   cycleEndCountdownLabel,
+  cycleRangeLabel,
   dailyAllowanceCard,
   dailyAllowanceCents,
   remainingCycleDays,
@@ -247,6 +248,9 @@ export default async function DashboardPage({
         monthKey={referenceMonthKey}
         isCurrentMonth={isNextDisabled}
         basePath="/"
+        rangeLabel={
+          referenceWindow ? cycleRangeLabel(referenceWindow) : undefined
+        }
       />
 
       {view.state === "error" && (

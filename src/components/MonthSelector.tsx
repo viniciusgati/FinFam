@@ -9,12 +9,18 @@ interface MonthSelectorProps {
   isCurrentMonth: boolean;
   /** Rota base da navegação; padrão `/historico` (dashboard usa `/`). */
   basePath?: string;
+  /**
+   * Intervalo da janela exibida (ex.: `15/09 a 14/10`), mostrado abaixo do
+   * rótulo do mês para explicitar a moldura do ciclo.
+   */
+  rangeLabel?: string;
 }
 
 export interface MonthSelectorViewProps {
   monthKey: string;
   isCurrentMonth: boolean;
   isPending: boolean;
+  rangeLabel?: string;
   onPrevious: () => void;
   onNext: () => void;
   onSelectMonth: (monthKey: string) => void;
@@ -32,6 +38,7 @@ export function MonthSelectorView({
   monthKey,
   isCurrentMonth,
   isPending,
+  rangeLabel,
   onPrevious,
   onNext,
   onSelectMonth,
@@ -51,12 +58,17 @@ export function MonthSelectorView({
         <span aria-hidden="true">←</span> Mês anterior
       </button>
 
-      <p
-        aria-live="polite"
-        className="min-w-[10rem] text-center text-lg font-semibold text-foreground"
-      >
-        {monthLabel(monthKey)}
-      </p>
+      <div className="min-w-[10rem] text-center">
+        <p
+          aria-live="polite"
+          className="text-lg font-semibold text-foreground"
+        >
+          {monthLabel(monthKey)}
+        </p>
+        {rangeLabel && (
+          <p className="text-xs font-medium text-subtle">{rangeLabel}</p>
+        )}
+      </div>
 
       <input
         type="month"
@@ -84,6 +96,7 @@ export default function MonthSelector({
   monthKey,
   isCurrentMonth,
   basePath = "/historico",
+  rangeLabel,
 }: MonthSelectorProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -100,6 +113,7 @@ export default function MonthSelector({
       monthKey={monthKey}
       isCurrentMonth={isCurrentMonth}
       isPending={isPending}
+      rangeLabel={rangeLabel}
       onPrevious={() => navigate(shiftMonthKey(monthKey, -1))}
       onNext={() => navigate(shiftMonthKey(monthKey, 1))}
       onSelectMonth={navigate}

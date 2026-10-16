@@ -133,6 +133,20 @@ function lastDayOfMonth(year: number, month: number): number {
 }
 
 /**
+ * Intervalo legível da janela, sem o ano: `15/09 a 14/10`. Usado ao lado do
+ * mês de início do ciclo para que a moldura (dia 15 → dia 14) fique explícita.
+ */
+export function cycleRangeLabel(
+  cycle: CycleWindow,
+  timeZone: string = resolveTimeZone(),
+): string {
+  const start = zonedDateParts(cycle.start, timeZone);
+  const end = zonedDateParts(cycle.end, timeZone);
+  const dd = (value: number) => String(value).padStart(2, "0");
+  return `${dd(start.day)}/${dd(start.month)} a ${dd(end.day)}/${dd(end.month)}`;
+}
+
+/**
  * Ocorrência do dia-do-mês `day` (ex.: vencimento 20) dentro da janela do
  * ciclo, como instante (meia-noite no fuso da família). O dia é limitado ao
  * tamanho do mês (dia 31 em mês de 30 vence no dia 30). Cada janela contém no
