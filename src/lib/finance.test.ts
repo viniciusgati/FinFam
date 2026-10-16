@@ -1044,6 +1044,30 @@ describe("computeFinanceStatus — moldura do período (ciclo)", () => {
     expect(status.projectedCents).toBe(100000 + Math.round((30000 / 16) * 31));
   });
 
+  it("com cardExpensesVariable o cartão entra no ritmo e não nas obrigações", () => {
+    const base = {
+      monthlyIncomeCents: 300000,
+      fixedExpensesCents: 100000,
+      variableExpensesCents: 0,
+      cardExpensesCents: 60000,
+      referenceDate: reference,
+    };
+
+    // Mês calendário: a fatura é obrigação conhecida (projeção não a dilui).
+    const committed = computeFinanceStatus(base);
+    expect(committed.consumedCents).toBe(160000);
+    expect(committed.projectedCents).toBe(160000);
+
+    // Dashboard por ciclo: o cartão é consumo variável — entra no ritmo.
+    const variableCard = computeFinanceStatus({
+      ...base,
+      cardExpensesVariable: true,
+    });
+    expect(variableCard.consumedCents).toBe(160000);
+    expect(variableCard.projectedCents).toBe(100000 + Math.round((60000 / 16) * 31));
+    expect(variableCard.ratio).toBeGreaterThan(committed.ratio);
+  });
+
   it("com periodDays/elapsedDays usa a janela do ciclo", () => {
     const status = computeFinanceStatus({
       ...base,

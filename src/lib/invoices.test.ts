@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 import { cycleWindowForKey, remainingCycleDays } from "./cycle";
 import {
   allocateInstallments,
+  cycleInvoicePaymentLabel,
   installmentDueDate,
   invoiceDueLabel,
   invoiceDueLabelForWindow,
   invoiceLinesForMonth,
   invoiceLinesForSeries,
-  invoiceLinesForWindow,
+  purchaseInstallmentsInWindow,
   purchaseInvoice,
   resolveReferenceDate,
+  shiftDateMonthsClamped,
+  sumCardExpensesByPurchaseWindow,
   sumCardExpensesForMonth,
   sumCardExpensesForWindow,
 } from "./invoices";
@@ -409,39 +412,87 @@ describe("faturas na janela do ciclo", () => {
     ).toBe(10000 + 20000 + 25000);
   });
 
-  it("marca a compra feita dentro da janela e trata as anteriores como obrigação", () => {
-    const purchases = [
-      compra01out,
-      {
-        amountCents: 30000,
-        purchaseDate: at("2026-10-16T12:00:00.000Z"),
-        installmentsTotal: 1,
-        card: { closingDay: 20, dueDay: 25 },
-      },
-    ];
-
+  it("shiftDateMonthsClamped soma meses limitando o dia ao mês de destino", () => {
     expect(
-      invoiceLinesForWindow(purchases, {
+      shiftDateMonthsClamped(at("2026-10-16T12:00:00.000Z"), 1).toISOString(),
+    ).toBe("2026-11-16T03:00:00.000Z");
+    // 31/01 + 1 mês = 28/02.
+    expect(
+      shiftDateMonthsClamped(at("2026-01-31T12:00:00.000Z"), 1).toISOString(),
+    ).toBe("2026-02-28T03:00:00.000Z");
+  });
+
+  it("parcela k cai no ciclo da compra + k−1 meses (competência pela data)", () => {
+    const window1 = { start: cycle.start, end: cycle.nextStart };
+    const window2 = {
+      start: at("2026-11-15T03:00:00.000Z"),
+      end: at("2026-12-15T03:00:00.000Z"),
+    };
+
+    // Compra 01/10 (1x): cai no ciclo anterior (15/09–14/10), não no atual.
+    expect(
+      purchaseInstallmentsInWindow(compra01out, window1).length,
+    ).toBe(0);
+    expect(
+      purchaseInstallmentsInWindow(compra01out, {
+        start: at("2026-09-15T03:00:00.000Z"),
+        end: at("2026-10-15T03:00:00.000Z"),
+      }).length,
+    ).toBe(1);
+
+    // Parcelada em 3x: 1ª no ciclo da compra, as seguintes um ciclo depois.
+    const parcelada3 = {
+      amountCents: 30000,
+      purchaseDate: at("2026-10-01T15:00:00.000Z"),
+      installmentsTotal: 3,
+      card,
+    };
+    expect(
+      purchaseInstallmentsInWindow(parcelada3, {
+        start: at("2026-09-15T03:00:00.000Z"),
+        end: at("2026-10-15T03:00:00.000Z"),
+      }).map((installment) => installment.amountCents),
+    ).toEqual([10000]);
+    expect(
+      purchaseInstallmentsInWindow(parcelada3, window1).map(
+        (installment) => installment.amountCents,
+      ),
+    ).toEqual([10000]);
+    expect(
+      purchaseInstallmentsInWindow(parcelada3, window2).map(
+        (installment) => installment.amountCents,
+      ),
+    ).toEqual([10000]);
+  });
+
+  it("sumCardExpensesByPurchaseWindow soma compras do ciclo e ignora a fatura antiga", () => {
+    const purchases = [compra01out, compra16out];
+
+    // Ciclo 15/10–14/11: só a compra de 16/10 (a de 01/10 é do ciclo anterior,
+    // mesmo que a fatura dela vença em 21/10).
+    expect(
+      sumCardExpensesByPurchaseWindow(purchases, {
         start: cycle.start,
         end: cycle.nextStart,
       }),
-    ).toEqual([
-      {
-        amountCents: 10000,
-        dueDate: at("2026-10-21T03:00:00.000Z"),
-        purchaseDate: null,
-      },
-      {
-        amountCents: 30000,
-        dueDate: at("2026-10-25T03:00:00.000Z"),
-        purchaseDate: at("2026-10-16T12:00:00.000Z"),
-      },
-    ]);
+    ).toBe(40000);
   });
 
   it("invoiceDueLabelForWindow cita o intervalo do ciclo", () => {
     expect(invoiceDueLabelForWindow(cycle)).toBe(
       "Faturas com vencimento no ciclo (15/10 a 14/11/2026)",
     );
+  });
+});
+
+describe("cycleInvoicePaymentLabel", () => {
+  it("mostra a fatura a pagar no ciclo e omite quando zero", () => {
+    expect(
+      cycleInvoicePaymentLabel(607215)
+        ?.replace(/\u00a0/g, " ")
+        .replace(/\u00a0/g, " "),
+    ).toBe("Faturas a pagar no ciclo: R$ 6.072,15");
+    expect(cycleInvoicePaymentLabel(0)).toBeNull();
+    expect(cycleInvoicePaymentLabel(-10)).toBeNull();
   });
 });

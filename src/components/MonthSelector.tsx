@@ -14,6 +14,13 @@ interface MonthSelectorProps {
    * rótulo do mês para explicitar a moldura do ciclo.
    */
   rangeLabel?: string;
+  /**
+   * Quantos meses somar à chave de navegação (`?mes`) para obter o mês
+   * exibido. No dashboard por ciclo, a chave é o mês de início e o ciclo é
+   * exibido pelo mês da **fatura** (início + 1): `?mes=2026-10` aparece como
+   * "novembro de 2026".
+   */
+  queryMonthShift?: number;
 }
 
 export interface MonthSelectorViewProps {
@@ -97,25 +104,33 @@ export default function MonthSelector({
   isCurrentMonth,
   basePath = "/historico",
   rangeLabel,
+  queryMonthShift = 0,
 }: MonthSelectorProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  // A navegação continua em `?mes` (chave do banco); o que o usuário vê é o
+  // mês exibido, que no dashboard por ciclo é o mês da fatura (chave + 1).
+  const displayMonth = shiftMonthKey(monthKey, queryMonthShift);
+  const toQueryMonth = (display: string) =>
+    shiftMonthKey(display, -queryMonthShift);
 
-  function navigate(target: string) {
-    if (!target || target === monthKey) return;
+  function navigate(targetDisplay: string) {
+    if (!targetDisplay) return;
+    const query = toQueryMonth(targetDisplay);
+    if (!query || query === monthKey) return;
     startTransition(() => {
-      router.push(`${basePath}?mes=${target}`);
+      router.push(`${basePath}?mes=${query}`);
     });
   }
 
   return (
     <MonthSelectorView
-      monthKey={monthKey}
+      monthKey={displayMonth}
       isCurrentMonth={isCurrentMonth}
       isPending={isPending}
       rangeLabel={rangeLabel}
-      onPrevious={() => navigate(shiftMonthKey(monthKey, -1))}
-      onNext={() => navigate(shiftMonthKey(monthKey, 1))}
+      onPrevious={() => navigate(shiftMonthKey(displayMonth, -1))}
+      onNext={() => navigate(shiftMonthKey(displayMonth, 1))}
       onSelectMonth={navigate}
     />
   );

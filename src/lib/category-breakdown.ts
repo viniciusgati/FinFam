@@ -29,7 +29,7 @@ import { dayInCycleWindow, type CycleWindow } from "./cycle";
 import { isActiveInMonth, monthKey, type MonthVigency } from "./finance";
 import {
   allocateInstallments,
-  installmentDueDate,
+  purchaseInstallmentsInWindow,
   type InstallmentPlanInput,
 } from "./invoices";
 import { formatCents } from "./money";
@@ -158,10 +158,10 @@ export interface CycleCategoryBreakdownInput {
 /**
  * Agregação por categoria na **janela do ciclo**: fixas cujo vencimento cai na
  * janela (vigência checada no mês do vencimento), avulsos já filtrados pela
- * query e parcelas de cartão cujo **vencimento** cai na janela. Mesma
- * invariante de `buildCategoryBreakdown`: `sum(items) === totalCents` e a soma
- * coincide com `fixedExpensesCents + variableExpensesCents +
- * cardExpensesCents` quando as coleções são as da mesma janela.
+ * query e **compras de cartão pela data** (parcela `k` no ciclo da compra +
+ * `k−1` meses). Mesma invariante de `buildCategoryBreakdown`: `sum(items) ===
+ * totalCents` e a soma coincide com `fixedExpensesCents + variableExpensesCents
+ * + cardExpensesCents` quando as coleções são as da mesma janela.
  */
 export function buildCycleCategoryBreakdown(
   input: CycleCategoryBreakdownInput,
@@ -195,24 +195,13 @@ export function buildCycleCategoryBreakdown(
     add(expense.category, expense.amountCents);
   }
 
+  const window = { start: input.cycle.start, end: input.cycle.nextStart };
   for (const purchase of input.cardPurchases) {
-    const installments = allocateInstallments(
+    for (const installment of purchaseInstallmentsInWindow(
       purchase,
-      purchase.card.closingDay,
-      purchase.card.dueDay,
-    );
-    for (const installment of installments) {
-      const due = installmentDueDate(
-        installment.monthKey,
-        purchase.card.dueDay,
-        timeZone,
-      );
-      if (
-        due.getTime() < input.cycle.start.getTime() ||
-        due.getTime() >= input.cycle.nextStart.getTime()
-      ) {
-        continue;
-      }
+      window,
+      timeZone,
+    )) {
       add(purchase.category, installment.amountCents);
     }
   }

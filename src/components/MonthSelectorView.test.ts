@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { MonthSelectorView, type MonthSelectorViewProps } from "./MonthSelector";
+import MonthSelector, {
+  MonthSelectorView,
+  type MonthSelectorViewProps,
+} from "./MonthSelector";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -55,5 +58,32 @@ describe("MonthSelectorView (markup estático)", () => {
   it("sem intervalo não renderiza a linha extra", () => {
     const html = render({ monthKey: "2026-09" });
     expect(html).not.toContain("15/09 a 14/10");
+  });
+});
+
+describe("MonthSelector do ciclo — mês exibido = mês da fatura", () => {
+  it("com queryMonthShift 1, a chave ?mes=2026-10 aparece como novembro", () => {
+    const html = renderToStaticMarkup(
+      createElement(MonthSelector, {
+        monthKey: "2026-10",
+        isCurrentMonth: false,
+        queryMonthShift: 1,
+      }),
+    );
+
+    expect(html).toContain("novembro de 2026");
+    expect(html).toContain('value="2026-11"');
+  });
+
+  it("sem shift, mantém a chave como mês exibido", () => {
+    const html = renderToStaticMarkup(
+      createElement(MonthSelector, {
+        monthKey: "2026-09",
+        isCurrentMonth: false,
+      }),
+    );
+
+    expect(html).toContain("setembro de 2026");
+    expect(html).toContain('value="2026-09"');
   });
 });

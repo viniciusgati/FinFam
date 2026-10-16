@@ -131,11 +131,11 @@ describe("seção Gastos por categoria no dashboard", () => {
     const page = readSource("../app/(app)/page.tsx");
 
     const errorIndex = page.indexOf('view.state === "error"');
-    const futureIndex = page.indexOf('view.state === "future"');
-    const errorBlock = page.slice(errorIndex, futureIndex);
+    const emptyIndex = page.indexOf('view.state === "empty"');
+    const errorBlock = page.slice(errorIndex, emptyIndex);
 
     expect(errorIndex).toBeGreaterThanOrEqual(0);
-    expect(futureIndex).toBeGreaterThan(errorIndex);
+    expect(emptyIndex).toBeGreaterThan(errorIndex);
     expect(errorBlock).not.toContain("CategoryBreakdownCard");
     expect(errorBlock).toContain("<RetryButton");
   });
@@ -154,11 +154,11 @@ const HISTORY_PAGE = "../app/(app)/historico/page.tsx";
 const HISTORY_VIEW = "../components/HistoryView.tsx";
 
 describe("estados de navegação e onboarding do ciclo", () => {
-  it("renderiza FutureMonthNotice sob o estado future nas duas telas", () => {
+  it("pré-visualiza ciclo futuro no dashboard e mantém o aviso no histórico", () => {
     const dashboard = readSource(DASHBOARD_PAGE);
-    expect(dashboard).toContain('view.state === "future"');
-    expect(dashboard).toContain("<FutureMonthNotice />");
-    expect(dashboard).toContain("isFutureMonth");
+    expect(dashboard).toContain("isFutureCycle");
+    expect(dashboard).toContain("<CyclePreviewNotice />");
+    expect(dashboard).not.toContain("<FutureMonthNotice />");
 
     const history = readSource(HISTORY_VIEW);
     expect(history).toContain('view.state === "future"');

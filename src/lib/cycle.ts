@@ -210,6 +210,35 @@ export function cycleLengthDays(
 }
 
 /**
+ * Dias até o início da janela (0 quando o ciclo já começou ou passou). Usado
+ * pela pré-visualização de ciclo futuro ("O ciclo começa em N dias").
+ */
+export function daysUntilCycleStart(
+  cycle: CycleWindow,
+  now: Date,
+  timeZone: string = resolveTimeZone(),
+): number {
+  const start = zonedDateParts(cycle.start, timeZone);
+  const target = zonedDateParts(now, timeZone);
+  const diff = Math.round(
+    (calendarDayUtc(start.year, start.month, start.day) -
+      calendarDayUtc(target.year, target.month, target.day)) /
+      DAY_MS,
+  );
+  return Math.max(diff, 0);
+}
+
+/**
+ * Rótulo do contador do card principal quando o ciclo ainda não começou.
+ * Ex.: "O ciclo começa em 30 dias".
+ */
+export function cycleStartCountdownLabel(days: number): string {
+  if (days <= 0) return "O ciclo começa hoje";
+  if (days === 1) return "O ciclo começa amanhã";
+  return `O ciclo começa em ${days} dias`;
+}
+
+/**
  * Dias restantes do ciclo, contando o próprio dia e o último dia (inclusive).
  * Nunca negativo: um instante posterior ao fim do ciclo retorna `0`.
  */

@@ -19,6 +19,7 @@
  */
 
 import { monthKey } from "./finance";
+import { formatCents } from "./money";
 import type { CycleWindow } from "./cycle";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 
@@ -168,10 +169,100 @@ export interface BudgetWindow {
 }
 
 /**
- * Soma as parcelas cujo **vencimento** cai em `[start, end)`. Diferente de
- * `sumCardExpensesForMonth` (competência por mês calendário), aqui a fatura
- * conta na janela do ciclo em que é efetivamente paga. Cada parcela entra em
- * exatamente uma janela.
+ * Soma `months` a uma data preservando o dia do mês no fuso da família,
+ * limitado ao tamanho do mês de destino (31/01 + 1 mês = 28/02). Usado para
+ * projetar a parcela k de uma compra no ciclo `k−1` meses depois da compra.
+ */
+export function shiftDateMonthsClamped(
+  date: Date,
+  months: number,
+  timeZone: string = resolveTimeZone(),
+): Date {
+  const { year, month, day } = zonedDateParts(date, timeZone);
+  const total = year * 12 + (month - 1) + months;
+  const shiftedYear = Math.floor(total / 12);
+  const shiftedMonth = total - shiftedYear * 12 + 1;
+  const lastDay = new Date(Date.UTC(shiftedYear, shiftedMonth, 0)).getUTCDate();
+  return zonedTimeToUtc(
+    shiftedYear,
+    shiftedMonth,
+    Math.min(day, lastDay),
+    timeZone,
+  );
+}
+
+/** Parcela de uma compra com a data efetiva dentro da janela do ciclo. */
+export interface PurchaseWindowInstallment {
+  installmentNumber: number;
+  amountCents: number;
+  /** Data efetiva da parcela: compra + (k−1) meses, limitada ao mês. */
+  date: Date;
+}
+
+/**
+ * Parcelas de uma compra que caem na janela **pela data** (modelo de
+ * competência usado pelo dashboard): a parcela `k` pertence ao ciclo da data da
+ * compra + `k−1` meses — a 1ª parcela no ciclo da compra e cada seguinte um
+ * ciclo depois. Compras fora da janela não entram, mesmo que a fatura delas
+ * seja paga dentro dela.
+ */
+export function purchaseInstallmentsInWindow(
+  purchase: CardPurchaseForMonth,
+  window: BudgetWindow,
+  timeZone: string = resolveTimeZone(),
+): PurchaseWindowInstallment[] {
+  return allocateInstallments(
+    purchase,
+    purchase.card.closingDay,
+    purchase.card.dueDay,
+  ).flatMap((installment) => {
+    const date = shiftDateMonthsClamped(
+      purchase.purchaseDate,
+      installment.installmentNumber - 1,
+      timeZone,
+    );
+    if (
+      date.getTime() < window.start.getTime() ||
+      date.getTime() >= window.end.getTime()
+    ) {
+      return [];
+    }
+    return [
+      {
+        installmentNumber: installment.installmentNumber,
+        amountCents: installment.amountCents,
+        date,
+      },
+    ];
+  });
+}
+
+/**
+ * Soma as parcelas que caem na janela **pela data** (compras do ciclo), usada
+ * pelo dashboard no modelo de competência. Diferente de
+ * `sumCardExpensesForWindow` (vencimento), a fatura paga dentro da janela por
+ * compras anteriores não entra. Cada parcela entra em exatamente uma janela.
+ */
+export function sumCardExpensesByPurchaseWindow(
+  purchases: CardPurchaseForMonth[],
+  window: BudgetWindow,
+  timeZone: string = resolveTimeZone(),
+): number {
+  return purchases.reduce(
+    (total, purchase) =>
+      total +
+      purchaseInstallmentsInWindow(purchase, window, timeZone).reduce(
+        (sum, installment) => sum + installment.amountCents,
+        0,
+      ),
+    0,
+  );
+}
+
+/**
+ * Soma as parcelas cujo **vencimento** cai em `[start, end)`. É a leitura de
+ * **caixa** das faturas (o que será pago na janela), usada na linha informativa
+ * do card principal — não no consumo do ciclo.
  */
 export function sumCardExpensesForWindow(
   purchases: CardPurchaseForMonth[],
@@ -194,59 +285,6 @@ export function sumCardExpensesForWindow(
         .reduce((sum, installment) => sum + installment.amountCents, 0)
     );
   }, 0);
-}
-
-/** Parcela com vencimento dentro de uma janela, no formato da série diária. */
-export interface WindowInvoiceLine {
-  amountCents: number;
-  /** Vencimento da parcela (instante). */
-  dueDate: Date;
-  /**
-   * Data da compra quando ela foi feita dentro da própria janela (consumo na
-   * data); `null` para compras anteriores (obrigação no vencimento).
-   */
-  purchaseDate: Date | null;
-}
-
-/**
- * Parcelas com vencimento na janela, com a data de vencimento e a data da
- * compra quando a compra é da própria janela. Usada pela série diária do ciclo.
- */
-export function invoiceLinesForWindow(
-  purchases: CardPurchaseForMonth[],
-  window: BudgetWindow,
-  timeZone: string = resolveTimeZone(),
-): WindowInvoiceLine[] {
-  return purchases.flatMap((purchase) =>
-    allocateInstallments(
-      purchase,
-      purchase.card.closingDay,
-      purchase.card.dueDay,
-    )
-      .flatMap((installment) => {
-        const dueDate = installmentDueDate(
-          installment.monthKey,
-          purchase.card.dueDay,
-          timeZone,
-        );
-        if (
-          dueDate.getTime() < window.start.getTime() ||
-          dueDate.getTime() >= window.end.getTime()
-        ) {
-          return [];
-        }
-        const purchaseInWindow =
-          purchase.purchaseDate.getTime() >= window.start.getTime() &&
-          purchase.purchaseDate.getTime() < window.end.getTime();
-        return [
-          {
-            amountCents: installment.amountCents,
-            dueDate,
-            purchaseDate: purchaseInWindow ? purchase.purchaseDate : null,
-          },
-        ];
-      }),
-  );
 }
 
 /** Parcela do mês no formato do gráfico de consumo diário. */
@@ -411,4 +449,14 @@ export function invoiceDueLabelForWindow(
   return `Faturas com vencimento no ciclo (${dd(start.day)}/${dd(
     start.month,
   )} a ${dd(end.day)}/${dd(end.month)}/${end.year})`;
+}
+
+/**
+ * Linha informativa do card principal: faturas que **vencem na janela** do
+ * ciclo (leitura de caixa — compras de ciclos anteriores). Retorna `null`
+ * quando não há nada a pagar.
+ */
+export function cycleInvoicePaymentLabel(cents: number): string | null {
+  if (cents <= 0) return null;
+  return `Faturas a pagar no ciclo: ${formatCents(cents)}`;
 }

@@ -5,7 +5,9 @@ import {
   cycleEndCountdownLabel,
   cycleLengthDays,
   cycleRangeLabel,
+  cycleStartCountdownLabel,
   cycleWindow,
+  daysUntilCycleStart,
   cycleWindowForKey,
   dailyAllowanceCents,
   dailyAllowanceCard,
@@ -431,5 +433,29 @@ describe("janela do ciclo por chave e ocorrências de vencimento", () => {
     expect(cycleRangeLabel(cycleWindowForKey("2026-02", 1))).toBe(
       "01/02 a 28/02",
     );
+  });
+});
+
+describe("pré-visualização de ciclo futuro", () => {
+  it("daysUntilCycleStart conta os dias até o início e zera depois", () => {
+    const cycle = cycleWindowForKey("2026-11", 15); // 15/11–14/12
+
+    expect(
+      daysUntilCycleStart(cycle, new Date("2026-10-16T15:00:00.000Z")),
+    ).toBe(30);
+    expect(
+      daysUntilCycleStart(cycle, new Date("2026-11-15T15:00:00.000Z")),
+    ).toBe(0);
+    expect(
+      daysUntilCycleStart(cycle, new Date("2026-12-01T15:00:00.000Z")),
+    ).toBe(0);
+  });
+
+  it("cycleStartCountdownLabel escreve os textos exatos", () => {
+    expect(cycleStartCountdownLabel(30)).toBe("O ciclo começa em 30 dias");
+    expect(cycleStartCountdownLabel(2)).toBe("O ciclo começa em 2 dias");
+    expect(cycleStartCountdownLabel(1)).toBe("O ciclo começa amanhã");
+    expect(cycleStartCountdownLabel(0)).toBe("O ciclo começa hoje");
+    expect(cycleStartCountdownLabel(-3)).toBe("O ciclo começa hoje");
   });
 });

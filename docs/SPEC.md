@@ -87,6 +87,12 @@ gastos avulsos, §4). CRUD em `/entradas` e `/api/variable-incomes`.
 - Cada parcela de uma compra parcelada é alocada à fatura do mês
   correspondente (parcela 1 no ciclo da compra; parcela `k` em `k-1` meses
   depois).
+- **No dashboard** (moldura do ciclo, §4), a despesa de crédito conta pela
+  **data da compra** (competência de consumo): a parcela `k` cai no ciclo da
+  data da compra + `k−1` meses. A fatura **paga** dentro da janela por compras
+  anteriores **não** entra no consumo — aparece só como linha informativa
+  ("Faturas a pagar no ciclo"). A tela `/cartoes` continua pela competência de
+  vencimento (o que vai ser pago e quando).
 - Para o **consumo disponível** (§4.5), a fatura é **consumo variável**, não
   obrigação fixa: ela **não** entra na subtração `entradas − gastos fixos`.
 
@@ -104,17 +110,22 @@ O dashboard exibe:
    "8 dias para o fim do ciclo"). A **moldura do dashboard é o ciclo**: com
    `cycleStartDay ≠ 1`, o `%`, a projeção e os valores em R$ do card usam a
    janela `[início do ciclo, próximo início)` para renda, obrigações, avulsos,
-   série e categorias (§4.1). Com `cycleStartDay = 1` a janela coincide com o
-   mês calendário. O `?mes` do seletor é o **mês de início do ciclo** (ex.:
-   `2026-09` = 15/09–14/10): de 01 a 14 o ciclo corrente ainda é o do mês
-   anterior.
+   cartão (pela **data da compra** — §3.4), série e categorias (§4.1). Com
+   `cycleStartDay = 1` a janela coincide com o mês calendário. O `?mes` do
+   seletor é o **mês de início do ciclo** (ex.: `2026-10` = 15/10–14/11),
+   exibido pelo **mês da fatura** (início + 1 ⇒ "novembro de 2026"). O ciclo
+   futuro pode ser pré-visualizado (previsão com o que já está lançado: rendas,
+   contas fixas e faturas) — "O ciclo começa em N dias" e o aviso "Ciclo
+   futuro".
 3. **Feedback comparativo**: mensagem textual comparando o mês atual com os
    últimos `N` meses (padrão `N = 4`).
 4. **Cor de fundo** do dashboard, interpolada do verde ao vermelho.
 5. **Valores em R$ do card principal** — renda, já consumido, ainda disponível
    (ou estourado em) e projeção de fechamento — para decompor o `%` em dinheiro
    e responder "quanto ainda cabe" sem cálculo mental. Usam exatamente a mesma
-   janela do `%` (§4.1).
+   janela do `%` (§4.1). As faturas que **vencem** na janela (compras de ciclos
+   anteriores) aparecem numa **linha informativa** ("Faturas a pagar no ciclo"),
+   fora do consumo.
 
 ### 4.1 Fórmula do consumo
 
@@ -127,15 +138,17 @@ o mês calendário. Tudo que entra na conta usa essa janela:
 - **saídas fixas** cuja ocorrência de `dueDay` cai na janela (vigência no mês
   da ocorrência) — cada ocorrência pertence a exatamente um ciclo, então uma
   despesa paga antes do início da janela **não** reaparece nela;
-- **faturas de cartão** cujas parcelas **vencem** na janela — a fatura entra
-  pelo **vencimento** (não pelo fechamento nem pela data das compras);
+- **compras no cartão pela data** (competência de consumo, §3.4): a parcela
+  `k` entra no ciclo da data da compra + `k−1` meses. A fatura paga dentro da
+  janela por compras anteriores **não** entra no consumo (vira a linha
+  informativa de caixa);
 - **gastos avulsos** no orçamento pela `date` — no ciclo corrente, até hoje;
   em ciclo fechado, a janela inteira.
 
 ```
 consumido_ciclo = saidas_fixas_que_vencem_na_janela
               + gastos_avulsos_da_janela (não pagos no cartão)
-              + parcelas_de_fatura_que_vencem_na_janela
+              + compras_no_cartao_da_janela (parcela k na compra + k−1 meses)
 
 renda_ciclo = entradas_fixas_recebidas_na_janela + entradas_avulsas_da_janela
 percentual_consumido = consumido_ciclo / renda_ciclo * 100
@@ -149,18 +162,18 @@ nela. A série diária usa a mesma janela e o eixo é o do ciclo (dia 1 =
 ### 4.2 Regra de situação (cor)
 
 Percentual cru não basta: gastar 80% com 2 dias para o fim do ciclo é diferente
-de gastar 80% com 20 dias. Além disso, as saídas fixas e as faturas de cartão
-já valem 100% desde o início da janela (SPEC §5.2), então não podem inflar o
-ritmo: elas
-são **obrigações conhecidas** e o ritmo mede apenas o **gasto avulso** contra o
-orçamento diário disponível.
+de gastar 80% com 20 dias. Além disso, as saídas fixas já valem 100% desde o
+início da janela (SPEC §5.2), então não podem inflar o ritmo: elas
+são **obrigações conhecidas** e o ritmo mede o **gasto variável** (avulsos +
+compras do cartão) contra o orçamento diário disponível.
 
 ```
-obrigacoes       = saidas_fixas_que_vencem_na_janela + faturas_que_vencem_na_janela
+obrigacoes       = saidas_fixas_que_vencem_na_janela
 orcamento_livre  = max(renda_ciclo - obrigacoes, 0)
 diaria_disponivel = orcamento_livre / dias_da_janela
 
-gasto_diario = gastos_avulsos_da_janela / max(dias_decorridos_da_janela, 1)
+gasto_diario = (gastos_avulsos_da_janela + compras_do_cartao_da_janela)
+             / max(dias_decorridos_da_janela, 1)
 coeficiente  = gasto_diario / diaria_disponivel
 ```
 
@@ -240,13 +253,14 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
     cruzava o gráfico no meio e confundia a leitura.
 - **Séries diárias** (`src/lib/dashboard-series.ts`, funções puras): eixo da
   **janela do dashboard**. Avulsos no orçamento na `date`; fixas na ocorrência
-  do `dueDay` dentro da janela (limitado ao tamanho do mês); faturas no
-  **vencimento** da parcela. Avulsos `CREDIT` não entram (evita dupla
-  contagem, §3.3). A soma da série coincide com `consumedCents` (mesma janela,
-  §4.1). Ciclo corrente acumula até hoje; ciclo fechado cobre a janela toda;
-  com `cycleStartDay = 1` a janela é o mês calendário.
+  do `dueDay` dentro da janela (limitado ao tamanho do mês); compras do cartão
+  pela **data** (parcela `k` no ciclo da compra + `k−1` meses — §3.4), como
+  consumo. Avulsos `CREDIT` não entram (evita dupla contagem, §3.3). A soma da
+  série coincide com `consumedCents` (mesma janela, §4.1). Ciclo corrente
+  acumula até hoje; ciclo fechado cobre a janela toda; com `cycleStartDay = 1`
+  a janela é o mês calendário.
   A mesma série expõe `variableDailyCents` (barras do "Consumo por dia") e
-  `obligationDailyCents` (marcadores de vencimento).
+  `obligationDailyCents` (marcadores de vencimento das fixas).
 - **Avaliação de ciclo fechado por IA** (DeepSeek, opcional via
   `DEEPSEEK_API_KEY`): supervisor `src/lib/ai/deepseek.ts`. Somente agregados
   **numéricos** são enviados; o veredito e o fallback são locais. Cache em
@@ -255,19 +269,24 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
 - **Simulador "posso comprar?"**: veredito local determinístico
   (`ok`/`cuidado`/`nao`) pelo impacto no **poder de compra por dia** do ciclo:
   a compra ÷ dias restantes reduz a diária; compara-se a diária resultante com o
-  **ritmo recente** de consumo (gastos avulsos do ciclo + faturas que vencem no
-  ciclo ÷ dias decorridos). Não cabe no orçamento do ciclo ou cai abaixo de
-  metade do ritmo → `nao`; fica abaixo do ritmo → `cuidado`; mantém o ritmo →
-  `ok`. A IA apenas redige a justificativa; a rota sempre responde `200` com
-  fallback local. O card só aparece no ciclo corrente (depende do ciclo).
+  **ritmo recente** de consumo (avulsos + compras do cartão do ciclo ÷ dias
+  decorridos). Não cabe no orçamento do ciclo ou cai abaixo de metade do ritmo
+  → `nao`; fica abaixo do ritmo → `cuidado`; mantém o ritmo → `ok`. A IA apenas
+  redige a justificativa; a rota sempre responde `200` com fallback local. O
+  card só aparece no ciclo corrente (depende do ciclo).
 - O seletor de mês do dashboard navega para `/?mes=YYYY-MM` (prop `basePath`),
-  onde `YYYY-MM` é o **mês de início do ciclo**.
+  onde `YYYY-MM` é o **mês de início do ciclo** — exibido, no dashboard, pelo
+  **mês da fatura** (`início + 1`: `?mes=2026-10` aparece como "novembro de
+  2026"; `cycleStartDay = 1` mantém o rótulo do próprio mês). O intervalo da
+  janela ("15/10 a 14/11") fica abaixo do rótulo.
 - **Resolução do `?mes`** (`resolveCycleReference`): ausente/inválido → ciclo
   **corrente** (dados acumulados até agora); ciclo **fechado** → janela inteira
-  (cálculo ao vivo); ciclo **futuro** → aviso de mês futuro. Com
-  `cycleStartDay = 1`, tudo isso coincide com o mês calendário.
-  `resolveReferenceDate`/mês calendário continuam valendo para o `/historico`
-  e para os snapshots (§4.6).
+  (cálculo ao vivo); ciclo **futuro** → **pré-visualização**: o dashboard
+  mostra a previsão com o que já está lançado (rendas, contas fixas e faturas),
+  com o aviso "Ciclo futuro" e o contador "O ciclo começa em N dias"; o
+  seletor avança um ciclo por vez. Com `cycleStartDay = 1`, tudo isso coincide
+  com o mês calendário. `resolveReferenceDate`/mês calendário continuam valendo
+  para o `/historico` e para os snapshots (§4.6).
 
 ### 4.5 Consumo disponível e média diária
 
@@ -298,10 +317,11 @@ media_diaria       = consumo_disponivel / dias_da_janela   (Math.round)
 - Implementação: `consumptionAvailableCents`/`consumptionDailyAverageCents`
   (`src/lib/finance.ts`), `buildConsumptionSummary`/`consumptionAverageLabel`
   (`src/lib/dashboard-series.ts`) e `loadDashboardData` (`src/lib/dashboard.ts`).
-- Distinção: o `%` (`consumedCents`, §4.1) inclui fixas, avulsos e faturas; o
-  orçamento livre do ciclo (`dailyAllowanceCents`) subtrai fixas, faturas e
-  avulsos e divide pelos dias **restantes**; esta métrica separa o **consumo
-  variável** das obrigações fixas, sem alterar nenhum desses cálculos.
+- Distinção: o `%` (`consumedCents`, §4.1) inclui fixas, avulsos e compras do
+  cartão; o orçamento livre do ciclo (`dailyAllowanceCents`) subtrai as fixas e
+  divide pelos dias **restantes** (avulsos e cartão consomem esse orçamento ao
+  longo do ciclo); esta métrica separa o **consumo variável** das obrigações
+  fixas, sem alterar nenhum desses cálculos.
 
 ### 4.6 Mês fechado é imutável (snapshots)
 
@@ -340,8 +360,10 @@ o mês calendário. Com `cycleStartDay = 1` as duas coisas coincidem.
    uma conta já paga antes da janela não reaparece nela.
 3. **Gasto avulso** pago em dinheiro/débito/pix conta na data (dentro da
    janela).
-4. **Gasto no cartão** conta pela fatura do mês de vencimento (§3.4); no
-   dashboard, pela parcela que **vence** dentro da janela do ciclo.
+4. **Gasto no cartão** conta pela fatura do mês de vencimento (§3.4) na tela
+   de cartões; **no dashboard**, pela **data da compra** (parcela `k` no ciclo
+   da compra + `k−1` meses), com as faturas pagas na janela aparecendo só como
+   linha informativa.
 5. **Compra parcelada**: valor total dividido pelo número de parcelas; cada
    parcela em sua fatura.
 6. Se `renda_mensal == 0`, o percentual é indefinido: exibir estado neutro e

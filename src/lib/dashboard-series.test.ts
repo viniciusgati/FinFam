@@ -261,7 +261,7 @@ describe("buildCycleDailySeries — eixo do ciclo", () => {
   const cycle = cycleWindowForKey("2026-10", 15); // 15/10–14/11 (31 dias)
   const at = (iso: string) => new Date(iso);
 
-  it("distribui fixas, avulsos e faturas no dia do ciclo (1-based)", () => {
+  it("distribui fixas, avulsos e compras de cartão no dia do ciclo (1-based)", () => {
     const series = buildCycleDailySeries({
       cycle,
       now: at("2026-10-16T15:00:00.000Z"),
@@ -276,22 +276,19 @@ describe("buildCycleDailySeries — eixo do ciclo", () => {
           paymentMethod: "PIX",
         },
       ],
-      cardInvoiceLines: [
-        {
-          amountCents: 60000,
-          dueDate: at("2026-10-21T03:00:00.000Z"),
-          // Compra anterior à janela: `purchaseDate: null` = obrigação no
-          // vencimento (é o que `invoiceLinesForWindow` devolve).
-          purchaseDate: null,
-        },
+      cardExpenses: [
+        // Parcela com data efetiva 21/10 (consumo, nunca obrigação de
+        // vencimento — modelo de competência).
+        { amountCents: 60000, date: at("2026-10-21T15:00:00.000Z") },
       ],
     });
 
     expect(series.daysInMonth).toBe(31);
     expect(series.elapsedDay).toBe(2); // 15 e 16/10
     expect(series.variableDailyCents[1]).toBe(5000); // 16/10 = dia 2
-    expect(series.obligationDailyCents[5]).toBe(120000); // 20/10 = dia 6
-    expect(series.obligationDailyCents[6]).toBe(60000); // 21/10 = dia 7
+    expect(series.variableDailyCents[6]).toBe(60000); // 21/10 = dia 7 (cartão)
+    expect(series.obligationDailyCents[5]).toBe(120000); // 20/10 = dia 6 (fixa)
+    expect(series.obligationDailyCents[6]).toBe(0); // cartão não é obrigação
     expect(series.dailyExpensesCents[5]).toBe(120000);
     expect(series.dailyExpensesCents[6]).toBe(60000);
     expect(series.totalExpensesCents).toBe(185000);
@@ -303,22 +300,17 @@ describe("buildCycleDailySeries — eixo do ciclo", () => {
     expect(series.projectedMonthEndCents).toBe(Math.round((5000 / 2) * 31));
   });
 
-  it("compra feita dentro da janela entra como consumo na data da compra", () => {
+  it("compra de cartão fora da janela não entra na série", () => {
     const series = buildCycleDailySeries({
       cycle,
       now: at("2026-10-16T15:00:00.000Z"),
-      cardInvoiceLines: [
-        {
-          amountCents: 30000,
-          dueDate: at("2026-10-21T03:00:00.000Z"),
-          purchaseDate: at("2026-10-16T15:00:00.000Z"),
-        },
+      cardExpenses: [
+        { amountCents: 30000, date: at("2026-10-10T15:00:00.000Z") },
       ],
     });
 
-    expect(series.variableDailyCents[1]).toBe(30000);
-    expect(series.obligationDailyCents[6]).toBe(0);
-    expect(series.dailyExpensesCents[6]).toBe(30000);
+    expect(series.totalExpensesCents).toBe(0);
+    expect(series.variableDailyCents.every((value) => value === 0)).toBe(true);
   });
 
   it("elapsedDay: ciclo fechado cobre a janela inteira; futuro fica em 0", () => {

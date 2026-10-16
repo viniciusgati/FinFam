@@ -29,9 +29,10 @@ import {
 } from "./finance";
 import {
   invoiceLinesForSeries,
-  invoiceLinesForWindow,
+  purchaseInstallmentsInWindow,
   sumCardExpensesForMonth,
   sumCardExpensesForWindow,
+  type PurchaseWindowInstallment,
 } from "./invoices";
 import {
   buildDashboardDataFromSnapshot,
@@ -68,6 +69,11 @@ export interface DashboardData extends FinanceInput {
    * cartão, ou entrada avulsa. Distingue "sem renda" de "renda sem gastos".
    */
   hasMovements: boolean;
+  /**
+   * Faturas que **vencem** na janela (leitura de caixa), para a linha
+   * informativa do card principal — não entra no consumo do ciclo.
+   */
+  invoicePaymentCents?: number;
   /**
    * Percentuais dos meses fechados anteriores **com dados** (entrada e saída),
    * mais recente por último. Meses só com renda ou só com gasto ficam de fora.
@@ -524,11 +530,11 @@ export function resolveCycleReference(
 }
 
 /**
- * Coleções e somas do ciclo, na mesma moldura para renda, obrigações e
- * avulsos: fixas e entradas fixas pela **ocorrência do dia** (vencimento/
- * recebimento) dentro da janela, faturas pelo **vencimento** dentro da janela
- * e avulsos por `date` (até hoje no ciclo corrente; na janela inteira em ciclo
- * fechado). As coleções cruas alimentam série, categorias e o breakdown.
+ * Coleções e somas do ciclo, na mesma moldura: renda, fixas e avulsos pela
+ * ocorrência/data na janela; **cartão pela data da compra** (parcela k no ciclo
+ * da compra + k−1 meses) e a leitura de caixa das faturas que vencem na janela
+ * (`invoicePaymentCents`, só informativa). As coleções cruas alimentam série,
+ * categorias e o breakdown.
  */
 interface CycleMoney {
   timeZone: string;
@@ -539,6 +545,7 @@ interface CycleMoney {
   fixedExpensesCents: number;
   variableExpensesCents: number;
   cardExpensesCents: number;
+  invoicePaymentCents: number;
   hasMovements: boolean;
   fixedExpenses: Awaited<ReturnType<typeof prisma.fixedExpense.findMany>>;
   fixedExpenseOccurrences: { amountCents: number; dueDate: Date }[];
@@ -547,6 +554,7 @@ interface CycleMoney {
   cardPurchases: Awaited<
     ReturnType<typeof prisma.cardPurchase.findMany<{ include: { card: true } }>>
   >;
+  cardInstallments: PurchaseWindowInstallment[];
 }
 
 async function loadCycleMoney(reference: CycleReference): Promise<CycleMoney> {
@@ -620,21 +628,28 @@ async function loadCycleMoney(reference: CycleReference): Promise<CycleMoney> {
   const variableExpensesCents = sumByAmount(windowedVariableExpenses);
   const fixedExpensesCents = sumByAmount(fixedExpenseOccurrences);
   // As funções de fatura usam `[start, end)` — `CycleWindow.end` é o último dia
-  // inclusivo, então a janela de vencimentos vai até `nextStart`.
-  const dueWindow = { start: window.start, end: window.nextStart };
-  const cardExpensesCents = sumCardExpensesForWindow(
+  // inclusivo, então os limites vão até `nextStart`.
+  const windowBounds = { start: window.start, end: window.nextStart };
+  // Cartão **pela data** (competência): parcela k entra no ciclo da compra +
+  // k−1 meses. É o consumo do ciclo — a fatura paga dentro dele por compras
+  // anteriores não entra (vira só a linha informativa abaixo).
+  const cardInstallments = cardPurchases.flatMap((purchase) =>
+    purchaseInstallmentsInWindow(purchase, windowBounds, timeZone),
+  );
+  const cardExpensesCents = sumByAmount(cardInstallments);
+  // Leitura de caixa: faturas que **vencem** na janela (linha informativa).
+  const invoicePaymentCents = sumCardExpensesForWindow(
     cardPurchases,
-    dueWindow,
+    windowBounds,
     timeZone,
   );
-  const cardLines = invoiceLinesForWindow(cardPurchases, dueWindow, timeZone);
 
   // Movimentação = qualquer saída (fixa/avulsa/cartão) ou entrada avulsa na
   // janela — é o gatilho do estado vazio "renda sem gastos".
   const hasMovements =
     fixedExpenseOccurrences.length > 0 ||
     windowedVariableExpenses.length > 0 ||
-    cardLines.length > 0 ||
+    cardInstallments.length > 0 ||
     windowedVariableIncomes.length > 0;
 
   return {
@@ -646,12 +661,14 @@ async function loadCycleMoney(reference: CycleReference): Promise<CycleMoney> {
     fixedExpensesCents,
     variableExpensesCents,
     cardExpensesCents,
+    invoicePaymentCents,
     hasMovements,
     fixedExpenses,
     fixedExpenseOccurrences,
     variableExpenses: windowedVariableExpenses,
     variableIncomes: windowedVariableIncomes,
     cardPurchases,
+    cardInstallments,
   };
 }
 
@@ -711,11 +728,10 @@ export async function loadCycleDashboardData(
       date: item.date,
       paymentMethod: item.paymentMethod,
     })),
-    cardInvoiceLines: invoiceLinesForWindow(
-      money.cardPurchases,
-      { start: window.start, end: window.nextStart },
-      timeZone,
-    ),
+    cardExpenses: money.cardInstallments.map((installment) => ({
+      amountCents: installment.amountCents,
+      date: installment.date,
+    })),
   });
 
   const consumption = buildConsumptionSummary({
@@ -733,6 +749,8 @@ export async function loadCycleDashboardData(
     fixedExpensesCents: money.fixedExpensesCents,
     variableExpensesCents: money.variableExpensesCents,
     cardExpensesCents: money.cardExpensesCents,
+    invoicePaymentCents: money.invoicePaymentCents,
+    cardExpensesVariable: true,
     hasMovements: money.hasMovements,
     previousPercents: previousSnapshots.map(
       (snapshot) => snapshot.consumedPercent,
@@ -759,10 +777,10 @@ export async function loadCycleDashboardData(
 
 /**
  * Agrega os dados do **ciclo financeiro** para o card "Pode gastar por dia"
- * (história #225), na mesma moldura de `loadCycleDashboardData`: fixas e
- * entradas fixas pela ocorrência do dia na janela, faturas pelo vencimento na
- * janela e avulsos por `date` dentro dela. A invariante #231 (percentual <
- * 100% ⇒ diária > R$ 0,00) passa a valer com a mesma janela do `%`.
+ * (história #225), na mesma moldura de `loadCycleDashboardData`: fixas pela
+ * ocorrência do dia na janela, avulsos e cartão (pela data da compra) dentro
+ * dela. A invariante #231 (percentual < 100% ⇒ diária > R$ 0,00) passa a valer
+ * com a mesma janela do `%`.
  */
 export async function loadCycleAllowance(
   now: Date = new Date(),
@@ -782,8 +800,9 @@ export async function loadCycleAllowance(
 
   return dailyAllowanceCents({
     incomeCents: money.monthlyIncomeCents,
-    obligationsCents: money.fixedExpensesCents + money.cardExpensesCents,
-    variableSpentCents: money.variableExpensesCents,
+    // Cartão entra como **consumo do ciclo** (pela data), não como obrigação.
+    obligationsCents: money.fixedExpensesCents,
+    variableSpentCents: money.variableExpensesCents + money.cardExpensesCents,
     cycleStartDay,
     now,
     timeZone,

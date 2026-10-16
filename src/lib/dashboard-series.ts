@@ -28,7 +28,6 @@ import {
 } from "./finance";
 import { formatCents } from "./money";
 import { resolveTimeZone, zonedDateParts } from "./time";
-import type { WindowInvoiceLine } from "./invoices";
 import {
   isCountedInBudget,
   type PaymentMethod,
@@ -197,17 +196,21 @@ export interface BuildCycleDailySeriesInput {
   incomeCents?: number;
   fixedExpenses?: CycleSeriesFixedExpense[];
   variableExpenses?: SeriesVariableExpense[];
-  cardInvoiceLines?: WindowInvoiceLine[];
+  /**
+   * Compras de cartão **pela data** (modelo de competência): parcelas já
+   * resolvidas para o ciclo da compra + `k−1` meses e filtradas à janela.
+   * Entram como consumo (barras), nunca como obrigação de vencimento.
+   */
+  cardExpenses?: { amountCents: number; date: Date }[];
 }
 
 /**
  * Série diária da **janela do ciclo** (eixo do ciclo, não do mês calendário):
- * avulsos na data, fixas no vencimento e faturas no vencimento do cartão, com
- * compras feitas dentro do próprio ciclo entrando como consumo na data da
- * compra (obrigação apenas quando a compra é anterior à janela). Mesma
- * invariante do `buildDailySeries`: `sum(dailyExpensesCents) ===
- * totalExpensesCents`, que coincide com o `consumedCents` do `%` quando a
- * moldura é a mesma (ciclo).
+ * avulsos na data, fixas no vencimento e **compras de cartão pela data**
+ * (parcela `k` no ciclo da compra + `k−1` meses) — todas entram como consumo.
+ * Mesma invariante do `buildDailySeries`: `sum(dailyExpensesCents) ===
+ * totalExpensesCents`, que coincide com o `consumedCents` do `%` (mesma
+ * moldura: ciclo).
  */
 export function buildCycleDailySeries(
   input: BuildCycleDailySeriesInput,
@@ -250,18 +253,11 @@ export function buildCycleDailySeries(
     variable[index] += expense.amountCents;
   }
 
-  for (const line of input.cardInvoiceLines ?? []) {
-    const dueIndex = indexOf(line.dueDate);
-    if (dueIndex < 0) continue;
-    daily[dueIndex] += line.amountCents;
-    if (line.purchaseDate !== null) {
-      // Compra do próprio ciclo: consumo na data da compra, fora da escala das
-      // obrigações.
-      const purchaseIndex = indexOf(line.purchaseDate);
-      if (purchaseIndex >= 0) variable[purchaseIndex] += line.amountCents;
-    } else {
-      obligations[dueIndex] += line.amountCents;
-    }
+  for (const expense of input.cardExpenses ?? []) {
+    const index = indexOf(expense.date);
+    if (index < 0) continue;
+    daily[index] += expense.amountCents;
+    variable[index] += expense.amountCents;
   }
 
   const totalExpensesCents = daily.reduce((total, value) => total + value, 0);

@@ -297,7 +297,7 @@ describe("loadCycleDashboardData — integração com PostgreSQL (moldura do cic
     expect(status.daysInMonth).toBe(31);
   });
 
-  it("a fatura entra pelo vencimento na janela e a vencida antes dela fica de fora", async () => {
+  it("conta a compra do cartão pela data e mostra a fatura antiga só na linha informativa", async () => {
     const reference = resolveCycleReference("2026-10", now, 15);
     const card = await prisma.creditCard.create({
       data: { name: "Itau", closingDay: 15, dueDay: 21 },
@@ -305,28 +305,29 @@ describe("loadCycleDashboardData — integração com PostgreSQL (moldura do cic
 
     await prisma.cardPurchase.createMany({
       data: [
-        // Compra 10/09 (antes do fechamento 15) → fatura de 21/09: fora.
+        // Compra 20/09: a fatura dela vence 21/10 (é paga no ciclo), mas a
+        // compra é do ciclo anterior — fica só na linha informativa.
         {
           cardId: card.id,
-          description: "Fatura antiga",
+          description: "Compra do ciclo passado",
           amountCents: 30000,
-          purchaseDate: new Date(2026, 8, 10),
-          installmentsTotal: 1,
-        },
-        // Compra 20/09 (depois do fechamento) → vence 21/10: dentro.
-        {
-          cardId: card.id,
-          description: "Fatura do ciclo",
-          amountCents: 20000,
           purchaseDate: new Date(2026, 8, 20),
           installmentsTotal: 1,
         },
-        // Compra 16/10 (depois do fechamento) → vence 21/11: fora.
+        // Compra 20/10: dentro da janela (15/10–14/11).
         {
           cardId: card.id,
-          description: "Próxima fatura",
+          description: "Compra do ciclo",
+          amountCents: 20000,
+          purchaseDate: new Date(2026, 9, 20),
+          installmentsTotal: 1,
+        },
+        // Compra 16/11: já é do ciclo seguinte.
+        {
+          cardId: card.id,
+          description: "Compra futura",
           amountCents: 40000,
-          purchaseDate: new Date(2026, 9, 16),
+          purchaseDate: new Date(2026, 10, 16),
           installmentsTotal: 1,
         },
       ],
@@ -335,6 +336,7 @@ describe("loadCycleDashboardData — integração com PostgreSQL (moldura do cic
     const data = await loadCycleDashboardData(reference, now);
 
     expect(data.cardExpensesCents).toBe(20000);
+    expect(data.invoicePaymentCents).toBe(30000);
     expect(data.hasMovements).toBe(true);
     expect(data.series.totalExpensesCents).toBe(20000);
     expect(data.categoryBreakdown.totalCents).toBe(20000);
@@ -355,9 +357,9 @@ describe("loadCycleDashboardData — integração com PostgreSQL (moldura do cic
     await prisma.cardPurchase.create({
       data: {
         cardId: card.id,
-        description: "Fatura",
+        description: "Compra do ciclo",
         amountCents: 100000,
-        purchaseDate: new Date(2026, 8, 20),
+        purchaseDate: new Date(2026, 9, 20),
         installmentsTotal: 1,
       },
     });
@@ -373,7 +375,7 @@ describe("loadCycleDashboardData — integração com PostgreSQL (moldura do cic
     const data = await loadCycleDashboardData(reference, now);
     const status = computeFinanceStatus(data);
 
-    // Consumido do card = fixas + fatura + avulsos da mesma janela.
+    // Consumido do card = fixas + compras do cartão + avulsos da mesma janela.
     expect(status.consumedCents).toBe(160000 + 100000 + 18000);
     expect(data.fixedExpensesCents + data.cardExpensesCents + data.variableExpensesCents).toBe(
       status.consumedCents,

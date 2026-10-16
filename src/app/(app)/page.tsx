@@ -7,14 +7,16 @@ import {
   cycleAvailabilityLabel,
   cycleEndCountdownLabel,
   cycleRangeLabel,
+  cycleStartCountdownLabel,
   dailyAllowanceCard,
   dailyAllowanceCents,
+  daysUntilCycleStart,
   remainingCycleDays,
   usualDailySpendCents,
   type CycleWindow,
   type DailyAllowance,
 } from "@/lib/cycle";
-import { getSettings } from "@/lib/settings";
+import { defaultSettings, getSettings } from "@/lib/settings";
 import {
   actionableBudgetMessage,
   computeFinanceStatus,
@@ -24,13 +26,13 @@ import {
   type DashboardView,
   type FinanceLevel,
 } from "@/lib/finance";
-import { invoiceDueLabelForWindow } from "@/lib/invoices";
+import { cycleInvoicePaymentLabel } from "@/lib/invoices";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import {
   consumptionAverageLabel,
   type DailySeries,
 } from "@/lib/dashboard-series";
-import FutureMonthNotice from "@/components/FutureMonthNotice";
+import CyclePreviewNotice from "@/components/CyclePreviewNotice";
 import {
   buildMonthReviewData,
   localMonthReview,
@@ -62,10 +64,12 @@ export const dynamic = "force-dynamic";
 
 /**
  * O dashboard usa o **ciclo financeiro** como moldura: `?mes=YYYY-MM` é o mês
- * de início do ciclo (ex.: `2026-09` = 15/09–14/10). Renda, obrigações,
- * avulsos, série e categorias contam pela janela do ciclo; ciclos fechados são
- * calculados ao vivo (os snapshots imutáveis de mês calendário seguem no
- * histórico e nas avaliações de IA).
+ * de início do ciclo (ex.: `2026-10` = 15/10–14/11), exibido pelo **mês da
+ * fatura** (`novembro de 2026`). Renda, obrigações, avulsos, série e categorias
+ * contam pela janela; o cartão entra pelas **compras** (parcela k no ciclo da
+ * compra + k−1 meses) e as faturas que **vencem** na janela aparecem numa linha
+ * informativa (caixa), fora do consumo. Ciclos futuros podem ser pré-visualizados
+ * (previsão com o que já está lançado).
  */
 export default async function DashboardPage({
   searchParams,
@@ -78,7 +82,7 @@ export default async function DashboardPage({
 
   let view: DashboardView = { state: "error" };
   let backgroundColor = "hsl(0 0% 45%)";
-  let cycleDaysRemaining = 0;
+  let countdownLabel = cycleEndCountdownLabel(0);
   let level: FinanceLevel = "neutral";
   let series: DailySeries | null = null;
   let incomeCents = 0;
@@ -89,36 +93,41 @@ export default async function DashboardPage({
   let fixedExpensesCents = 0;
   let variableExpensesCents = 0;
   let cardExpensesCents = 0;
+  let invoicePaymentLabel: string | null = null;
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
   let consumptionLabel: string | null = null;
   let categoryBreakdown: CategoryBreakdown | null = null;
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
+  let cycleStartDay = defaultSettings().cycleStartDay;
   let referenceMonthKey = monthKey(now);
   let referenceWindow: CycleWindow | null = null;
   let isCurrentCycle = false;
   let isClosedCycle = false;
+  let isFutureCycle = false;
   let isNextDisabled = true;
 
   try {
-    const { cycleStartDay } = await getSettings();
+    cycleStartDay = (await getSettings()).cycleStartDay;
     const reference = resolveCycleReference(mes, now, cycleStartDay);
     referenceMonthKey = reference.cycleKey;
     referenceWindow = reference.window;
     isCurrentCycle = reference.isCurrent;
     isClosedCycle = !reference.isCurrent && !reference.isFuture;
-    isNextDisabled = reference.isCurrent || reference.isFuture;
+    isFutureCycle = reference.isFuture;
+    isNextDisabled = reference.isFuture;
 
     const data = await loadCycleDashboardData(reference, now);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
-    // O contador do card principal segue o **ciclo financeiro**: dia 08 com o
-    // ciclo fechando no dia 15 ⇒ "8 dias para o fim do ciclo", contando o
-    // próprio dia. Em ciclo fechado, o contador é "Ciclo encerrado".
-    cycleDaysRemaining = isCurrentCycle
-      ? remainingCycleDays(now, cycleStartDay)
-      : 0;
+    // O contador do card principal segue o estado do ciclo: no corrente, dias
+    // até o fim; no futuro, dias até começar; em ciclo fechado, encerrado.
+    countdownLabel = reference.isCurrent
+      ? cycleEndCountdownLabel(remainingCycleDays(now, cycleStartDay))
+      : reference.isFuture
+        ? cycleStartCountdownLabel(daysUntilCycleStart(reference.window, now))
+        : cycleEndCountdownLabel(0);
     level = status.level;
     series = data.series;
     incomeCents = status.incomeCents;
@@ -129,6 +138,9 @@ export default async function DashboardPage({
     fixedExpensesCents = data.fixedExpensesCents;
     variableExpensesCents = data.variableExpensesCents;
     cardExpensesCents = data.cardExpensesCents;
+    invoicePaymentLabel = cycleInvoicePaymentLabel(
+      data.invoicePaymentCents ?? 0,
+    );
     categoryBreakdown = data.categoryBreakdown;
     localMonthSummary = localMonthReview(
       buildMonthReviewData(
@@ -136,9 +148,11 @@ export default async function DashboardPage({
         data.previousMonthsCents,
       ),
     );
+    // Ciclo futuro também mostra os números — como previsão (o aviso acima
+    // explica); o estado "future" do view model fica só no histórico.
     view = dashboardView({
       dbError: false,
-      isFutureMonth: reference.isFuture,
+      isFutureMonth: false,
       incomeCents: status.incomeCents,
       hasMovements: data.hasMovements,
       consumedPercent: status.consumedPercent,
@@ -146,14 +160,17 @@ export default async function DashboardPage({
       previousPercents: data.previousPercents,
     });
 
-    // O card de diária segue o ciclo real; só faz sentido no ciclo corrente.
-    if (isCurrentCycle) {
+    // O card de diária segue o ciclo real; só faz sentido no ciclo corrente ou
+    // na previsão do próximo (com a janela inteira por decorrer). O cartão
+    // entra como consumo (compras pela data), não como obrigação.
+    if (isCurrentCycle || reference.isFuture) {
       allowance = dailyAllowanceCents({
         incomeCents: data.monthlyIncomeCents,
-        obligationsCents: data.fixedExpensesCents + data.cardExpensesCents,
-        variableSpentCents: data.variableExpensesCents,
+        obligationsCents: data.fixedExpensesCents,
+        variableSpentCents:
+          data.variableExpensesCents + data.cardExpensesCents,
         cycleStartDay,
-        now,
+        now: isCurrentCycle ? now : reference.asOf,
       });
     }
 
@@ -174,7 +191,7 @@ export default async function DashboardPage({
         allowance !== null
           ? usualDailySpendCents({
               variableSpentCents: allowance.variableSpentCents,
-              cardExpensesCents,
+              cardExpensesCents: 0,
               elapsedDays: allowance.elapsedDays,
             })
           : null;
@@ -220,12 +237,12 @@ export default async function DashboardPage({
     : [];
 
   // Ritmo recente de consumo do ciclo — base do simulador "posso comprar?":
-  // avulsos do ciclo + fatura do ciclo, ÷ dias decorridos.
+  // avulsos + compras do cartão do ciclo, ÷ dias decorridos.
   const usualDailySpend =
     allowance !== null
       ? usualDailySpendCents({
           variableSpentCents: allowance.variableSpentCents,
-          cardExpensesCents,
+          cardExpensesCents: 0,
           elapsedDays: allowance.elapsedDays,
         })
       : null;
@@ -251,7 +268,10 @@ export default async function DashboardPage({
         rangeLabel={
           referenceWindow ? cycleRangeLabel(referenceWindow) : undefined
         }
+        queryMonthShift={cycleStartDay === 1 ? 0 : 1}
       />
+
+      {isFutureCycle && <CyclePreviewNotice />}
 
       {view.state === "error" && (
         <section
@@ -271,8 +291,6 @@ export default async function DashboardPage({
           <RetryButton />
         </section>
       )}
-
-      {view.state === "future" && <FutureMonthNotice />}
 
       {view.state === "empty" && (
         <section className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl border border-dashed border-border-strong bg-surface p-8 text-center">
@@ -304,10 +322,8 @@ export default async function DashboardPage({
             backgroundColor={backgroundColor}
             percent={view.percent}
             level={level}
-            invoiceDue={
-              referenceWindow ? invoiceDueLabelForWindow(referenceWindow) : ""
-            }
-            countdownLabel={cycleEndCountdownLabel(cycleDaysRemaining)}
+            invoiceDue={invoicePaymentLabel ?? ""}
+            countdownLabel={countdownLabel}
             consumptionLabel={consumptionLabel}
             feedback={view.feedback}
             actionableMessage={actionableMessage}
@@ -362,7 +378,7 @@ export default async function DashboardPage({
             localSummary={localMonthSummary}
           />
 
-          {allowance !== null && (
+          {allowance !== null && isCurrentCycle && (
             <PurchaseSimulator
               key={referenceMonthKey}
               freeBudgetCents={allowance.freeBudgetCents}

@@ -33,6 +33,13 @@ export interface FinanceInput {
   periodDays?: number;
   /** Dias decorridos do período (contando hoje). Default: dia do mês. */
   elapsedDays?: number;
+  /**
+   * No dashboard por ciclo, o cartão conta como **consumo variável** (compras
+   * pela data), não como obrigação: o ritmo inclui a fatura e o orçamento livre
+   * não a desconta de uma vez. Default `false` (mês calendário: fatura =
+   * obrigação pela competência).
+   */
+  cardExpensesVariable?: boolean;
 }
 
 export type DashboardState = "ready" | "empty";
@@ -363,14 +370,20 @@ export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
   const percent = income > 0 ? (consumed / income) * 100 : 0;
   const elapsedPercent = (elapsed / totalDays) * 100;
 
-  // Obrigações já comprometidas no mês (saídas fixas + faturas de cartão) não
-  // entram no ritmo: só o gasto avulso é medido contra o orçamento diário livre.
+  // Obrigações já comprometidas no período (saídas fixas + faturas de cartão no
+  // mês calendário) não entram no ritmo: só o gasto variável é medido contra o
+  // orçamento diário livre. No dashboard por ciclo, o cartão é consumo variável
+  // (compras pela data) e entra no ritmo em vez das obrigações.
+  const card = Math.max(input.cardExpensesCents, 0);
   const obligations =
-    Math.max(input.fixedExpensesCents, 0) + Math.max(input.cardExpensesCents, 0);
+    Math.max(input.fixedExpensesCents, 0) +
+    (input.cardExpensesVariable ? 0 : card);
   const freeBudget = Math.max(income - obligations, 0);
   const dailyAvailable = totalDays > 0 ? freeBudget / totalDays : 0;
   const variable = Math.max(input.variableExpensesCents, 0);
-  const dailySpend = variable / Math.max(elapsed, 1);
+  const dailySpend =
+    (variable + (input.cardExpensesVariable ? card : 0)) /
+    Math.max(elapsed, 1);
   const projectedCents = obligations + dailySpend * totalDays;
 
   const ratio =

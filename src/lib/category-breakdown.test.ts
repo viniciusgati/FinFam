@@ -433,7 +433,7 @@ describe("buildCycleCategoryBreakdown — janela do ciclo", () => {
     expect(breakdown.totalCents).toBe(0);
   });
 
-  it("conta a parcela do cartão pelo vencimento na janela", () => {
+  it("conta a compra do cartão pela data (a do ciclo anterior fica fora)", () => {
     const card = { closingDay: 15, dueDay: 21 };
     const breakdown = buildCycleCategoryBreakdown({
       cycleKey: "2026-10",
@@ -443,15 +443,36 @@ describe("buildCycleCategoryBreakdown — janela do ciclo", () => {
       cardPurchases: [
         {
           amountCents: 10000,
-          purchaseDate: at("2026-10-01T12:00:00.000Z"), // vence 21/10 ∈ janela
+          purchaseDate: at("2026-10-01T12:00:00.000Z"), // ciclo anterior
           installmentsTotal: 1,
           category: "Lazer",
           card,
         },
         {
           amountCents: 40000,
-          purchaseDate: at("2026-10-16T12:00:00.000Z"), // vence 21/11 → fora
+          purchaseDate: at("2026-10-16T12:00:00.000Z"), // dentro da janela
           installmentsTotal: 1,
+          category: "Lazer",
+          card,
+        },
+      ],
+    });
+
+    expect(breakdown.items).toEqual([{ category: "Lazer", amountCents: 40000 }]);
+  });
+
+  it("parcelada em 3x: uma parcela por ciclo", () => {
+    const card = { closingDay: 15, dueDay: 21 };
+    const breakdown = buildCycleCategoryBreakdown({
+      cycleKey: "2026-10",
+      cycle,
+      fixedExpenses: [],
+      variableExpenses: [],
+      cardPurchases: [
+        {
+          amountCents: 30000,
+          purchaseDate: at("2026-10-01T12:00:00.000Z"),
+          installmentsTotal: 3,
           category: "Lazer",
           card,
         },
