@@ -1,17 +1,23 @@
 import { captureClosedMonths, prisma } from "./db";
 import {
   buildConsumptionSummary,
+  buildCycleDailySeries,
   buildDailySeries,
   type ConsumptionSummary,
   type DailySeries,
 } from "./dashboard-series";
 import {
+  cycleLengthDays,
   cycleWindow,
+  cycleWindowForKey,
   dailyAllowanceCents,
+  dayInCycleWindow,
+  type CycleWindow,
   type DailyAllowance,
 } from "./cycle";
 import {
   buildCategoryBreakdown,
+  buildCycleCategoryBreakdown,
   type CategoryBreakdown,
 } from "./category-breakdown";
 import type { FinanceInput } from "./finance";
@@ -23,7 +29,9 @@ import {
 } from "./finance";
 import {
   invoiceLinesForSeries,
+  invoiceLinesForWindow,
   sumCardExpensesForMonth,
+  sumCardExpensesForWindow,
 } from "./invoices";
 import {
   buildDashboardDataFromSnapshot,
@@ -447,19 +455,314 @@ export async function loadDashboardData(
   };
 }
 
+const MONTH_PARAM_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 /**
- * Agrega os dados do **ciclo financeiro** atual para o card "Pode gastar por
- * dia" (história #225).
+ * Ciclo de referência do dashboard, resolvido a partir de `?mes=YYYY-MM`.
  *
- * - Renda e obrigações seguem o **mês calendário corrente** (`monthKey(now)`),
- *   o mesmo mês usado pelo percentual consumido do dashboard (invariante #231:
- *   mês com percentual < 100% ⇒ diária > R$ 0,00). Antes seguiam o mês de
- *   início do ciclo (`cycleKey`), o que desalinhava as obrigações de cartão em
- *   `cycleStartDay ≠ 1` e zerava a diária mesmo com orçamento livre.
- * - Gastos avulsos contam por `date` dentro de `[início do ciclo, hoje]`, apenas
- *   nas formas de pagamento do orçamento (mesma regra de `loadDashboardData`).
- * - Entradas avulsas contam por `date` dentro da mesma janela do ciclo e são
- *   somadas à renda que forma o orçamento livre.
+ * O parâmetro passa a ser o **mês de início do ciclo** (a "moldura" do
+ * dashboard é o ciclo financeiro): ausente/inválido → ciclo corrente; menor
+ * que o corrente → ciclo fechado; maior → ciclo futuro. `asOf` limita os dados
+ * carregados: ciclo corrente acumula até agora; ciclo fechado, até o fim da
+ * janela; futuro, nenhum dado ainda.
+ */
+export interface CycleReference {
+  cycleKey: string;
+  window: CycleWindow;
+  asOf: Date;
+  isCurrent: boolean;
+  isFuture: boolean;
+}
+
+export function resolveCycleReference(
+  mes: string | undefined,
+  now: Date = new Date(),
+  cycleStartDay: number = defaultSettings().cycleStartDay,
+  timeZone: string = resolveTimeZone(),
+): CycleReference {
+  const current = cycleWindow(now, cycleStartDay, timeZone);
+
+  if (!mes || !MONTH_PARAM_PATTERN.test(mes)) {
+    return {
+      cycleKey: current.cycleKey,
+      window: current,
+      asOf: now,
+      isCurrent: true,
+      isFuture: false,
+    };
+  }
+
+  if (mes > current.cycleKey) {
+    const window = cycleWindowForKey(mes, cycleStartDay, timeZone);
+    return {
+      cycleKey: window.cycleKey,
+      window,
+      asOf: window.start,
+      isCurrent: false,
+      isFuture: true,
+    };
+  }
+
+  if (mes < current.cycleKey) {
+    const window = cycleWindowForKey(mes, cycleStartDay, timeZone);
+    return {
+      cycleKey: window.cycleKey,
+      window,
+      asOf: window.nextStart,
+      isCurrent: false,
+      isFuture: false,
+    };
+  }
+
+  return {
+    cycleKey: current.cycleKey,
+    window: current,
+    asOf: now,
+    isCurrent: true,
+    isFuture: false,
+  };
+}
+
+/**
+ * Coleções e somas do ciclo, na mesma moldura para renda, obrigações e
+ * avulsos: fixas e entradas fixas pela **ocorrência do dia** (vencimento/
+ * recebimento) dentro da janela, faturas pelo **vencimento** dentro da janela
+ * e avulsos por `date` (até hoje no ciclo corrente; na janela inteira em ciclo
+ * fechado). As coleções cruas alimentam série, categorias e o breakdown.
+ */
+interface CycleMoney {
+  timeZone: string;
+  window: CycleWindow;
+  monthlyIncomeCents: number;
+  fixedIncomeCents: number;
+  variableIncomeCents: number;
+  fixedExpensesCents: number;
+  variableExpensesCents: number;
+  cardExpensesCents: number;
+  hasMovements: boolean;
+  fixedExpenses: Awaited<ReturnType<typeof prisma.fixedExpense.findMany>>;
+  fixedExpenseOccurrences: { amountCents: number; dueDate: Date }[];
+  variableExpenses: Awaited<ReturnType<typeof prisma.variableExpense.findMany>>;
+  variableIncomes: Awaited<ReturnType<typeof prisma.variableIncome.findMany>>;
+  cardPurchases: Awaited<
+    ReturnType<typeof prisma.cardPurchase.findMany<{ include: { card: true } }>>
+  >;
+}
+
+async function loadCycleMoney(reference: CycleReference): Promise<CycleMoney> {
+  const timeZone = resolveTimeZone();
+  const window = reference.window;
+
+  // Limite superior dos avulsos: fim do dia de `asOf`, sem ultrapassar o ciclo.
+  const asOf = zonedDateParts(reference.asOf, timeZone);
+  const nextDay = zonedTimeToUtc(asOf.year, asOf.month, asOf.day + 1, timeZone);
+  const upper =
+    nextDay.getTime() < window.nextStart.getTime() ? nextDay : window.nextStart;
+
+  const [
+    incomes,
+    fixedExpenses,
+    variableExpenses,
+    variableIncomes,
+    cardPurchases,
+  ] = await Promise.all([
+    prisma.income.findMany({ where: { active: true } }),
+    prisma.fixedExpense.findMany({ where: { active: true } }),
+    prisma.variableExpense.findMany({
+      where: {
+        date: { gte: window.start, lt: upper },
+        paymentMethod: { in: budgetPaymentMethods },
+      },
+    }),
+    prisma.variableIncome.findMany({
+      where: { date: { gte: window.start, lt: upper } },
+    }),
+    prisma.cardPurchase.findMany({
+      where: { purchaseDate: { lt: window.nextStart } },
+      include: { card: true },
+    }),
+  ]);
+
+  // Suposição (g): a relação CardPurchase → CreditCard é obrigatória; uma
+  // compra órfã indica corrupção de dados e deve falhar o carregamento.
+  if (cardPurchases.some((purchase) => !purchase.card)) {
+    throw new Error("Compra de cartão sem cartão relacionado.");
+  }
+
+  // Partição em memória: além do filtro da query, mantém a janela exata (e o
+  // comportamento é o mesmo sob mocks, que não aplicam o filtro do banco).
+  const windowedVariableExpenses = variableExpenses.filter(
+    (item) =>
+      item.date.getTime() >= window.start.getTime() &&
+      item.date.getTime() < upper.getTime(),
+  );
+  const windowedVariableIncomes = variableIncomes.filter(
+    (item) =>
+      item.date.getTime() >= window.start.getTime() &&
+      item.date.getTime() < upper.getTime(),
+  );
+
+  const fixedIncomeCents = incomes.reduce((total, item) => {
+    const received = dayInCycleWindow(window, item.receiveDay, timeZone);
+    if (received === null || !isActiveInMonth(item, monthKey(received))) {
+      return total;
+    }
+    return total + item.amountCents;
+  }, 0);
+
+  const fixedExpenseOccurrences = fixedExpenses.flatMap((item) => {
+    const due = dayInCycleWindow(window, item.dueDay, timeZone);
+    if (due === null || !isActiveInMonth(item, monthKey(due))) return [];
+    return [{ amountCents: item.amountCents, dueDate: due }];
+  });
+
+  const variableIncomeCents = sumByAmount(windowedVariableIncomes);
+  const variableExpensesCents = sumByAmount(windowedVariableExpenses);
+  const fixedExpensesCents = sumByAmount(fixedExpenseOccurrences);
+  // As funções de fatura usam `[start, end)` — `CycleWindow.end` é o último dia
+  // inclusivo, então a janela de vencimentos vai até `nextStart`.
+  const dueWindow = { start: window.start, end: window.nextStart };
+  const cardExpensesCents = sumCardExpensesForWindow(
+    cardPurchases,
+    dueWindow,
+    timeZone,
+  );
+  const cardLines = invoiceLinesForWindow(cardPurchases, dueWindow, timeZone);
+
+  // Movimentação = qualquer saída (fixa/avulsa/cartão) ou entrada avulsa na
+  // janela — é o gatilho do estado vazio "renda sem gastos".
+  const hasMovements =
+    fixedExpenseOccurrences.length > 0 ||
+    windowedVariableExpenses.length > 0 ||
+    cardLines.length > 0 ||
+    windowedVariableIncomes.length > 0;
+
+  return {
+    timeZone,
+    window,
+    monthlyIncomeCents: fixedIncomeCents + variableIncomeCents,
+    fixedIncomeCents,
+    variableIncomeCents,
+    fixedExpensesCents,
+    variableExpensesCents,
+    cardExpensesCents,
+    hasMovements,
+    fixedExpenses,
+    fixedExpenseOccurrences,
+    variableExpenses: windowedVariableExpenses,
+    variableIncomes: windowedVariableIncomes,
+    cardPurchases,
+  };
+}
+
+/**
+ * Dados do dashboard para uma **janela de ciclo** (o "mês" do dashboard é o
+ * ciclo financeiro — ver `resolveCycleReference`).
+ *
+ * - Renda: entradas fixas cuja ocorrência de `receiveDay` cai na janela
+ *   (vigência checada no mês da ocorrência) + entradas avulsas por `date`.
+ * - Obrigações: fixas pela ocorrência de `dueDay` na janela; faturas cujas
+ *   parcelas **vencem** na janela (`sumCardExpensesForWindow`).
+ * - Gastos avulsos por `date` (formas de pagamento do orçamento).
+ * - Série diária, consumo e categorias usam a mesma janela.
+ *
+ * Ciclos fechados são calculados ao vivo (dados completos da janela) — o
+ * snapshot imutável de mês calendário segue valendo para o histórico e as
+ * ferramentas de IA de mês fechado.
+ */
+export async function loadCycleDashboardData(
+  reference: CycleReference,
+  now: Date = new Date(),
+): Promise<DashboardData> {
+  const money = await loadCycleMoney(reference);
+  const timeZone = money.timeZone;
+  const window = reference.window;
+  const cycleDays = cycleLengthDays(window, timeZone);
+
+  const calendarMonthKey = monthKey(now);
+  const startMonthKey = shiftMonthKey(calendarMonthKey, -4);
+  const snapshots = await prisma.monthlySnapshot.findMany({
+    where: { monthKey: { gte: startMonthKey, lt: calendarMonthKey } },
+    orderBy: { monthKey: "asc" },
+    take: 4,
+    include: { categories: { orderBy: { amountCents: "desc" } } },
+  });
+
+  const previousSnapshots = snapshots
+    .map((snapshot) => ({
+      monthKey: snapshot.monthKey,
+      incomeCents: snapshot.incomeCents,
+      consumedCents: snapshot.consumedCents,
+      consumedPercent: snapshot.consumedPercent,
+      categories: snapshot.categories.map((category) => ({
+        category: category.categoryLabel,
+        amountCents: category.amountCents,
+      })),
+    }))
+    .filter(hasComparisonData);
+
+  const series = buildCycleDailySeries({
+    cycle: window,
+    now: reference.asOf,
+    incomeCents: money.monthlyIncomeCents,
+    fixedExpenses: money.fixedExpenseOccurrences,
+    variableExpenses: money.variableExpenses.map((item) => ({
+      amountCents: item.amountCents,
+      date: item.date,
+      paymentMethod: item.paymentMethod,
+    })),
+    cardInvoiceLines: invoiceLinesForWindow(
+      money.cardPurchases,
+      { start: window.start, end: window.nextStart },
+      timeZone,
+    ),
+  });
+
+  const consumption = buildConsumptionSummary({
+    incomeCents: money.monthlyIncomeCents,
+    fixedExpensesCents: money.fixedExpensesCents,
+    daysInMonth: cycleDays,
+    daysElapsed: series.elapsedDay,
+    cycleDays,
+  });
+
+  return {
+    monthlyIncomeCents: money.monthlyIncomeCents,
+    fixedIncomeCents: money.fixedIncomeCents,
+    variableIncomeCents: money.variableIncomeCents,
+    fixedExpensesCents: money.fixedExpensesCents,
+    variableExpensesCents: money.variableExpensesCents,
+    cardExpensesCents: money.cardExpensesCents,
+    hasMovements: money.hasMovements,
+    previousPercents: previousSnapshots.map(
+      (snapshot) => snapshot.consumedPercent,
+    ),
+    previousMonthsCents: previousSnapshots.map(
+      (snapshot) => snapshot.consumedCents,
+    ),
+    snapshots: previousSnapshots,
+    series,
+    consumption,
+    categoryBreakdown: buildCycleCategoryBreakdown({
+      cycleKey: reference.cycleKey,
+      cycle: window,
+      fixedExpenses: money.fixedExpenses,
+      variableExpenses: money.variableExpenses,
+      cardPurchases: money.cardPurchases,
+      timeZone,
+    }),
+    referenceDate: reference.asOf,
+    periodDays: cycleDays,
+    elapsedDays: series.elapsedDay,
+  };
+}
+
+/**
+ * Agrega os dados do **ciclo financeiro** para o card "Pode gastar por dia"
+ * (história #225), na mesma moldura de `loadCycleDashboardData`: fixas e
+ * entradas fixas pela ocorrência do dia na janela, faturas pelo vencimento na
+ * janela e avulsos por `date` dentro dela. A invariante #231 (percentual <
+ * 100% ⇒ diária > R$ 0,00) passa a valer com a mesma janela do `%`.
  */
 export async function loadCycleAllowance(
   now: Date = new Date(),
@@ -467,46 +770,20 @@ export async function loadCycleAllowance(
   const timeZone = resolveTimeZone();
   const { cycleStartDay } = await getSettings();
   const window = cycleWindow(now, cycleStartDay, timeZone);
-  const currentMonthKey = monthKey(now);
+  const reference: CycleReference = {
+    cycleKey: window.cycleKey,
+    window,
+    asOf: now,
+    isCurrent: true,
+    isFuture: false,
+  };
 
-  // Limite superior dos gastos avulsos: fim de hoje, sem ultrapassar o ciclo.
-  const today = zonedDateParts(now, timeZone);
-  const tomorrow = zonedTimeToUtc(today.year, today.month, today.day + 1, timeZone);
-  const upperBound =
-    tomorrow.getTime() < window.nextStart.getTime() ? tomorrow : window.nextStart;
-
-  const [incomes, fixedExpenses, variableExpenses, variableIncomes, cardPurchases] =
-    await Promise.all([
-      prisma.income.findMany({ where: { active: true } }),
-      prisma.fixedExpense.findMany({ where: { active: true } }),
-      prisma.variableExpense.findMany({
-        where: {
-          date: { gte: window.start, lt: upperBound },
-          paymentMethod: { in: budgetPaymentMethods },
-        },
-      }),
-      prisma.variableIncome.findMany({
-        where: { date: { gte: window.start, lt: upperBound } },
-      }),
-      prisma.cardPurchase.findMany({
-        where: { purchaseDate: { lt: window.nextStart } },
-        include: { card: true },
-      }),
-    ]);
-
-  const incomeCents =
-    sumByAmount(incomes.filter((item) => isActiveInMonth(item, currentMonthKey))) +
-    sumByAmount(variableIncomes);
-  const fixedCents = sumByAmount(
-    fixedExpenses.filter((item) => isActiveInMonth(item, currentMonthKey)),
-  );
-  const cardCents = sumCardExpensesForMonth(cardPurchases, currentMonthKey);
-  const variableSpentCents = sumByAmount(variableExpenses);
+  const money = await loadCycleMoney(reference);
 
   return dailyAllowanceCents({
-    incomeCents,
-    obligationsCents: fixedCents + cardCents,
-    variableSpentCents,
+    incomeCents: money.monthlyIncomeCents,
+    obligationsCents: money.fixedExpensesCents + money.cardExpensesCents,
+    variableSpentCents: money.variableExpensesCents,
     cycleStartDay,
     now,
     timeZone,

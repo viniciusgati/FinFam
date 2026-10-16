@@ -1,11 +1,16 @@
 import Link from "next/link";
-import { loadCycleAllowance, loadDashboardData } from "@/lib/dashboard";
+import {
+  loadCycleDashboardData,
+  resolveCycleReference,
+} from "@/lib/dashboard";
 import {
   cycleAvailabilityLabel,
   cycleEndCountdownLabel,
   dailyAllowanceCard,
+  dailyAllowanceCents,
   remainingCycleDays,
   usualDailySpendCents,
+  type CycleWindow,
   type DailyAllowance,
 } from "@/lib/cycle";
 import { getSettings } from "@/lib/settings";
@@ -18,7 +23,7 @@ import {
   type DashboardView,
   type FinanceLevel,
 } from "@/lib/finance";
-import { invoiceDueLabel, resolveReferenceDate } from "@/lib/invoices";
+import { invoiceDueLabelForWindow } from "@/lib/invoices";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import {
   consumptionAverageLabel,
@@ -54,6 +59,13 @@ import type { CategoryBreakdown } from "@/lib/category-breakdown";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * O dashboard usa o **ciclo financeiro** como moldura: `?mes=YYYY-MM` é o mês
+ * de início do ciclo (ex.: `2026-09` = 15/09–14/10). Renda, obrigações,
+ * avulsos, série e categorias contam pela janela do ciclo; ciclos fechados são
+ * calculados ao vivo (os snapshots imutáveis de mês calendário seguem no
+ * histórico e nas avaliações de IA).
+ */
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -61,13 +73,7 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const mes = Array.isArray(params.mes) ? params.mes[0] : params.mes;
-  const referenceDate = resolveReferenceDate(mes);
-  const referenceMonthKey = monthKey(referenceDate);
-  const currentMonthKey = monthKey(new Date());
-  const isCurrentMonth = referenceMonthKey >= currentMonthKey;
-  const isFutureMonth = referenceMonthKey > currentMonthKey;
-  const isCalendarMonth = referenceMonthKey === currentMonthKey;
-  const isClosedMonth = referenceMonthKey < currentMonthKey;
+  const now = new Date();
 
   let view: DashboardView = { state: "error" };
   let backgroundColor = "hsl(0 0% 45%)";
@@ -88,17 +94,30 @@ export default async function DashboardPage({
   let categoryBreakdown: CategoryBreakdown | null = null;
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
+  let referenceMonthKey = monthKey(now);
+  let referenceWindow: CycleWindow | null = null;
+  let isCurrentCycle = false;
+  let isClosedCycle = false;
+  let isNextDisabled = true;
 
   try {
-    const data = await loadDashboardData(referenceDate);
+    const { cycleStartDay } = await getSettings();
+    const reference = resolveCycleReference(mes, now, cycleStartDay);
+    referenceMonthKey = reference.cycleKey;
+    referenceWindow = reference.window;
+    isCurrentCycle = reference.isCurrent;
+    isClosedCycle = !reference.isCurrent && !reference.isFuture;
+    isNextDisabled = reference.isCurrent || reference.isFuture;
+
+    const data = await loadCycleDashboardData(reference, now);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
-    // O contador do card principal segue o **ciclo financeiro** (não o mês
-    // calendário): dia 08 com o ciclo fechando no dia 15 ⇒ "8 dias para o fim
-    // do ciclo", contando o próprio dia. `status.daysRemaining` é do mês
-    // calendário e não serve aqui.
-    const { cycleStartDay } = await getSettings();
-    cycleDaysRemaining = remainingCycleDays(referenceDate, cycleStartDay);
+    // O contador do card principal segue o **ciclo financeiro**: dia 08 com o
+    // ciclo fechando no dia 15 ⇒ "8 dias para o fim do ciclo", contando o
+    // próprio dia. Em ciclo fechado, o contador é "Ciclo encerrado".
+    cycleDaysRemaining = isCurrentCycle
+      ? remainingCycleDays(now, cycleStartDay)
+      : 0;
     level = status.level;
     series = data.series;
     incomeCents = status.incomeCents;
@@ -118,7 +137,7 @@ export default async function DashboardPage({
     );
     view = dashboardView({
       dbError: false,
-      isFutureMonth,
+      isFutureMonth: reference.isFuture,
       incomeCents: status.incomeCents,
       hasMovements: data.hasMovements,
       consumedPercent: status.consumedPercent,
@@ -126,22 +145,28 @@ export default async function DashboardPage({
       previousPercents: data.previousPercents,
     });
 
-    // O card de diária segue o ciclo real; só faz sentido no mês corrente.
-    if (isCalendarMonth) {
-      allowance = await loadCycleAllowance();
+    // O card de diária segue o ciclo real; só faz sentido no ciclo corrente.
+    if (isCurrentCycle) {
+      allowance = dailyAllowanceCents({
+        incomeCents: data.monthlyIncomeCents,
+        obligationsCents: data.fixedExpensesCents + data.cardExpensesCents,
+        variableSpentCents: data.variableExpensesCents,
+        cycleStartDay,
+        now,
+      });
     }
 
     // O subtítulo do card principal só existe no ramo `ok` (com renda e
-    // movimentação). No mês corrente ele repete os números do ciclo (igual ao
-    // "Pode gastar por dia"); em mês fechado, mostra a média do mês.
+    // movimentação). No ciclo corrente ele repete os números do ciclo (igual ao
+    // "Pode gastar por dia"); em ciclo fechado, mostra a média do mês.
     if (view.state === "ok") {
       consumptionLabel =
         allowance !== null
           ? cycleAvailabilityLabel(allowance)
           : consumptionAverageLabel(data.consumption);
 
-      // Variação diária só existe no mês corrente (mês fechado não tem "hoje").
-      const todayVariableSpendCents = isCalendarMonth
+      // Variação diária só existe no ciclo corrente (ciclo fechado não tem "hoje").
+      const todayVariableSpendCents = isCurrentCycle
         ? (series.variableDailyCents[series.elapsedDay - 1] ?? 0)
         : null;
       const usualDailySpend =
@@ -152,7 +177,7 @@ export default async function DashboardPage({
               elapsedDays: allowance.elapsedDays,
             })
           : null;
-      const dailyReferenceCents = isCalendarMonth
+      const dailyReferenceCents = isCurrentCycle
         ? usualDailySpend !== null && usualDailySpend > 0
           ? usualDailySpend
           : data.consumption.dailyByMonthCents
@@ -187,14 +212,14 @@ export default async function DashboardPage({
     });
   }
 
-  // Sugestões de categoria para o lançamento rápido: só fazem sentido no mês
+  // Sugestões de categoria para o lançamento rápido: só fazem sentido no ciclo
   // corrente (quando o card aparece); falha de leitura cai para [].
-  const categorySuggestions = isCalendarMonth
+  const categorySuggestions = isCurrentCycle
     ? await loadCategorySuggestions()
     : [];
 
   // Ritmo recente de consumo do ciclo — base do simulador "posso comprar?":
-  // avulsos do ciclo + fatura de cartão do mês, ÷ dias decorridos.
+  // avulsos do ciclo + fatura do ciclo, ÷ dias decorridos.
   const usualDailySpend =
     allowance !== null
       ? usualDailySpendCents({
@@ -220,7 +245,7 @@ export default async function DashboardPage({
     <div className="flex w-full flex-col gap-6">
       <MonthSelector
         monthKey={referenceMonthKey}
-        isCurrentMonth={isCurrentMonth}
+        isCurrentMonth={isNextDisabled}
         basePath="/"
       />
 
@@ -275,7 +300,9 @@ export default async function DashboardPage({
             backgroundColor={backgroundColor}
             percent={view.percent}
             level={level}
-            invoiceDue={invoiceDueLabel(referenceDate)}
+            invoiceDue={
+              referenceWindow ? invoiceDueLabelForWindow(referenceWindow) : ""
+            }
             countdownLabel={cycleEndCountdownLabel(cycleDaysRemaining)}
             consumptionLabel={consumptionLabel}
             feedback={view.feedback}
@@ -287,7 +314,7 @@ export default async function DashboardPage({
             projectedCents={projectedCents}
           />
 
-          {isCalendarMonth && (
+          {isCurrentCycle && (
             <div className="grid items-stretch gap-6 md:grid-cols-2">
               <QuickExpenseCard categorySuggestions={categorySuggestions} />
               {allowance !== null && (
@@ -310,7 +337,7 @@ export default async function DashboardPage({
               variableDailyCents={series.variableDailyCents}
               obligationDailyCents={series.obligationDailyCents}
               elapsedDay={series.elapsedDay}
-              highlightDay={isCalendarMonth ? series.elapsedDay : undefined}
+              highlightDay={isCurrentCycle ? series.elapsedDay : undefined}
             />
           </div>
 
@@ -327,7 +354,7 @@ export default async function DashboardPage({
           <MonthReviewPanel
             key={referenceMonthKey}
             monthKey={referenceMonthKey}
-            eligible={isClosedMonth}
+            eligible={isClosedCycle}
             localSummary={localMonthSummary}
           />
 

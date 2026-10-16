@@ -277,14 +277,14 @@ describe("monthEndCountdownLabel", () => {
 });
 
 describe("projectionLabel", () => {
-  it("formata a projeção arredondada até o fim do mês", () => {
-    expect(projectionLabel(248)).toBe("No ritmo atual: 248% até o fim do mês");
-    expect(projectionLabel(90)).toBe("No ritmo atual: 90% até o fim do mês");
+  it("formata a projeção arredondada até o fim do ciclo", () => {
+    expect(projectionLabel(248)).toBe("No ritmo atual: 248% até o fim do ciclo");
+    expect(projectionLabel(90)).toBe("No ritmo atual: 90% até o fim do ciclo");
   });
 
   it("arredonda como o percentual consumido exibido", () => {
-    expect(projectionLabel(99.6)).toBe("No ritmo atual: 100% até o fim do mês");
-    expect(projectionLabel(99.4)).toBe("No ritmo atual: 99% até o fim do mês");
+    expect(projectionLabel(99.6)).toBe("No ritmo atual: 100% até o fim do ciclo");
+    expect(projectionLabel(99.4)).toBe("No ritmo atual: 99% até o fim do ciclo");
   });
 });
 
@@ -1022,5 +1022,37 @@ describe("conversão de valores", () => {
 
   it("formata centavos como moeda brasileira", () => {
     expect(formatCents(123456).replace(/\u00a0/g, " ")).toBe("R$ 1.234,56");
+  });
+});
+
+describe("computeFinanceStatus — moldura do período (ciclo)", () => {
+  const reference = new Date("2026-10-16T15:00:00.000Z");
+
+  const base = {
+    monthlyIncomeCents: 300000,
+    fixedExpensesCents: 100000,
+    variableExpensesCents: 30000,
+    cardExpensesCents: 0,
+    referenceDate: reference,
+  };
+
+  it("sem override usa o mês calendário (dia 16, 31 dias)", () => {
+    const status = computeFinanceStatus(base);
+
+    expect(status.daysInMonth).toBe(31);
+    expect(status.daysElapsed).toBe(16);
+    expect(status.projectedCents).toBe(100000 + Math.round((30000 / 16) * 31));
+  });
+
+  it("com periodDays/elapsedDays usa a janela do ciclo", () => {
+    const status = computeFinanceStatus({
+      ...base,
+      periodDays: 31,
+      elapsedDays: 2,
+    });
+
+    expect(status.daysInMonth).toBe(31);
+    expect(status.daysElapsed).toBe(2);
+    expect(status.projectedCents).toBe(100000 + 15000 * 31);
   });
 });

@@ -26,25 +26,25 @@ describe("MonthSpendCard (renderização)", () => {
   it("mantém todo o conteúdo do hero: percentual, nível, vencimento e contador do ciclo", () => {
     const html = render();
 
-    expect(html).toContain("Renda do mês consumida");
+    expect(html).toContain("Renda do ciclo consumida");
     expect(html).toContain("42");
     expect(html).toContain("Ok");
     expect(html).toContain("Vencimento da fatura em 10/04");
-    expect(html).toContain("Mês calendário");
+    expect(html).toContain("Ciclo financeiro");
     expect(html).toContain("8 dias para o fim do ciclo");
   });
 
   it("decompõe o percentual nos valores do mês: renda, consumido, disponível e projeção", () => {
     const html = render();
 
-    expect(html).toContain("Renda do mês");
+    expect(html).toContain("Renda do ciclo");
     expect(html).toContain("R$ 5.000,00");
     expect(html).toContain("Já consumido");
     expect(html).toContain("R$ 2.100,00");
     expect(html).toContain("42% da renda");
     expect(html).toContain("Ainda disponível");
     expect(html).toContain("R$ 2.900,00");
-    expect(html).toContain("Projeção até o fim do mês");
+    expect(html).toContain("Projeção até o fim do ciclo");
     expect(html).toContain("R$ 3.000,00");
   });
 
@@ -142,14 +142,14 @@ describe("MonthSpendCard (renderização)", () => {
   it("mostra a projeção e o risco quando a projeção estoura a renda", () => {
     const html = render({ projectedPercent: 248, projectedRisk: true });
 
-    expect(html).toContain("No ritmo atual: 248% até o fim do mês");
+    expect(html).toContain("No ritmo atual: 248% até o fim do ciclo");
     expect(html).toContain("Risco de estouro");
   });
 
   it("mostra a projeção sem risco quando abaixo de 100%", () => {
     const html = render({ projectedPercent: 90, projectedRisk: false });
 
-    expect(html).toContain("No ritmo atual: 90% até o fim do mês");
+    expect(html).toContain("No ritmo atual: 90% até o fim do ciclo");
     expect(html).not.toContain("Risco de estouro");
   });
 

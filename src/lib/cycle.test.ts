@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   cycleAvailabilityLabel,
+  cycleDayNumber,
   cycleEndCountdownLabel,
+  cycleLengthDays,
   cycleWindow,
+  cycleWindowForKey,
   dailyAllowanceCents,
   dailyAllowanceCard,
   dailyCentsForBudget,
+  dayInCycleWindow,
   elapsedCycleDays,
   remainingCycleDays,
   usualDailySpendCents,
@@ -362,5 +366,57 @@ describe("cycleAvailabilityLabel", () => {
     expect(cycleAvailabilityLabel(allowance({ hasData: false }))).toBe(
       "Sem dados do ciclo.",
     );
+  });
+});
+
+describe("janela do ciclo por chave e ocorrências de vencimento", () => {
+  it("cycleWindowForKey devolve a mesma janela que cycleWindow", () => {
+    const byKey = cycleWindowForKey("2026-10", 15);
+    const byDate = cycleWindow(new Date("2026-10-16T15:00:00.000Z"), 15);
+
+    expect(byKey).toEqual(byDate);
+  });
+
+  it("dayInCycleWindow acha a ocorrência do dia dentro da janela", () => {
+    const cycle = cycleWindowForKey("2026-10", 15);
+
+    expect(dayInCycleWindow(cycle, 20)?.toISOString()).toBe(
+      "2026-10-20T03:00:00.000Z",
+    );
+    expect(dayInCycleWindow(cycle, 5)?.toISOString()).toBe(
+      "2026-11-05T03:00:00.000Z",
+    );
+    expect(dayInCycleWindow(cycle, 15)?.toISOString()).toBe(
+      "2026-10-15T03:00:00.000Z",
+    );
+    expect(dayInCycleWindow(cycle, 14)?.toISOString()).toBe(
+      "2026-11-14T03:00:00.000Z",
+    );
+  });
+
+  it("limita o dia ao tamanho do mês (31 em setembro vence no dia 30)", () => {
+    const cycle = cycleWindowForKey("2026-09", 15);
+
+    expect(dayInCycleWindow(cycle, 31)?.toISOString()).toBe(
+      "2026-09-30T03:00:00.000Z",
+    );
+  });
+
+  it("cycleDayNumber conta a partir de 1 e devolve 0 antes do início", () => {
+    const cycle = cycleWindowForKey("2026-10", 15);
+
+    expect(cycleDayNumber(new Date("2026-10-15T15:00:00.000Z"), cycle)).toBe(1);
+    expect(cycleDayNumber(new Date("2026-10-16T15:00:00.000Z"), cycle)).toBe(2);
+    expect(cycleDayNumber(new Date("2026-11-14T15:00:00.000Z"), cycle)).toBe(
+      31,
+    );
+    expect(cycleDayNumber(new Date("2026-10-14T15:00:00.000Z"), cycle)).toBe(0);
+  });
+
+  it("cycleLengthDays devolve o tamanho da janela (28–31)", () => {
+    expect(cycleLengthDays(cycleWindowForKey("2026-10", 15))).toBe(31);
+    expect(cycleLengthDays(cycleWindowForKey("2026-09", 15))).toBe(30);
+    expect(cycleLengthDays(cycleWindowForKey("2026-02", 15))).toBe(28);
+    expect(cycleLengthDays(cycleWindowForKey("2026-02", 1))).toBe(28);
   });
 });

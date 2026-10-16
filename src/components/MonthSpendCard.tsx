@@ -31,9 +31,10 @@ export interface MonthSpendCardProps {
 
 /**
  * Card principal do dashboard. O `%` fica à esquerda com a barra de progresso
- * (mês calendário) e, à direita, os valores em R$ que explicam o número: renda,
- * consumido, disponível e projeção de fechamento. Os rótulos do dinheiro vêm de
- * `buildMonthSpendStats` (função pura testada em month-spend.test.ts).
+ * (janela do ciclo financeiro) e, à direita, os valores em R$ que explicam o
+ * número: renda, consumido, disponível e projeção de fechamento. Os rótulos do
+ * dinheiro vêm de `buildMonthSpendStats` (função pura testada em
+ * month-spend.test.ts).
  */
 export default function MonthSpendCard({
   backgroundColor,
@@ -74,7 +75,7 @@ export default function MonthSpendCard({
               FinFam
             </p>
             <h1 className="text-xl font-semibold opacity-90 sm:text-2xl">
-              Renda do mês consumida
+              Renda do ciclo consumida
             </h1>
           </div>
 
@@ -86,7 +87,7 @@ export default function MonthSpendCard({
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center lg:gap-10">
           <div className="flex flex-col gap-3 text-center lg:text-left">
             <p className="text-xs font-medium uppercase tracking-widest opacity-80">
-              Mês calendário
+              Ciclo financeiro
             </p>
 
             <p className="text-5xl font-black tabular-nums sm:text-7xl">

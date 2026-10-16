@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCategoryBreakdown,
+  buildCycleCategoryBreakdown,
   categoryBreakdownView,
   type CategoryBreakdownInput,
 } from "./category-breakdown";
+import { cycleWindowForKey } from "./cycle";
 
 const MONTH = "2026-10";
 
@@ -365,5 +367,97 @@ describe("categoryBreakdownView", () => {
     expect(normalize(view.ariaLabel)).toBe(
       "Gastos por categoria: Moradia R$ 1.200,00 (95%), Mercado R$ 60,00 (5%). Total R$ 1.260,00",
     );
+  });
+});
+
+describe("buildCycleCategoryBreakdown — janela do ciclo", () => {
+  const cycle = cycleWindowForKey("2026-10", 15); // 15/10–14/11
+  const at = (iso: string) => new Date(iso);
+
+  it("conta a fixa pela ocorrência do vencimento na janela", () => {
+    const breakdown = buildCycleCategoryBreakdown({
+      cycleKey: "2026-10",
+      cycle,
+      fixedExpenses: [
+        {
+          amountCents: 45000,
+          dueDay: 20, // 20/10 ∈ janela
+          category: "Casa",
+          active: true,
+          startMonth: null,
+          endMonth: null,
+        },
+        {
+          amountCents: 12000,
+          dueDay: 5, // vence 05/11 ∈ janela
+          category: "Transporte",
+          active: true,
+          startMonth: "2026-11",
+          endMonth: null,
+        },
+      ],
+      variableExpenses: [
+        { amountCents: 3000, category: "Mercado", paymentMethod: "PIX" },
+      ],
+      cardPurchases: [],
+    });
+
+    expect(breakdown.monthKey).toBe("2026-10");
+    expect(breakdown.items).toEqual([
+      { category: "Casa", amountCents: 45000 },
+      { category: "Transporte", amountCents: 12000 },
+      { category: "Mercado", amountCents: 3000 },
+    ]);
+    expect(breakdown.totalCents).toBe(60000);
+  });
+
+  it("checa a vigência no mês da ocorrência (05/11 com startMonth 12/2026 fica fora)", () => {
+    const breakdown = buildCycleCategoryBreakdown({
+      cycleKey: "2026-10",
+      cycle,
+      fixedExpenses: [
+        {
+          amountCents: 9999,
+          dueDay: 5,
+          category: "Futura",
+          active: true,
+          startMonth: "2026-12",
+          endMonth: null,
+        },
+      ],
+      variableExpenses: [],
+      cardPurchases: [],
+    });
+
+    expect(breakdown.items).toEqual([]);
+    expect(breakdown.totalCents).toBe(0);
+  });
+
+  it("conta a parcela do cartão pelo vencimento na janela", () => {
+    const card = { closingDay: 15, dueDay: 21 };
+    const breakdown = buildCycleCategoryBreakdown({
+      cycleKey: "2026-10",
+      cycle,
+      fixedExpenses: [],
+      variableExpenses: [],
+      cardPurchases: [
+        {
+          amountCents: 10000,
+          purchaseDate: at("2026-10-01T12:00:00.000Z"), // vence 21/10 ∈ janela
+          installmentsTotal: 1,
+          category: "Lazer",
+          card,
+        },
+        {
+          amountCents: 40000,
+          purchaseDate: at("2026-10-16T12:00:00.000Z"), // vence 21/11 → fora
+          installmentsTotal: 1,
+          category: "Lazer",
+          card,
+        },
+      ],
+    });
+
+    expect(breakdown.items).toEqual([{ category: "Lazer", amountCents: 10000 }]);
   });
 });

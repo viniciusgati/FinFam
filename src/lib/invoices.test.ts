@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { remainingCycleDays } from "./cycle";
+import { cycleWindowForKey, remainingCycleDays } from "./cycle";
 import {
   allocateInstallments,
+  installmentDueDate,
   invoiceDueLabel,
+  invoiceDueLabelForWindow,
   invoiceLinesForMonth,
   invoiceLinesForSeries,
+  invoiceLinesForWindow,
   purchaseInvoice,
   resolveReferenceDate,
   sumCardExpensesForMonth,
+  sumCardExpensesForWindow,
 } from "./invoices";
 import { zonedDateParts } from "./time";
 
@@ -348,6 +352,96 @@ describe("invoiceDueLabel", () => {
   it("segue o calendário do Brasil: 23:30 de 31/10 ainda é outubro", () => {
     expect(invoiceDueLabel(new Date("2026-11-01T02:30:00Z"))).toBe(
       "Fatura com vencimento em outubro/2026",
+    );
+  });
+});
+
+describe("faturas na janela do ciclo", () => {
+  const card = { closingDay: 15, dueDay: 21 };
+  const cycle = cycleWindowForKey("2026-10", 15); // 15/10–14/11
+  const at = (iso: string) => new Date(iso);
+
+  const compra01out = {
+    amountCents: 10000,
+    purchaseDate: at("2026-10-01T12:00:00.000Z"),
+    installmentsTotal: 1,
+    card,
+  };
+  const compra20set = {
+    amountCents: 20000,
+    purchaseDate: at("2026-09-20T12:00:00.000Z"),
+    installmentsTotal: 1,
+    card,
+  };
+  // Depois do fechamento (15): a parcela vence em 21/11 e fica fora da janela.
+  const compra16out = {
+    amountCents: 40000,
+    purchaseDate: at("2026-10-16T12:00:00.000Z"),
+    installmentsTotal: 1,
+    card,
+  };
+  // Parcelada: só a 1ª parcela vence na janela.
+  const parcelada = {
+    amountCents: 50000,
+    purchaseDate: at("2026-10-01T12:00:00.000Z"),
+    installmentsTotal: 2,
+    card,
+  };
+
+  it("installmentDueDate resolve o vencimento no mês da competência", () => {
+    expect(installmentDueDate("2026-10", 21).toISOString()).toBe(
+      "2026-10-21T03:00:00.000Z",
+    );
+    // Dia 31 em mês de 28 vence no último dia do mês.
+    expect(installmentDueDate("2026-02", 31).toISOString()).toBe(
+      "2026-02-28T03:00:00.000Z",
+    );
+  });
+
+  it("soma só as parcelas que vencem na janela", () => {
+    const purchases = [compra01out, compra20set, compra16out, parcelada];
+
+    expect(
+      sumCardExpensesForWindow(purchases, {
+        start: cycle.start,
+        end: cycle.nextStart,
+      }),
+    ).toBe(10000 + 20000 + 25000);
+  });
+
+  it("marca a compra feita dentro da janela e trata as anteriores como obrigação", () => {
+    const purchases = [
+      compra01out,
+      {
+        amountCents: 30000,
+        purchaseDate: at("2026-10-16T12:00:00.000Z"),
+        installmentsTotal: 1,
+        card: { closingDay: 20, dueDay: 25 },
+      },
+    ];
+
+    expect(
+      invoiceLinesForWindow(purchases, {
+        start: cycle.start,
+        end: cycle.nextStart,
+      }),
+    ).toEqual([
+      {
+        amountCents: 10000,
+        dueDate: at("2026-10-21T03:00:00.000Z"),
+        purchaseDate: null,
+      },
+      {
+        amountCents: 30000,
+        dueDate: at("2026-10-25T03:00:00.000Z"),
+        purchaseDate: at("2026-10-16T12:00:00.000Z"),
+      },
+    ]);
+  });
+
+  it("invoiceDueLabelForWindow cita o intervalo do ciclo", () => {
+    expect(invoiceDueLabelForWindow(cycle)).toBe(
+      "Faturas com vencimento no ciclo (15/10 a 14/11/2026)",
     );
   });
 });

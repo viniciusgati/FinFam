@@ -66,7 +66,7 @@ export function buildMonthSpendStats(
   return [
     {
       key: "income",
-      label: "Renda do mês",
+      label: "Renda do ciclo",
       value: formatCents(income),
       detail: null,
     },
@@ -79,7 +79,7 @@ export function buildMonthSpendStats(
     available,
     {
       key: "projection",
-      label: "Projeção até o fim do mês",
+      label: "Projeção até o fim do ciclo",
       value: formatCents(Math.max(input.projectedCents, 0)),
       detail: null,
     },

@@ -25,6 +25,14 @@ export interface FinanceInput {
   variableExpensesCents: number;
   cardExpensesCents: number;
   referenceDate?: Date;
+  /**
+   * Total de dias do período avaliado. Default: dias do mês de
+   * `referenceDate`. O dashboard por ciclo passa os dias da janela para que
+   * projeção e ritmo usem a mesma moldura do `%`.
+   */
+  periodDays?: number;
+  /** Dias decorridos do período (contando hoje). Default: dia do mês. */
+  elapsedDays?: number;
 }
 
 export type DashboardState = "ready" | "empty";
@@ -345,8 +353,9 @@ export function projectedPercent(
 export function computeFinanceStatus(input: FinanceInput): FinanceStatus {
   const referenceDate = input.referenceDate ?? new Date();
   const currentMonth = monthKey(referenceDate);
-  const totalDays = daysInMonth(referenceDate);
-  const elapsed = zonedDateParts(referenceDate, resolveTimeZone()).day;
+  const totalDays = input.periodDays ?? daysInMonth(referenceDate);
+  const elapsed =
+    input.elapsedDays ?? zonedDateParts(referenceDate, resolveTimeZone()).day;
   const remaining = totalDays - elapsed;
   const income = Math.max(input.monthlyIncomeCents, 0);
   const consumed = consumedCents(input);
@@ -504,12 +513,12 @@ export function monthEndCountdownLabel(days: number): string {
 }
 
 /**
- * Rótulo textual da projeção de fechamento do mês. Usa `Math.round`, igual ao
- * percentual consumido exibido, para a leitura exibir o mesmo inteiro que
+ * Rótulo textual da projeção de fechamento do período. Usa `Math.round`, igual
+ * ao percentual consumido exibido, para a leitura exibir o mesmo inteiro que
  * decide o risco.
  */
 export function projectionLabel(projectedPercent: number): string {
-  return `No ritmo atual: ${Math.round(projectedPercent)}% até o fim do mês`;
+  return `No ritmo atual: ${Math.round(projectedPercent)}% até o fim do ciclo`;
 }
 
 /**

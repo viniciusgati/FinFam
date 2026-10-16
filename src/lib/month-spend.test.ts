@@ -18,7 +18,7 @@ describe("buildMonthSpendStats", () => {
     expect(stats).toEqual([
       {
         key: "income",
-        label: "Renda do mês",
+        label: "Renda do ciclo",
         value: "R$ 5.000,00",
         detail: null,
       },
@@ -36,7 +36,7 @@ describe("buildMonthSpendStats", () => {
       },
       {
         key: "projection",
-        label: "Projeção até o fim do mês",
+        label: "Projeção até o fim do ciclo",
         value: "R$ 4.800,00",
         detail: null,
       },

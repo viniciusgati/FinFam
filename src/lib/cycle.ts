@@ -94,6 +94,108 @@ export function cycleWindow(
 }
 
 /**
+ * Janela do ciclo identificado pelo mês de início (`cycleKey`, YYYY-MM).
+ * Espelha `cycleWindow` para uma chave explícita (histórico/navegação por
+ * ciclo, sem depender de uma data de referência).
+ */
+export function cycleWindowForKey(
+  cycleKey: string,
+  cycleStartDay: number,
+  timeZone: string = resolveTimeZone(),
+): CycleWindow {
+  const [year, month] = cycleKey.split("-").map(Number);
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+
+  const start = zonedTimeToUtc(year, month, cycleStartDay, timeZone);
+  const nextStart = zonedTimeToUtc(
+    nextYear,
+    nextMonth,
+    cycleStartDay,
+    timeZone,
+  );
+  const endCalendar = new Date(
+    calendarDayUtc(nextYear, nextMonth, cycleStartDay) - DAY_MS,
+  );
+  const end = zonedTimeToUtc(
+    endCalendar.getUTCFullYear(),
+    endCalendar.getUTCMonth() + 1,
+    endCalendar.getUTCDate(),
+    timeZone,
+  );
+
+  return { cycleKey: `${year}-${pad2(month)}`, start, end, nextStart, startDay: cycleStartDay };
+}
+
+/** Último dia do mês de `year`/`month` (1-based). */
+function lastDayOfMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * Ocorrência do dia-do-mês `day` (ex.: vencimento 20) dentro da janela do
+ * ciclo, como instante (meia-noite no fuso da família). O dia é limitado ao
+ * tamanho do mês (dia 31 em mês de 30 vence no dia 30). Cada janela contém no
+ * máximo uma ocorrência; `null` quando o dia — mesmo limitado — não cai nela.
+ */
+export function dayInCycleWindow(
+  cycle: CycleWindow,
+  day: number,
+  timeZone: string = resolveTimeZone(),
+): Date | null {
+  const start = zonedDateParts(cycle.start, timeZone);
+  const nextYear = start.month === 12 ? start.year + 1 : start.year;
+  const nextMonth = start.month === 12 ? 1 : start.month + 1;
+  const candidates: Array<[number, number]> = [
+    [start.year, start.month],
+    [nextYear, nextMonth],
+  ];
+
+  for (const [year, month] of candidates) {
+    const clamped = Math.min(Math.max(Math.trunc(day), 1), lastDayOfMonth(year, month));
+    const instant = zonedTimeToUtc(year, month, clamped, timeZone);
+    if (instant.getTime() >= cycle.start.getTime() && instant.getTime() < cycle.nextStart.getTime()) {
+      return instant;
+    }
+  }
+  return null;
+}
+
+/**
+ * Dia do ciclo (1-based) de `date`: `1` no primeiro dia, `n` no último. `0`
+ * para instantes anteriores ao início (e para datas posteriores ao fim não há
+ * limite aqui — o retorno pode passar de `n`; o chamador compara com o total).
+ */
+export function cycleDayNumber(
+  date: Date,
+  cycle: CycleWindow,
+  timeZone: string = resolveTimeZone(),
+): number {
+  const start = zonedDateParts(cycle.start, timeZone);
+  const target = zonedDateParts(date, timeZone);
+  const diff = Math.round(
+    (calendarDayUtc(target.year, target.month, target.day) -
+      calendarDayUtc(start.year, start.month, start.day)) /
+      DAY_MS,
+  );
+  return diff + 1;
+}
+
+/** Total de dias da janela (28–31). */
+export function cycleLengthDays(
+  cycle: CycleWindow,
+  timeZone: string = resolveTimeZone(),
+): number {
+  const start = zonedDateParts(cycle.start, timeZone);
+  const next = zonedDateParts(cycle.nextStart, timeZone);
+  return Math.round(
+    (calendarDayUtc(next.year, next.month, next.day) -
+      calendarDayUtc(start.year, start.month, start.day)) /
+      DAY_MS,
+  );
+}
+
+/**
  * Dias restantes do ciclo, contando o próprio dia e o último dia (inclusive).
  * Nunca negativo: um instante posterior ao fim do ciclo retorna `0`.
  */

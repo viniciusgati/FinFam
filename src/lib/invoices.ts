@@ -19,6 +19,7 @@
  */
 
 import { monthKey } from "./finance";
+import type { CycleWindow } from "./cycle";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 
 export interface PurchaseInvoice {
@@ -142,6 +143,110 @@ export function sumCardExpensesForMonth(
         .reduce((sum, installment) => sum + installment.amountCents, 0)
     );
   }, 0);
+}
+
+/**
+ * Instante de vencimento de uma parcela: dia `dueDay` do mês de competência
+ * (`monthKey`), limitado ao tamanho do mês (vencimento 31 em mês de 30 cai no
+ * dia 30) e resolvido no fuso da família.
+ */
+export function installmentDueDate(
+  monthKey: string,
+  dueDay: number,
+  timeZone: string = resolveTimeZone(),
+): Date {
+  const [year, month] = monthKey.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const day = Math.min(Math.max(Math.trunc(dueDay), 1), lastDay);
+  return zonedTimeToUtc(year, month, day, timeZone);
+}
+
+/** Janela de orçamento (início inclusivo, fim exclusivo) — a do ciclo. */
+export interface BudgetWindow {
+  start: Date;
+  end: Date;
+}
+
+/**
+ * Soma as parcelas cujo **vencimento** cai em `[start, end)`. Diferente de
+ * `sumCardExpensesForMonth` (competência por mês calendário), aqui a fatura
+ * conta na janela do ciclo em que é efetivamente paga. Cada parcela entra em
+ * exatamente uma janela.
+ */
+export function sumCardExpensesForWindow(
+  purchases: CardPurchaseForMonth[],
+  window: BudgetWindow,
+  timeZone: string = resolveTimeZone(),
+): number {
+  return purchases.reduce((total, purchase) => {
+    const installments = allocateInstallments(
+      purchase,
+      purchase.card.closingDay,
+      purchase.card.dueDay,
+    );
+    return (
+      total +
+      installments
+        .filter((installment) => {
+          const due = installmentDueDate(installment.monthKey, purchase.card.dueDay, timeZone);
+          return due.getTime() >= window.start.getTime() && due.getTime() < window.end.getTime();
+        })
+        .reduce((sum, installment) => sum + installment.amountCents, 0)
+    );
+  }, 0);
+}
+
+/** Parcela com vencimento dentro de uma janela, no formato da série diária. */
+export interface WindowInvoiceLine {
+  amountCents: number;
+  /** Vencimento da parcela (instante). */
+  dueDate: Date;
+  /**
+   * Data da compra quando ela foi feita dentro da própria janela (consumo na
+   * data); `null` para compras anteriores (obrigação no vencimento).
+   */
+  purchaseDate: Date | null;
+}
+
+/**
+ * Parcelas com vencimento na janela, com a data de vencimento e a data da
+ * compra quando a compra é da própria janela. Usada pela série diária do ciclo.
+ */
+export function invoiceLinesForWindow(
+  purchases: CardPurchaseForMonth[],
+  window: BudgetWindow,
+  timeZone: string = resolveTimeZone(),
+): WindowInvoiceLine[] {
+  return purchases.flatMap((purchase) =>
+    allocateInstallments(
+      purchase,
+      purchase.card.closingDay,
+      purchase.card.dueDay,
+    )
+      .flatMap((installment) => {
+        const dueDate = installmentDueDate(
+          installment.monthKey,
+          purchase.card.dueDay,
+          timeZone,
+        );
+        if (
+          dueDate.getTime() < window.start.getTime() ||
+          dueDate.getTime() >= window.end.getTime()
+        ) {
+          return [];
+        }
+        const purchaseInWindow =
+          purchase.purchaseDate.getTime() >= window.start.getTime() &&
+          purchase.purchaseDate.getTime() < window.end.getTime();
+        return [
+          {
+            amountCents: installment.amountCents,
+            dueDate,
+            purchaseDate: purchaseInWindow ? purchase.purchaseDate : null,
+          },
+        ];
+      }),
+  );
 }
 
 /** Parcela do mês no formato do gráfico de consumo diário. */
@@ -289,4 +394,21 @@ export function resolveReferenceDate(
 export function invoiceDueLabel(referenceDate: Date): string {
   const { year, month } = zonedDateParts(referenceDate, resolveTimeZone());
   return `Fatura com vencimento em ${MONTH_NAMES[month - 1]}/${year}`;
+}
+
+/**
+ * Rótulo das faturas do **ciclo**: a janela pode conter vencimentos de dois
+ * meses civis, então o rótulo cita o intervalo exato. Ex.:
+ * `Faturas com vencimento no ciclo (15/10 a 14/11/2026)`.
+ */
+export function invoiceDueLabelForWindow(
+  window: Pick<CycleWindow, "start" | "end">,
+  timeZone: string = resolveTimeZone(),
+): string {
+  const start = zonedDateParts(window.start, timeZone);
+  const end = zonedDateParts(window.end, timeZone);
+  const dd = (value: number) => String(value).padStart(2, "0");
+  return `Faturas com vencimento no ciclo (${dd(start.day)}/${dd(
+    start.month,
+  )} a ${dd(end.day)}/${dd(end.month)}/${end.year})`;
 }

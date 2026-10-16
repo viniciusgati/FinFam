@@ -50,7 +50,7 @@ describe("layout do dashboard", () => {
     expect(quick).toBeGreaterThan(gridStart);
     expect(daily).toBeGreaterThan(quick);
     expect(daily).toBeLessThan(gridEnd);
-    expect(page).toContain("{isCalendarMonth && (");
+    expect(page).toContain("{isCurrentCycle && (");
   });
 });
 

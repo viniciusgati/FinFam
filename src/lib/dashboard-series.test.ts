@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildConsumptionSummary,
+  buildCycleDailySeries,
   buildDailySeries,
   consumptionAverageLabel,
 } from "./dashboard-series";
+import { cycleWindowForKey } from "./cycle";
 
 // Datas ao meio-dia UTC para que o dia no fuso America/Sao_Paulo seja o mesmo
 // (ver time.ts); evita off-by-one nas asserções.
@@ -252,5 +254,102 @@ describe("consumptionAverageLabel", () => {
       "Sem consumo disponível: as contas fixas consomem toda a renda do mês.",
     );
     expect(label).not.toContain("R$");
+  });
+});
+
+describe("buildCycleDailySeries — eixo do ciclo", () => {
+  const cycle = cycleWindowForKey("2026-10", 15); // 15/10–14/11 (31 dias)
+  const at = (iso: string) => new Date(iso);
+
+  it("distribui fixas, avulsos e faturas no dia do ciclo (1-based)", () => {
+    const series = buildCycleDailySeries({
+      cycle,
+      now: at("2026-10-16T15:00:00.000Z"),
+      incomeCents: 500000,
+      fixedExpenses: [
+        { amountCents: 120000, dueDate: at("2026-10-20T03:00:00.000Z") },
+      ],
+      variableExpenses: [
+        {
+          amountCents: 5000,
+          date: at("2026-10-16T15:00:00.000Z"),
+          paymentMethod: "PIX",
+        },
+      ],
+      cardInvoiceLines: [
+        {
+          amountCents: 60000,
+          dueDate: at("2026-10-21T03:00:00.000Z"),
+          // Compra anterior à janela: `purchaseDate: null` = obrigação no
+          // vencimento (é o que `invoiceLinesForWindow` devolve).
+          purchaseDate: null,
+        },
+      ],
+    });
+
+    expect(series.daysInMonth).toBe(31);
+    expect(series.elapsedDay).toBe(2); // 15 e 16/10
+    expect(series.variableDailyCents[1]).toBe(5000); // 16/10 = dia 2
+    expect(series.obligationDailyCents[5]).toBe(120000); // 20/10 = dia 6
+    expect(series.obligationDailyCents[6]).toBe(60000); // 21/10 = dia 7
+    expect(series.dailyExpensesCents[5]).toBe(120000);
+    expect(series.dailyExpensesCents[6]).toBe(60000);
+    expect(series.totalExpensesCents).toBe(185000);
+    expect(series.totalExpensesCents).toBe(
+      series.dailyExpensesCents.reduce((total, value) => total + value, 0),
+    );
+    expect(series.cumulativeExpensesCents).toEqual([0, 5000]);
+    expect(series.dailyBudgetCents).toBe(Math.round(500000 / 31));
+    expect(series.projectedMonthEndCents).toBe(Math.round((5000 / 2) * 31));
+  });
+
+  it("compra feita dentro da janela entra como consumo na data da compra", () => {
+    const series = buildCycleDailySeries({
+      cycle,
+      now: at("2026-10-16T15:00:00.000Z"),
+      cardInvoiceLines: [
+        {
+          amountCents: 30000,
+          dueDate: at("2026-10-21T03:00:00.000Z"),
+          purchaseDate: at("2026-10-16T15:00:00.000Z"),
+        },
+      ],
+    });
+
+    expect(series.variableDailyCents[1]).toBe(30000);
+    expect(series.obligationDailyCents[6]).toBe(0);
+    expect(series.dailyExpensesCents[6]).toBe(30000);
+  });
+
+  it("elapsedDay: ciclo fechado cobre a janela inteira; futuro fica em 0", () => {
+    const closed = buildCycleDailySeries({
+      cycle,
+      now: at("2026-11-20T15:00:00.000Z"),
+    });
+    expect(closed.elapsedDay).toBe(31);
+
+    const future = buildCycleDailySeries({
+      cycle,
+      now: at("2026-10-01T15:00:00.000Z"),
+    });
+    expect(future.elapsedDay).toBe(0);
+    expect(future.cumulativeExpensesCents).toEqual([]);
+  });
+
+  it("ignora avulsos no crédito (dupla contagem com a fatura)", () => {
+    const series = buildCycleDailySeries({
+      cycle,
+      now: at("2026-10-16T15:00:00.000Z"),
+      variableExpenses: [
+        {
+          amountCents: 9999,
+          date: at("2026-10-16T15:00:00.000Z"),
+          paymentMethod: "CREDIT",
+        },
+      ],
+    });
+
+    expect(series.totalExpensesCents).toBe(0);
+    expect(series.variableDailyCents[1]).toBe(0);
   });
 });

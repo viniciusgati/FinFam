@@ -6,7 +6,12 @@ import {
   resetDatabase,
 } from "../test/integration";
 import { categoryBreakdownView } from "./category-breakdown";
-import { loadDashboardData } from "./dashboard";
+import {
+  loadCycleDashboardData,
+  loadDashboardData,
+  resolveCycleReference,
+} from "./dashboard";
+import { computeFinanceStatus } from "./finance";
 
 // Falha de forma explícita sem `TEST_DATABASE_URL`; nunca toca SQLite.
 requireTestDatabase();
@@ -226,5 +231,152 @@ describe("loadDashboardData — integração com PostgreSQL", () => {
       "2026-06",
       "2026-09",
     ]);
+  });
+});
+
+describe("loadCycleDashboardData — integração com PostgreSQL (moldura do ciclo)", () => {
+  // 16/10/2026 12:00 BRT: dia 2 do ciclo 15/10–14/11 (cycleStartDay = 15).
+  const now = new Date(Date.UTC(2026, 9, 16, 15));
+
+  beforeEach(async () => {
+    await resetDatabase();
+    await prisma.appSettings.create({
+      data: { id: "singleton", cycleStartDay: 15 },
+    });
+  });
+
+  it("conta fixas, entradas e avulsos pela ocorrência na janela do ciclo", async () => {
+    const reference = resolveCycleReference(undefined, now, 15);
+
+    await prisma.income.createMany({
+      data: [
+        // Recebimento 5 → 05/11 ∈ janela; recebimento 20 → 20/10 ∈ janela.
+        { name: "Salário 1", amountCents: 528000, receiveDay: 5 },
+        { name: "Salário 2", amountCents: 450000, receiveDay: 20 },
+        // Vigência encerrada em setembro: a ocorrência de 10/11 fica fora.
+        { name: "Antiga", amountCents: 100000, receiveDay: 10, endMonth: "2026-09" },
+      ],
+    });
+
+    await prisma.fixedExpense.createMany({
+      data: [
+        // Vencimento 21 → 21/10 ∈ janela; vencimento 9 → 09/11 ∈ janela.
+        { name: "Água", amountCents: 25000, dueDay: 21 },
+        { name: "Carro", amountCents: 135000, dueDay: 9 },
+        // A ocorrência de 15/10 cai em outubro/2026, depois do endMonth.
+        { name: "Encerrada", amountCents: 9999, dueDay: 15, endMonth: "2026-09" },
+      ],
+    });
+
+    await prisma.variableExpense.createMany({
+      data: [
+        // Antes do início do ciclo: fora.
+        { description: "Mercado", amountCents: 70000, date: new Date(2026, 9, 10), paymentMethod: "PIX" },
+        // Dentro do ciclo: entra.
+        { description: "Badminton", amountCents: 15000, date: new Date(2026, 9, 15), paymentMethod: "PIX" },
+      ],
+    });
+
+    const data = await loadCycleDashboardData(reference, now);
+
+    expect(data.fixedIncomeCents).toBe(978000);
+    expect(data.variableIncomeCents).toBe(0);
+    expect(data.monthlyIncomeCents).toBe(978000);
+    expect(data.fixedExpensesCents).toBe(160000);
+    expect(data.variableExpensesCents).toBe(15000);
+    expect(data.hasMovements).toBe(true);
+    expect(data.periodDays).toBe(31);
+    expect(data.elapsedDays).toBe(2);
+    expect(data.series.totalExpensesCents).toBe(175000);
+    expect(data.categoryBreakdown.totalCents).toBe(175000);
+    expect(data.referenceDate).toBe(reference.asOf);
+
+    const status = computeFinanceStatus(data);
+    expect(status.consumedCents).toBe(175000);
+    expect(status.daysElapsed).toBe(2);
+    expect(status.daysInMonth).toBe(31);
+  });
+
+  it("a fatura entra pelo vencimento na janela e a vencida antes dela fica de fora", async () => {
+    const reference = resolveCycleReference("2026-10", now, 15);
+    const card = await prisma.creditCard.create({
+      data: { name: "Itau", closingDay: 15, dueDay: 21 },
+    });
+
+    await prisma.cardPurchase.createMany({
+      data: [
+        // Compra 10/09 (antes do fechamento 15) → fatura de 21/09: fora.
+        {
+          cardId: card.id,
+          description: "Fatura antiga",
+          amountCents: 30000,
+          purchaseDate: new Date(2026, 8, 10),
+          installmentsTotal: 1,
+        },
+        // Compra 20/09 (depois do fechamento) → vence 21/10: dentro.
+        {
+          cardId: card.id,
+          description: "Fatura do ciclo",
+          amountCents: 20000,
+          purchaseDate: new Date(2026, 8, 20),
+          installmentsTotal: 1,
+        },
+        // Compra 16/10 (depois do fechamento) → vence 21/11: fora.
+        {
+          cardId: card.id,
+          description: "Próxima fatura",
+          amountCents: 40000,
+          purchaseDate: new Date(2026, 9, 16),
+          installmentsTotal: 1,
+        },
+      ],
+    });
+
+    const data = await loadCycleDashboardData(reference, now);
+
+    expect(data.cardExpensesCents).toBe(20000);
+    expect(data.hasMovements).toBe(true);
+    expect(data.series.totalExpensesCents).toBe(20000);
+    expect(data.categoryBreakdown.totalCents).toBe(20000);
+  });
+
+  it("a diária do ciclo usa a mesma janela do card principal (invariante #231)", async () => {
+    const reference = resolveCycleReference(undefined, now, 15);
+
+    await prisma.income.create({
+      data: { name: "Salário", amountCents: 978000, receiveDay: 20 },
+    });
+    await prisma.fixedExpense.create({
+      data: { name: "Fixas", amountCents: 160000, dueDay: 21 },
+    });
+    const card = await prisma.creditCard.create({
+      data: { name: "Itau", closingDay: 15, dueDay: 21 },
+    });
+    await prisma.cardPurchase.create({
+      data: {
+        cardId: card.id,
+        description: "Fatura",
+        amountCents: 100000,
+        purchaseDate: new Date(2026, 8, 20),
+        installmentsTotal: 1,
+      },
+    });
+    await prisma.variableExpense.create({
+      data: {
+        description: "Avulso no ciclo",
+        amountCents: 18000,
+        date: new Date(2026, 9, 15),
+        paymentMethod: "PIX",
+      },
+    });
+
+    const data = await loadCycleDashboardData(reference, now);
+    const status = computeFinanceStatus(data);
+
+    // Consumido do card = fixas + fatura + avulsos da mesma janela.
+    expect(status.consumedCents).toBe(160000 + 100000 + 18000);
+    expect(data.fixedExpensesCents + data.cardExpensesCents + data.variableExpensesCents).toBe(
+      status.consumedCents,
+    );
   });
 });

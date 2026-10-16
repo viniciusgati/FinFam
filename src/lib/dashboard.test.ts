@@ -18,7 +18,12 @@ vi.mock("@/lib/db", () => ({
   captureClosedMonths: captureClosedMonthsMock,
 }));
 
-import { loadCycleAllowance, loadDashboardData } from "./dashboard";
+import {
+  loadCycleAllowance,
+  loadCycleDashboardData,
+  loadDashboardData,
+  resolveCycleReference,
+} from "./dashboard";
 import { computeFinanceStatus, dashboardView } from "./finance";
 import { buildMonthSpendStats } from "./month-spend";
 
@@ -325,20 +330,19 @@ describe("loadDashboardData — hasMovements", () => {
   });
 });
 
-describe("loadCycleAllowance — diária restante (regressão #231)", () => {
+describe("loadCycleAllowance — diária restante (regressão #231, moldura do ciclo)", () => {
   const card = { id: "c1", name: "Nubank", closingDay: 20, dueDay: 5 };
 
-  it("não zera a diária quando as obrigações de cartão são do mês calendário, mesmo com ciclo ≠ mês", async () => {
-    // cycleStartDay = 20 e hoje 05/03/2026 → o ciclo começou em 20/02
-    // (cycleKey "2026-02"), mas o percentual do dashboard é do mês calendário
-    // (março). Antes a fatura de fevereiro (R$ 10.000) zerava a diária mesmo
-    // com o mês corrente longe de 100%.
+  it("conta a fatura pelo vencimento na janela do ciclo e ignora a que venceu antes dela", async () => {
+    // cycleStartDay = 20 e hoje 05/03/2026 → ciclo 20/02–19/03. A fatura de
+    // fevereiro (vence 05/02) ficou no ciclo anterior; a de março (vence
+    // 05/03) é a obrigação desta janela.
     prismaMock.appSettings.findUnique.mockResolvedValue({
       id: "singleton",
       cycleStartDay: 20,
     });
     prismaMock.income.findMany.mockResolvedValue([
-      { id: "i", amountCents: 1000000, active: true, startMonth: null, endMonth: null },
+      { id: "i", amountCents: 1000000, receiveDay: 20, active: true, startMonth: null, endMonth: null },
     ]);
     prismaMock.fixedExpense.findMany.mockResolvedValue([]);
     prismaMock.variableExpense.findMany.mockResolvedValue([
@@ -371,7 +375,7 @@ describe("loadCycleAllowance — diária restante (regressão #231)", () => {
       new Date("2026-03-05T15:00:00.000Z"),
     );
 
-    // Obrigações do mês calendário (março): fatura de R$ 2.200,00.
+    // Obrigações da janela: fatura que vence em 05/03 (R$ 2.200,00).
     expect(allowance.freeBudgetCents).toBe(760000);
     expect(allowance.dailyCents).toBeGreaterThan(0);
   });
@@ -382,7 +386,7 @@ describe("loadCycleAllowance — diária restante (regressão #231)", () => {
       cycleStartDay: 1,
     });
     prismaMock.income.findMany.mockResolvedValue([
-      { id: "i", amountCents: 500000, active: true, startMonth: null, endMonth: null },
+      { id: "i", amountCents: 500000, receiveDay: 1, active: true, startMonth: null, endMonth: null },
     ]);
     prismaMock.fixedExpense.findMany.mockResolvedValue([]);
     prismaMock.variableExpense.findMany.mockResolvedValue([]);
@@ -946,5 +950,185 @@ describe("loadDashboardData — regressão: dia 1 do ciclo não herda o consumo 
     expect(status.consumedCents).toBe(90000);
     expect(status.consumedPercent).toBe(30);
     expect(status.level).toBe("green");
+  });
+});
+
+describe("resolveCycleReference — ?mes é o mês de início do ciclo", () => {
+  const now = new Date("2026-10-16T15:00:00.000Z");
+
+  it("sem mes usa o ciclo corrente e acumula até agora", () => {
+    const reference = resolveCycleReference(undefined, now, 15);
+
+    expect(reference.cycleKey).toBe("2026-10");
+    expect(reference.window.start.toISOString()).toBe(
+      "2026-10-15T03:00:00.000Z",
+    );
+    expect(reference.window.end.toISOString()).toBe(
+      "2026-11-14T03:00:00.000Z",
+    );
+    expect(reference.isCurrent).toBe(true);
+    expect(reference.isFuture).toBe(false);
+    expect(reference.asOf).toBe(now);
+  });
+
+  it("no dia 05/10 o ciclo corrente ainda é o de setembro", () => {
+    const reference = resolveCycleReference(
+      undefined,
+      new Date("2026-10-05T15:00:00.000Z"),
+      15,
+    );
+
+    expect(reference.cycleKey).toBe("2026-09");
+    expect(reference.window.end.toISOString()).toBe(
+      "2026-10-14T03:00:00.000Z",
+    );
+  });
+
+  it("ciclo fechado cobre a janela inteira (asOf = próximo início)", () => {
+    const reference = resolveCycleReference("2026-09", now, 15);
+
+    expect(reference.cycleKey).toBe("2026-09");
+    expect(reference.isCurrent).toBe(false);
+    expect(reference.isFuture).toBe(false);
+    expect(reference.asOf.toISOString()).toBe("2026-10-15T03:00:00.000Z");
+  });
+
+  it("ciclo futuro é sinalizado sem dados", () => {
+    const reference = resolveCycleReference("2026-11", now, 15);
+
+    expect(reference.isFuture).toBe(true);
+    expect(reference.asOf.toISOString()).toBe("2026-11-15T03:00:00.000Z");
+  });
+
+  it("mes inválido cai no ciclo corrente", () => {
+    expect(resolveCycleReference("2026-13", now, 15).cycleKey).toBe("2026-10");
+    expect(resolveCycleReference("abc", now, 15).cycleKey).toBe("2026-10");
+  });
+
+  it("com cycleStartDay = 1 a moldura é o mês calendário", () => {
+    expect(resolveCycleReference("2026-09", now, 1).cycleKey).toBe("2026-09");
+    expect(resolveCycleReference(undefined, now, 1).cycleKey).toBe("2026-10");
+  });
+});
+
+describe("loadCycleDashboardData — moldura do ciclo", () => {
+  const now = new Date("2026-10-16T15:00:00.000Z");
+  const reference = resolveCycleReference(undefined, now, 15);
+
+  it("conta fixas e entradas pela ocorrência do dia na janela; avulsos pela data", async () => {
+    prismaMock.income.findMany.mockResolvedValue([
+      { id: "s1", amountCents: 528000, receiveDay: 5, active: true, startMonth: "2026-10", endMonth: null },
+      { id: "s2", amountCents: 450000, receiveDay: 20, active: true, startMonth: "2026-10", endMonth: null },
+    ]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      { id: "carro", amountCents: 135000, dueDay: 9, category: "Carro", active: true, startMonth: "2026-10", endMonth: null },
+      { id: "agua", amountCents: 25000, dueDay: 21, category: "Casa", active: true, startMonth: "2026-10", endMonth: null },
+    ]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      { amountCents: 70000, paymentMethod: "PIX", date: new Date("2026-10-10T12:00:00.000Z") },
+      { amountCents: 15000, paymentMethod: "PIX", date: new Date("2026-10-15T12:00:00.000Z") },
+    ]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([]);
+
+    const data = await loadCycleDashboardData(reference, now);
+
+    // Recebimento 20 → 20/10 ∈ janela; recebimento 5 → 05/11 ∈ janela.
+    expect(data.fixedIncomeCents).toBe(978000);
+    // Vencimento 21 → 21/10 ∈ janela; vencimento 9 → 09/11 ∈ janela.
+    expect(data.fixedExpensesCents).toBe(160000);
+    // Avulso de 10/10 fica fora do ciclo; o de 15/10 entra.
+    expect(data.variableExpensesCents).toBe(15000);
+    expect(data.variableIncomeCents).toBe(0);
+    expect(data.monthlyIncomeCents).toBe(978000);
+    expect(data.hasMovements).toBe(true);
+    expect(data.periodDays).toBe(31);
+    expect(data.elapsedDays).toBe(2);
+    expect(data.series.totalExpensesCents).toBe(175000);
+    expect(data.categoryBreakdown.totalCents).toBe(175000);
+    expect(data.categoryBreakdown.monthKey).toBe("2026-10");
+    expect(data.referenceDate).toBe(reference.asOf);
+
+    const status = computeFinanceStatus(data);
+    expect(status.consumedCents).toBe(175000);
+    expect(status.daysElapsed).toBe(2);
+    expect(status.daysInMonth).toBe(31);
+  });
+
+  it("conta a fatura pelo vencimento na janela e ignora a do ciclo seguinte", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([
+      {
+        id: "p1",
+        description: "Compra de outubro",
+        amountCents: 10000,
+        purchaseDate: new Date("2026-10-01T12:00:00.000Z"),
+        category: "Lazer",
+        installmentsTotal: 1,
+        card: { id: "c", name: "Itau", closingDay: 15, dueDay: 21 },
+      },
+      {
+        id: "p2",
+        description: "Compra pós-fechamento",
+        amountCents: 40000,
+        purchaseDate: new Date("2026-10-16T12:00:00.000Z"),
+        category: "Lazer",
+        installmentsTotal: 1,
+        card: { id: "c", name: "Itau", closingDay: 15, dueDay: 21 },
+      },
+    ]);
+
+    const data = await loadCycleDashboardData(reference, now);
+
+    expect(data.cardExpensesCents).toBe(10000);
+    expect(data.hasMovements).toBe(true);
+    expect(data.series.totalExpensesCents).toBe(10000);
+  });
+
+  it("consulta avulsos só na janela do ciclo, limitada a amanhã", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([]);
+
+    await loadCycleDashboardData(reference, now);
+
+    const [args] = prismaMock.variableExpense.findMany.mock.calls[0];
+    expect(args.where.date.gte.toISOString()).toBe(
+      "2026-10-15T03:00:00.000Z",
+    );
+    expect(args.where.date.lt.toISOString()).toBe(
+      "2026-10-17T03:00:00.000Z",
+    );
+  });
+
+  it("regressão 'não fechou o mês anterior': obrigação vencida antes da janela fica fora", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+    // Compra de 10/08 com fechamento 5 e vencimento 20: a fatura vence em
+    // 20/09, antes do ciclo 15/10–14/11 — não pode reaparecer no ciclo novo.
+    prismaMock.cardPurchase.findMany.mockResolvedValue([
+      {
+        id: "p-set",
+        description: "Fatura antiga",
+        amountCents: 100000,
+        purchaseDate: new Date("2026-08-10T12:00:00.000Z"),
+        category: null,
+        installmentsTotal: 1,
+        card: { id: "c", name: "Nubank", closingDay: 5, dueDay: 20 },
+      },
+    ]);
+
+    const data = await loadCycleDashboardData(reference, now);
+
+    expect(data.cardExpensesCents).toBe(0);
+    expect(data.hasMovements).toBe(false);
+    expect(data.series.totalExpensesCents).toBe(0);
   });
 });

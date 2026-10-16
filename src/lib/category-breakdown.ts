@@ -25,15 +25,25 @@ import {
   normalizeCategoryLabel,
   NO_CATEGORY_LABEL,
 } from "./categories";
-import { isActiveInMonth, type MonthVigency } from "./finance";
-import { allocateInstallments, type InstallmentPlanInput } from "./invoices";
+import { dayInCycleWindow, type CycleWindow } from "./cycle";
+import { isActiveInMonth, monthKey, type MonthVigency } from "./finance";
+import {
+  allocateInstallments,
+  installmentDueDate,
+  type InstallmentPlanInput,
+} from "./invoices";
 import { formatCents } from "./money";
-import { isCountedInBudget, type PaymentMethod } from "./variable-expenses";
+import {
+  isCountedInBudget,
+  type PaymentMethod,
+} from "./variable-expenses";
 
 /** Saída fixa crua, com os campos de vigência e categoria. */
 export interface CategoryBreakdownFixedExpense extends MonthVigency {
   amountCents: number;
   category?: string | null;
+  /** Vencimento; o modo ciclo usa para achar a ocorrência na janela. */
+  dueDay?: number;
 }
 
 /** Gasto avulso já restrito ao mês pela query; a categoria é opcional. */
@@ -128,6 +138,94 @@ export function buildCategoryBreakdown(
 
   return {
     monthKey,
+    items,
+    totalCents: items.reduce((total, item) => total + item.amountCents, 0),
+  };
+}
+
+export interface CycleCategoryBreakdownInput {
+  /** Mês de início do ciclo (YYYY-MM) — o rótulo/frame da agregação. */
+  cycleKey: string;
+  /** Janela do ciclo; fixas e faturas entram quando **vencem** nela. */
+  cycle: CycleWindow;
+  fixedExpenses: CategoryBreakdownFixedExpense[];
+  /** Avulsos já restritos à janela pela query (mesma convenção do mês). */
+  variableExpenses: CategoryBreakdownVariableExpense[];
+  cardPurchases: CategoryBreakdownCardPurchase[];
+  timeZone?: string;
+}
+
+/**
+ * Agregação por categoria na **janela do ciclo**: fixas cujo vencimento cai na
+ * janela (vigência checada no mês do vencimento), avulsos já filtrados pela
+ * query e parcelas de cartão cujo **vencimento** cai na janela. Mesma
+ * invariante de `buildCategoryBreakdown`: `sum(items) === totalCents` e a soma
+ * coincide com `fixedExpensesCents + variableExpensesCents +
+ * cardExpensesCents` quando as coleções são as da mesma janela.
+ */
+export function buildCycleCategoryBreakdown(
+  input: CycleCategoryBreakdownInput,
+): CategoryBreakdown {
+  const byKey = new Map<string, CategoryBreakdownItem>();
+  const timeZone = input.timeZone;
+
+  const add = (rawCategory: string | null | undefined, amountCents: number) => {
+    const key = categoryKey(rawCategory);
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.amountCents += amountCents;
+      return;
+    }
+    byKey.set(key, {
+      category: normalizeCategoryLabel(rawCategory) ?? NO_CATEGORY_LABEL,
+      amountCents,
+    });
+  };
+
+  for (const expense of input.fixedExpenses) {
+    if (expense.dueDay === undefined) continue;
+    const due = dayInCycleWindow(input.cycle, expense.dueDay, timeZone);
+    if (due === null) continue;
+    if (!isActiveInMonth(expense, monthKey(due))) continue;
+    add(expense.category, expense.amountCents);
+  }
+
+  for (const expense of input.variableExpenses) {
+    if (!isCountedInBudget(expense.paymentMethod)) continue;
+    add(expense.category, expense.amountCents);
+  }
+
+  for (const purchase of input.cardPurchases) {
+    const installments = allocateInstallments(
+      purchase,
+      purchase.card.closingDay,
+      purchase.card.dueDay,
+    );
+    for (const installment of installments) {
+      const due = installmentDueDate(
+        installment.monthKey,
+        purchase.card.dueDay,
+        timeZone,
+      );
+      if (
+        due.getTime() < input.cycle.start.getTime() ||
+        due.getTime() >= input.cycle.nextStart.getTime()
+      ) {
+        continue;
+      }
+      add(purchase.category, installment.amountCents);
+    }
+  }
+
+  const items = [...byKey.values()].filter((item) => item.amountCents > 0);
+  items.sort(
+    (a, b) =>
+      b.amountCents - a.amountCents ||
+      a.category.localeCompare(b.category, "pt-BR"),
+  );
+
+  return {
+    monthKey: input.cycleKey,
     items,
     totalCents: items.reduce((total, item) => total + item.amountCents, 0),
   };

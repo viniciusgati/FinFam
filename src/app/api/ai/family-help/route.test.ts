@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/dashboard", () => ({
-  loadDashboardData: vi.fn(),
+vi.mock("@/lib/dashboard", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/dashboard")>();
+  return { ...actual, loadCycleDashboardData: vi.fn() };
+});
+
+vi.mock("@/lib/settings", () => ({
+  getSettings: vi.fn(async () => ({ cycleStartDay: 1 })),
 }));
 
-import { loadDashboardData } from "@/lib/dashboard";
+import { loadCycleDashboardData } from "@/lib/dashboard";
 import { monthKey } from "@/lib/finance";
 import { POST } from "./route";
 
-const loadDashboardDataMock = loadDashboardData as unknown as ReturnType<
+const loadCycleDashboardDataMock = loadCycleDashboardData as unknown as ReturnType<
   typeof vi.fn
 >;
 
@@ -54,7 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
   delete process.env.DEEPSEEK_API_KEY;
-  loadDashboardDataMock.mockResolvedValue(dashboardData);
+  loadCycleDashboardDataMock.mockResolvedValue(dashboardData);
 });
 
 afterEach(() => {
@@ -73,7 +78,7 @@ describe("POST /api/ai/family-help", () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: "ai_unavailable" });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(loadDashboardDataMock).not.toHaveBeenCalled();
+    expect(loadCycleDashboardDataMock).not.toHaveBeenCalled();
   });
 
   it("rejeita monthKey inválido com 400", async () => {

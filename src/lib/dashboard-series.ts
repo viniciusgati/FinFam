@@ -16,6 +16,11 @@
  */
 
 import {
+  cycleDayNumber,
+  cycleLengthDays,
+  type CycleWindow,
+} from "./cycle";
+import {
   consumptionAvailableCents,
   consumptionDailyAverageCents,
   daysInMonth as daysInMonthOf,
@@ -23,6 +28,7 @@ import {
 } from "./finance";
 import { formatCents } from "./money";
 import { resolveTimeZone, zonedDateParts } from "./time";
+import type { WindowInvoiceLine } from "./invoices";
 import {
   isCountedInBudget,
   type PaymentMethod,
@@ -140,6 +146,119 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
       // Compra do próprio mês: consumo na data da compra, fora da escala das
       // obrigações.
       variable[dayIndex(line.purchaseDay, totalDays)] += line.amountCents;
+    } else {
+      obligations[dueIndex] += line.amountCents;
+    }
+  }
+
+  const totalExpensesCents = daily.reduce((total, value) => total + value, 0);
+
+  const cumulative: number[] = [];
+  let running = 0;
+  for (let day = 0; day < elapsedDay; day += 1) {
+    running += daily[day];
+    cumulative.push(running);
+  }
+
+  const entriesCents = Math.max(input.incomeCents ?? 0, 0);
+  const dailyBudgetCents =
+    totalDays > 0 ? Math.round(entriesCents / totalDays) : 0;
+  const projectedMonthEndCents =
+    elapsedDay > 0
+      ? Math.round((running / elapsedDay) * totalDays)
+      : 0;
+
+  return {
+    daysInMonth: totalDays,
+    elapsedDay,
+    dailyExpensesCents: daily,
+    cumulativeExpensesCents: cumulative,
+    variableDailyCents: variable,
+    obligationDailyCents: obligations,
+    entriesCents,
+    totalExpensesCents,
+    dailyBudgetCents,
+    projectedMonthEndCents,
+  };
+}
+
+/** Fixa que vence dentro da janela (ocorrência com vencimento resolvido). */
+export interface CycleSeriesFixedExpense {
+  amountCents: number;
+  /** Vencimento (ocorrência do dia da fixa dentro da janela do ciclo). */
+  dueDate: Date;
+}
+
+export interface BuildCycleDailySeriesInput {
+  /** Janela do ciclo que a série cobre (1 array por dia da janela). */
+  cycle: CycleWindow;
+  /** "Agora" usado para decidir o dia de hoje/elapsedDay. Default: new Date(). */
+  now?: Date;
+  incomeCents?: number;
+  fixedExpenses?: CycleSeriesFixedExpense[];
+  variableExpenses?: SeriesVariableExpense[];
+  cardInvoiceLines?: WindowInvoiceLine[];
+}
+
+/**
+ * Série diária da **janela do ciclo** (eixo do ciclo, não do mês calendário):
+ * avulsos na data, fixas no vencimento e faturas no vencimento do cartão, com
+ * compras feitas dentro do próprio ciclo entrando como consumo na data da
+ * compra (obrigação apenas quando a compra é anterior à janela). Mesma
+ * invariante do `buildDailySeries`: `sum(dailyExpensesCents) ===
+ * totalExpensesCents`, que coincide com o `consumedCents` do `%` quando a
+ * moldura é a mesma (ciclo).
+ */
+export function buildCycleDailySeries(
+  input: BuildCycleDailySeriesInput,
+): DailySeries {
+  const timeZone = resolveTimeZone();
+  const totalDays = cycleLengthDays(input.cycle, timeZone);
+  const now = input.now ?? new Date();
+
+  let elapsedDay: number;
+  if (now.getTime() >= input.cycle.nextStart.getTime()) {
+    elapsedDay = totalDays;
+  } else if (now.getTime() < input.cycle.start.getTime()) {
+    elapsedDay = 0;
+  } else {
+    elapsedDay = cycleDayNumber(now, input.cycle, timeZone);
+  }
+  elapsedDay = Math.min(Math.max(elapsedDay, 0), totalDays);
+
+  const daily = new Array<number>(totalDays).fill(0);
+  const variable = new Array<number>(totalDays).fill(0);
+  const obligations = new Array<number>(totalDays).fill(0);
+
+  const indexOf = (date: Date): number => {
+    const dayNumber = cycleDayNumber(date, input.cycle, timeZone);
+    return dayNumber >= 1 && dayNumber <= totalDays ? dayNumber - 1 : -1;
+  };
+
+  for (const expense of input.fixedExpenses ?? []) {
+    const index = indexOf(expense.dueDate);
+    if (index < 0) continue;
+    daily[index] += expense.amountCents;
+    obligations[index] += expense.amountCents;
+  }
+
+  for (const expense of input.variableExpenses ?? []) {
+    if (!isCountedInBudget(expense.paymentMethod)) continue;
+    const index = indexOf(expense.date);
+    if (index < 0) continue;
+    daily[index] += expense.amountCents;
+    variable[index] += expense.amountCents;
+  }
+
+  for (const line of input.cardInvoiceLines ?? []) {
+    const dueIndex = indexOf(line.dueDate);
+    if (dueIndex < 0) continue;
+    daily[dueIndex] += line.amountCents;
+    if (line.purchaseDate !== null) {
+      // Compra do próprio ciclo: consumo na data da compra, fora da escala das
+      // obrigações.
+      const purchaseIndex = indexOf(line.purchaseDate);
+      if (purchaseIndex >= 0) variable[purchaseIndex] += line.amountCents;
     } else {
       obligations[dueIndex] += line.amountCents;
     }

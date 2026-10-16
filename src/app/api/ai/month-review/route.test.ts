@@ -6,12 +6,17 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-vi.mock("@/lib/dashboard", () => ({
-  loadDashboardData: vi.fn(),
+vi.mock("@/lib/dashboard", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/dashboard")>();
+  return { ...actual, loadCycleDashboardData: vi.fn() };
+});
+
+vi.mock("@/lib/settings", () => ({
+  getSettings: vi.fn(async () => ({ cycleStartDay: 1 })),
 }));
 
 import { prisma } from "@/lib/db";
-import { loadDashboardData } from "@/lib/dashboard";
+import { loadCycleDashboardData } from "@/lib/dashboard";
 import { monthKey, shiftMonthKey } from "@/lib/finance";
 import { POST } from "./route";
 
@@ -19,7 +24,7 @@ const monthlyReviewMock = prisma.monthlyReview as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
   upsert: ReturnType<typeof vi.fn>;
 };
-const loadDashboardDataMock = loadDashboardData as unknown as ReturnType<
+const loadCycleDashboardDataMock = loadCycleDashboardData as unknown as ReturnType<
   typeof vi.fn
 >;
 
@@ -62,7 +67,7 @@ beforeEach(() => {
   delete process.env.DEEPSEEK_API_KEY;
   monthlyReviewMock.findUnique.mockResolvedValue(null);
   monthlyReviewMock.upsert.mockResolvedValue({});
-  loadDashboardDataMock.mockResolvedValue(dashboardData);
+  loadCycleDashboardDataMock.mockResolvedValue(dashboardData);
 });
 
 afterEach(() => {
@@ -91,7 +96,7 @@ describe("POST /api/ai/month-review", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "month_not_closed" });
-    expect(loadDashboardDataMock).not.toHaveBeenCalled();
+    expect(loadCycleDashboardDataMock).not.toHaveBeenCalled();
   });
 
   it("usa o cache sem novo fetch quando o mês já foi avaliado", async () => {
@@ -112,7 +117,7 @@ describe("POST /api/ai/month-review", () => {
       cached: true,
     });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(loadDashboardDataMock).not.toHaveBeenCalled();
+    expect(loadCycleDashboardDataMock).not.toHaveBeenCalled();
   });
 
   it("gera, envia apenas números e grava o cache", async () => {
