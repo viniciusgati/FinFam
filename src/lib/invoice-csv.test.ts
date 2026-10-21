@@ -195,3 +195,87 @@ describe("parseNubankInvoiceCsv — casos de borda", () => {
     expect(result.positives).toEqual([]);
   });
 });
+
+describe("parseNubankInvoiceCsv — validação da subtarefa 1", () => {
+  it("campo multilinha com CRLF não deixa \\r sobrando no título (regressão)", () => {
+    const csv = [
+      HEADER,
+      '2026-09-01,"Linha1\r\nLinha2",10,00',
+      "2026-09-02,Y,5,00",
+    ].join("\r\n");
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.headerError).toBeUndefined();
+    expect(result.positives[0].title).toBe("Linha1\nLinha2");
+    expect(result.positives[0].line).toBe(2);
+    expect(result.positives[1].line).toBe(4);
+  });
+
+  it("título vazio vai para invalid reason title sem derrubar as demais", () => {
+    const csv = [
+      HEADER,
+      "2026-09-01,,10,00",
+      "2026-09-02,   ,10,00",
+      "2026-09-03,Loja boa,10,00",
+    ].join("\n");
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.invalid).toEqual([
+      { line: 2, reason: "title" },
+      { line: 3, reason: "title" },
+    ]);
+    expect(result.positives).toEqual([
+      { line: 4, date: "2026-09-03", title: "Loja boa", amountCents: 1000 },
+    ]);
+  });
+
+  it("valores pt-BR extras: inteiro, milhar sem decimal e negativo sem espaço", () => {
+    const csv = [
+      HEADER,
+      "2026-09-01,Inteiro,12",
+      "2026-09-02,Milhar,1.234",
+      "2026-09-03,Estorno,-17,60",
+      "2026-09-04,Vazio,",
+    ].join("\n");
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.positives).toEqual([
+      { line: 2, date: "2026-09-01", title: "Inteiro", amountCents: 1200 },
+      { line: 3, date: "2026-09-02", title: "Milhar", amountCents: 123400 },
+    ]);
+    expect(result.negatives).toEqual([
+      { line: 4, date: "2026-09-03", title: "Estorno", amountCents: -1760 },
+    ]);
+    expect(result.invalid).toEqual([{ line: 5, reason: "amount" }]);
+  });
+
+  it("cabeçalho tolera caixa e espaços; data e valor entre aspas são aceitos", () => {
+    const csv = [
+      " DATE , Title , AMOUNT ",
+      '"2026-09-01",X,"10,00"',
+    ].join("\n");
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.headerError).toBeUndefined();
+    expect(result.positives).toEqual([
+      { line: 2, date: "2026-09-01", title: "X", amountCents: 1000 },
+    ]);
+  });
+
+  it("linhas em branco no meio preservam a numeração do arquivo", () => {
+    const csv = [HEADER, "", "2026-09-01,X,10,00", "", "2026-09-02,Y,5,00"].join(
+      "\n",
+    );
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.positives).toEqual([
+      { line: 3, date: "2026-09-01", title: "X", amountCents: 1000 },
+      { line: 5, date: "2026-09-02", title: "Y", amountCents: 500 },
+    ]);
+  });
+});

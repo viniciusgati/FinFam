@@ -78,6 +78,10 @@ function parseCsvRows(text: string): RawRow[] {
         } else {
           inQuotes = false;
         }
+      } else if (char === "\r") {
+        // CRLF dentro de campo entre aspas: o `\n` seguinte conta a linha e
+        // o `\r` não vira conteúdo (mesmo tratamento do campo não aspas).
+        continue;
       } else {
         if (char === "\n") line += 1;
         field += char;
