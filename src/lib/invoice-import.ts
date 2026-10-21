@@ -34,6 +34,14 @@ export interface InvoiceImportCard {
   dueDay: number;
 }
 
+/**
+ * Mensagem fixa de falha da importação (história #269): usada pela rota em
+ * erros de gravação (500) e pela UI em falha de rede/JSON, garantindo o mesmo
+ * texto pt-BR nos dois caminhos.
+ */
+export const IMPORT_FAILURE_MESSAGE =
+  "Não foi possível importar a fatura. Tente novamente.";
+
 /** Compra já persistida, no mínimo shape para excluir/casar no plano. */
 export interface InvoiceImportExistingPurchase {
   id: string;

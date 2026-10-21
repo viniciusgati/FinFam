@@ -157,6 +157,34 @@ export const invoiceSetTotalSchema = z.object({
   totalCents: amountCentsSchema,
 });
 
+/**
+ * Payload de importação de fatura CSV (história #269): cartão, texto bruto do
+ * CSV (lido no navegador com `File.text()` e enviado em JSON — o projeto não
+ * tem upload multipart) e o modo de pré-visualização (`dryRun` não escreve).
+ */
+export const invoiceImportSchema = z.object(
+  {
+    cardId: z
+      .string({
+        required_error: "Selecione um cartão",
+        invalid_type_error: "Selecione um cartão",
+      })
+      .trim()
+      .min(1, "Selecione um cartão"),
+    csv: z
+      .string({
+        required_error: "Cole o conteúdo do CSV da fatura",
+        invalid_type_error: "Cole o conteúdo do CSV da fatura",
+      })
+      .min(1, "Cole o conteúdo do CSV da fatura"),
+    dryRun: z
+      .boolean({ invalid_type_error: "Pré-visualização inválida" })
+      .optional()
+      .default(false),
+  },
+  { invalid_type_error: "Corpo da requisição inválido" },
+);
+
 const CYCLE_START_DAY_MESSAGE = "Dia do ciclo deve ser entre 1 e 28";
 
 /** Configuração global: dia do mês em que começa o ciclo financeiro (1–28). */
@@ -180,6 +208,7 @@ export type CreditCardUpdateInput = z.infer<typeof creditCardUpdateSchema>;
 export type CardPurchaseCreateInput = z.infer<typeof cardPurchaseCreateSchema>;
 export type CardPurchaseUpdateInput = z.infer<typeof cardPurchaseUpdateSchema>;
 export type InvoiceSetTotalInput = z.infer<typeof invoiceSetTotalSchema>;
+export type InvoiceImportInput = z.infer<typeof invoiceImportSchema>;
 export type SettingsUpdateInput = z.infer<typeof settingsUpdateSchema>;
 
 /** Primeira mensagem de erro do zod, usada nas respostas `{ error }`. */
