@@ -442,3 +442,88 @@ describe("parseNubankInvoiceCsv — revalidação da subtarefa 1", () => {
     expect(result.invalid).toEqual([{ line: 2, reason: "title" }]);
   });
 });
+
+describe("parseNubankInvoiceCsv — revalidação da subtarefa 1 (critérios de aceite)", () => {
+  it("AC completo: 1,92 → 192, 1.234,56 → 123456, - 17,60 → negativa -1760, 0/0,00 inválidas na ordem do arquivo", () => {
+    const csv = [
+      HEADER,
+      "2026-08-13,Loja A,1,92",
+      "2026-08-14,Loja B,1.234,56",
+      '2026-08-15,"IOF de ""Opencode""",- 17,60',
+      "2026-08-16,Zero A,0",
+      "2026-08-17,Zero B,0,00",
+      "2026-08-18,Loja C,45,90",
+    ].join("\n");
+
+    const result = parseNubankInvoiceCsv("\uFEFF" + csv);
+
+    expect(result.headerError).toBeUndefined();
+    expect(result.positives.map((p) => p.amountCents)).toEqual([
+      192, 123456, 4590,
+    ]);
+    expect(result.positives.map((p) => p.line)).toEqual([2, 3, 7]);
+    expect(result.negatives).toEqual([
+      {
+        line: 4,
+        date: "2026-08-15",
+        title: 'IOF de "Opencode"',
+        amountCents: -1760,
+      },
+    ]);
+    expect(result.invalid).toEqual([
+      { line: 5, reason: "amount" },
+      { line: 6, reason: "amount" },
+    ]);
+  });
+
+  it("aspas não fechadas no fim do arquivo não derrubam o parse nem lançam exceção", () => {
+    const csv = `${HEADER}\n2026-09-01,"Titulo sem fechar,10,00`;
+
+    expect(() => parseNubankInvoiceCsv(csv)).not.toThrow();
+
+    const result = parseNubankInvoiceCsv(csv);
+    expect(result.positives).toEqual([]);
+    expect(result.invalid).toEqual([{ line: 2, reason: "columns" }]);
+  });
+
+  it("CRLF + BOM com positivas, negativas e inválidas mantém o número da linha do arquivo", () => {
+    const csv =
+      "\uFEFF" +
+      [
+        HEADER,
+        '2026-09-01,"IOF de ""Opencode""",1,92',
+        "2026-09-02,Pagamento recebido,- 200,00",
+        "2026-09-03,Loja,0,00",
+        "2026-09-04,Loja2,1.234,56",
+      ].join("\r\n");
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.positives.map((p) => [p.line, p.amountCents])).toEqual([
+      [2, 192],
+      [5, 123456],
+    ]);
+    expect(result.negatives.map((n) => n.line)).toEqual([3]);
+    expect(result.invalid).toEqual([{ line: 4, reason: "amount" }]);
+  });
+
+  it("linhas em branco antes do cabeçalho não deslocam a numeração das linhas", () => {
+    const csv = `\n\n${HEADER}\n2026-09-01,X,10,00`;
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.headerError).toBeUndefined();
+    expect(result.positives).toEqual([
+      { line: 4, date: "2026-09-01", title: "X", amountCents: 1000 },
+    ]);
+  });
+
+  it("vírgula no título sem aspas desloca colunas e o valor vai para invalid (não vira lançamento errado)", () => {
+    const csv = `${HEADER}\n2026-09-01,Padaria, Pao,10,00`;
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.positives).toEqual([]);
+    expect(result.invalid).toEqual([{ line: 2, reason: "amount" }]);
+  });
+});
