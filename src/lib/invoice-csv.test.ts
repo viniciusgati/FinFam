@@ -130,3 +130,68 @@ describe("parseNubankInvoiceCsv", () => {
     expect(result.invalid).toEqual([{ line: 3, reason: "date" }]);
   });
 });
+
+describe("parseNubankInvoiceCsv — casos de borda", () => {
+  it("cabeçalho entre aspas é reconhecido e valor entre aspas preservado", () => {
+    const csv = '"date","title","amount"\n2026-09-01,X,"1.234,56"';
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.headerError).toBeUndefined();
+    expect(result.positives).toEqual([
+      { line: 2, date: "2026-09-01", title: "X", amountCents: 123456 },
+    ]);
+  });
+
+  it("zero com sinal ou espaços é linha inválida", () => {
+    const csv = [
+      HEADER,
+      "2026-09-01,A,- 0,00",
+      "2026-09-02,B, 0 ",
+      "2026-09-03,C,10,00",
+    ].join("\n");
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.invalid).toEqual([
+      { line: 2, reason: "amount" },
+      { line: 3, reason: "amount" },
+    ]);
+    expect(result.positives).toHaveLength(1);
+  });
+
+  it("campo multilinha entre aspas mantém o número da linha de início", () => {
+    const csv = [
+      HEADER,
+      "2026-09-01,\"Linha1",
+      "Linha2\",10,00",
+      "2026-09-02,Y,5,00",
+    ].join("\n");
+
+    const result = parseNubankInvoiceCsv(csv);
+
+    expect(result.positives[0].title).toBe("Linha1\nLinha2");
+    expect(result.positives[0].line).toBe(2);
+    expect(result.positives[1].line).toBe(4);
+  });
+
+  it("arquivo só com cabeçalho não tem linhas válidas (a rota responderá 400)", () => {
+    const result = parseNubankInvoiceCsv(`${HEADER}\n`);
+
+    expect(result.headerError).toBeUndefined();
+    expect(result.positives).toEqual([]);
+    expect(result.negatives).toEqual([]);
+    expect(result.invalid).toEqual([]);
+  });
+
+  it("texto que não é CSV devolve headerError em pt-BR sem exceção", () => {
+    expect(() => parseNubankInvoiceCsv("qualquer\nlixo\nnada")).not.toThrow();
+
+    const result = parseNubankInvoiceCsv("qualquer\nlixo\nnada");
+
+    expect(result.headerError).toBe(
+      'Cabeçalho inválido: era esperado "date,title,amount".',
+    );
+    expect(result.positives).toEqual([]);
+  });
+});
