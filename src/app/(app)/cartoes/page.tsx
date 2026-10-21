@@ -3,6 +3,7 @@ import CreditCardsManager, {
   type CardPurchaseData,
   type CreditCardData,
 } from "@/components/CreditCardsManager";
+import InvoiceImportPanel from "@/components/InvoiceImportPanel";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import { prisma } from "@/lib/db";
 import { monthKey } from "@/lib/finance";
@@ -43,12 +44,15 @@ export default async function CartoesPage({
   const categorySuggestions = await loadCategorySuggestions();
 
   return (
-    <CreditCardsManager
-      initialCards={cards}
-      initialPurchases={purchases}
-      referenceMonthKey={referenceMonthKey}
-      initialError={loadError}
-      categorySuggestions={categorySuggestions}
-    />
+    <div className="space-y-8">
+      <InvoiceImportPanel cards={cards} />
+      <CreditCardsManager
+        initialCards={cards}
+        initialPurchases={purchases}
+        referenceMonthKey={referenceMonthKey}
+        initialError={loadError}
+        categorySuggestions={categorySuggestions}
+      />
+    </div>
   );
 }
