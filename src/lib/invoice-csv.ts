@@ -79,9 +79,14 @@ function parseCsvRows(text: string): RawRow[] {
           inQuotes = false;
         }
       } else if (char === "\r") {
-        // CRLF dentro de campo entre aspas: o `\n` seguinte conta a linha e
-        // o `\r` não vira conteúdo (mesmo tratamento do campo não aspas).
-        continue;
+        if (text[i + 1] === "\n") {
+          // CRLF dentro de campo entre aspas: o `\n` seguinte conta a linha e
+          // o `\r` não vira conteúdo (mesmo tratamento do campo não aspas).
+          continue;
+        }
+        // CR único dentro de aspas: quebra de linha legada (estilo Mac).
+        line += 1;
+        field += "\n";
       } else {
         if (char === "\n") line += 1;
         field += char;
@@ -96,13 +101,13 @@ function parseCsvRows(text: string): RawRow[] {
       pushField();
       continue;
     }
-    if (char === "\n") {
+    if (char === "\n" || char === "\r") {
+      if (char === "\r" && text[i + 1] === "\n") continue;
       line += 1;
       pushRow();
       rowStartLine = line;
       continue;
     }
-    if (char === "\r") continue;
     field += char;
   }
 
