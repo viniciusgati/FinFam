@@ -167,6 +167,14 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
     };
   }, []);
 
+  // `router.refresh()` (ex.: após importar fatura em `InvoiceImportPanel`)
+  // re-renderiza a página e traz cartões/compras novos como propriedade; sem
+  // este sync o estado local ficaria defasado até um reload manual.
+  useEffect(() => {
+    setCards(sortCards(initialCards));
+    setPurchases(sortPurchases(initialPurchases));
+  }, [initialCards, initialPurchases]);
+
   const cardsById = useMemo(
     () => new Map(cards.map((card) => [card.id, card])),
     [cards],

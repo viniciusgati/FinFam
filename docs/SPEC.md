@@ -95,6 +95,24 @@ gastos avulsos, §4). CRUD em `/entradas` e `/api/variable-incomes`.
   vencimento (o que vai ser pago e quando).
 - Para o **consumo disponível** (§4.5), a fatura é **consumo variável**, não
   obrigação fixa: ela **não** entra na subtração `entradas − gastos fixos`.
+- **Importação de fatura via CSV** (história #269): o usuário pode importar a
+  fatura de um cartão a partir do CSV exportado no padrão do Nubank (formato
+  `date,title,amount`, valores em pt-BR) na tela `/cartoes`. A competência alvo
+  é detectada pela **maioria** das linhas do arquivo (moda; empate de linhas →
+  maior soma absoluta; empate de soma → mês mais recente), aplicando as regras
+  de ciclo da §3.4. Linhas da minoria discordantes têm a data ajustada em
+  no mínimo para caírem na janela do ciclo detectado, preservando o valor
+  original. A importação **substitui** as compras à vista (`installmentsTotal
+  = 1`) da competência detectada naquele cartão — isso inclui ajustes de
+  fatura e gastos lançados manualmente — numa única transação Prisma (exclusão
+  + inserção ou nada). Compras **parceladas nunca são apagadas**; linhas
+  `… - Parcela k/N` que casarem com uma parcelada existente (mesma descrição,
+  mesmo total, valor igual à k-ésima) são mantidas e não reinseridas. Linhas
+  negativas (pagamentos, estornos) e inválidas (data/valor malformados ou
+  zero) não viram lançamento: são contadas e devolvidas no resumo. A
+  classificação das descrições usa o histórico local primeiro e, para o que
+  restar, uma única chamada em lote à DeepSeek (exceção documentada à §7).
+  Um modo de pré-visualização (`dryRun`) devolve o plano sem escrever nada.
 
 > Regra central: o mesmo gasto nunca é contado duas vezes. Gasto pago no
 > cartão substitui o gasto avulso correspondente — por isso um gasto avulso
@@ -398,14 +416,20 @@ são entregas seguintes.
 - **Privacidade**: por padrão sem envio para terceiros; tudo no PostgreSQL
   próprio. Exceção restrita aos recursos de IA (avaliação de mês fechado e
   simulador), que enviam **somente agregados numéricos** à DeepSeek — nunca
-  nomes, descrições, categorias ou texto do usuário.
+  nomes, descrições, categorias ou texto do usuário. **Exceção documentada à
+  importação de fatura CSV (história #269):** na classificação de títulos da
+  importação trafegam **apenas títulos de lançamento e rótulos de categoria**
+  já usados pela família para a DeepSeek, e somente nesta função — nenhum outro
+  dado pessoal ou agregado sai do sistema.
 - **Acessibilidade**: contraste adequado mesmo com fundo colorido; gráficos e
   estados usam `role`/`aria-label`/`aria-live` e rótulos textuais.
 
 ## 8. Fora de escopo (por agora)
 
 - Múltiplos usuários/perfis e permissões.
-- Open Finance / importação bancária.
+- Open Finance / importação bancária automática. (A importação **manual** de
+  fatura de cartão via CSV no padrão do Nubank está **dentro** do escopo —
+  história #269, §3.4.)
 - Notificações push.
 - Aplicativo nativo.
 
