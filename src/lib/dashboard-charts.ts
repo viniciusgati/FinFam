@@ -256,15 +256,6 @@ export interface IncomeAllocationView {
   /** Renda total formatada (ex.: `R$ 1.000,00`). */
   incomeLabel: string;
   rows: IncomeAllocationRow[];
-  /** Consumo disponível = entradas − contas fixas (nunca negativo). */
-  consumptionCents: number;
-  consumptionLabel: string;
-  /** Saldo do mês = entradas − (fixas + fatura + avulsos); negativo ⇒ estouro. */
-  balanceCents: number;
-  balanceLabel: string;
-  /** Consumo (fixas + fatura + avulsos) acima da renda do mês. */
-  overspent: boolean;
-  overspentLabel: string | null;
   ariaLabel: string;
   isEmpty: boolean;
   emptyMessage: string;
@@ -274,11 +265,10 @@ export interface IncomeAllocationView {
 
 /**
  * Composição da renda do mês: as entradas (fixas + variáveis) viram contas
- * fixas, fatura do cartão, gastos avulsos e sobra. Destaca ainda o **consumo
- * disponível** (entradas − fixas, nunca negativo) e o **saldo do mês**
- * (entradas − todas as saídas; negativo ⇒ estouro). Quando o saldo é negativo a
- * linha de sobra some da barra e a mensagem de estouro aparece; as fatias
- * continuam proporcionais ao consumo.
+ * fixas, fatura do cartão, gastos avulsos e sobra. Quando as saídas passam da
+ * renda a linha de sobra some da barra e as fatias continuam proporcionais ao
+ * consumo. Consumo disponível, saldo e aviso de estouro saíram daqui: a
+ * orientação do ciclo mora no bloco único `SpendAdviceCard`.
  */
 export function buildIncomeAllocationView(
   input: IncomeAllocationInput,
@@ -291,8 +281,6 @@ export function buildIncomeAllocationView(
   const variable = Math.max(input.variableExpensesCents, 0);
   const consumed = fixed + card + variable;
   const remaining = income - consumed;
-  const consumption = Math.max(income - fixed, 0);
-  const overspent = income > 0 && remaining < 0;
   const base = Math.max(income, consumed, 1);
   const percent = (value: number) => Math.round((value / base) * 100);
 
@@ -337,7 +325,7 @@ export function buildIncomeAllocationView(
   if (remaining >= 0) {
     rows.push({
       key: "remaining",
-      label: "Saldo do mês",
+      label: "Sobra do mês",
       amountCents: remaining,
       percent: percent(remaining),
       barClass: "bg-emerald-500",
@@ -350,7 +338,7 @@ export function buildIncomeAllocationView(
   const rowsForAria = rows
     .map((row) => `${row.label} ${formatCents(row.amountCents)}`)
     .join(", ");
-  const ariaLabel = `${INCOME_ALLOCATION_TITLE}: ${entriesForAria}, total de entradas ${formatCents(income)}, ${rowsForAria}, consumo disponível ${formatCents(consumption)}, saldo do mês ${formatCents(remaining)}.`;
+  const ariaLabel = `${INCOME_ALLOCATION_TITLE}: ${entriesForAria}, total de entradas ${formatCents(income)}, ${rowsForAria}.`;
 
   return {
     title: INCOME_ALLOCATION_TITLE,
@@ -358,14 +346,6 @@ export function buildIncomeAllocationView(
     totalIncomeCents: income,
     incomeLabel: formatCents(income),
     rows,
-    consumptionCents: consumption,
-    consumptionLabel: formatCents(consumption),
-    balanceCents: remaining,
-    balanceLabel: formatCents(remaining),
-    overspent,
-    overspentLabel: overspent
-      ? `No vermelho: o consumo passou a renda em ${formatCents(-remaining)}.`
-      : null,
     ariaLabel,
     isEmpty: income <= 0,
     emptyMessage: INCOME_ALLOCATION_EMPTY_MESSAGE,

@@ -37,6 +37,25 @@ describe("buildMonthReviewData", () => {
     expect(data.previousMonthsAverageCents).toBe(0);
   });
 
+  it("expõe os 10 campos numéricos do mês e o histórico", () => {
+    const data = buildMonthReviewData(snapshot, [100000, 200000]);
+
+    expect(data).toMatchObject({
+      incomeCents: 500000,
+      fixedExpensesCents: 100000,
+      variableExpensesCents: 50000,
+      cardExpensesCents: 20000,
+      consumedCents: 170000,
+      consumedPercent: 34,
+      daysInMonth: 30,
+      elapsedDay: 30,
+      dailyBudgetCents: 16667,
+      projectedMonthEndCents: 170000,
+      previousMonthsCount: 2,
+      previousMonthsAverageCents: 150000,
+    });
+  });
+
   it("não calcula média com apenas 1 mês anterior (regressão)", () => {
     const data = buildMonthReviewData(snapshot, [100000]);
 

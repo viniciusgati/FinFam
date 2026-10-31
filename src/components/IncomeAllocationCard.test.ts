@@ -22,7 +22,7 @@ function render(
 }
 
 describe("IncomeAllocationCard (renderização)", () => {
-  it("mostra as entradas decompostas, as saídas, o consumo e o saldo", () => {
+  it("mostra as entradas decompostas, as saídas e a sobra", () => {
     const html = render();
 
     expect(html).toContain("Para onde vai a renda");
@@ -35,10 +35,10 @@ describe("IncomeAllocationCard (renderização)", () => {
     expect(html).toContain("Contas fixas");
     expect(html).toContain("Fatura do cartão");
     expect(html).toContain("Gastos avulsos");
-    expect(html).toContain("Saldo do mês");
+    expect(html).toContain("Sobra do mês");
     expect(html).toContain("R$ 2.600,00");
-    expect(html).toContain("Consumo disponível");
-    expect(html).toContain("R$ 9.000,00");
+    expect(html).not.toContain("Consumo disponível");
+    expect(html).not.toContain("Saldo do mês");
     expect(html).toContain("(25%)");
     expect(html).toContain("(50%)");
     expect(html).toContain('role="img"');
@@ -54,11 +54,12 @@ describe("IncomeAllocationCard (renderização)", () => {
     expect(aria).toContain("Contas fixas R$ 3.000,00");
     expect(aria).toContain("Fatura do cartão R$ 6.000,00");
     expect(aria).toContain("Gastos avulsos R$ 400,00");
-    expect(aria).toContain("consumo disponível R$ 9.000,00");
-    expect(aria).toContain("saldo do mês R$ 2.600,00");
+    expect(aria).toContain("Sobra do mês R$ 2.600,00");
+    expect(aria).not.toContain("consumo disponível");
+    expect(aria).not.toContain("saldo do mês");
   });
 
-  it("alerta quando as saídas passam das entradas", () => {
+  it("não exibe aviso de estouro quando as saídas passam das entradas", () => {
     const html = render({
       incomeCents: 100000,
       fixedIncomeCents: 80000,
@@ -68,10 +69,11 @@ describe("IncomeAllocationCard (renderização)", () => {
       variableExpensesCents: 10000,
     });
 
-    expect(html).toContain("Saldo do mês");
-    expect(html).toContain("-R$ 200,00");
-    expect(html).toContain("No vermelho: o consumo passou a renda em R$ 200,00.");
-    expect(html).toContain('role="alert"');
+    expect(html).not.toContain("Saldo do mês");
+    expect(html).not.toContain("Consumo disponível");
+    expect(html).not.toContain("No vermelho");
+    expect(html).not.toContain("Sobra do mês");
+    expect(html).not.toContain('role="alert"');
     expect(html).not.toContain("(0%)");
   });
 

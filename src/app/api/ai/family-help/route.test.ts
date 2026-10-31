@@ -29,7 +29,11 @@ function jsonRequest(body: unknown) {
 
 const dashboardData = {
   monthlyIncomeCents: 500000,
+  fixedIncomeCents: 400000,
+  variableIncomeCents: 100000,
   fixedExpensesCents: 100000,
+  variableExpensesCents: 30000,
+  cardExpensesCents: 20000,
   categoryBreakdown: {
     monthKey: currentMonth,
     items: [{ category: "Mercado", amountCents: 30000 }],
@@ -45,12 +49,16 @@ const dashboardData = {
     },
   ],
   series: {
+    daysInMonth: 30,
     elapsedDay: 2,
     variableDailyCents: [1000, 2000, 0],
   },
   consumption: {
     dailyByMonthCents: 10000,
   },
+  periodDays: 30,
+  elapsedDays: 2,
+  cardExpensesVariable: true,
 };
 
 const originalKey = process.env.DEEPSEEK_API_KEY;
@@ -115,6 +123,28 @@ describe("POST /api/ai/family-help", () => {
       } else {
         expect(typeof value).toBe("number");
       }
+    }
+
+    for (const key of [
+      "monthlyIncomeCents",
+      "fixedIncomeCents",
+      "variableIncomeCents",
+      "fixedExpensesCents",
+      "variableExpensesCents",
+      "cardExpensesCents",
+      "consumedCents",
+      "consumedPercent",
+      "projectedCents",
+      "projectedPercent",
+      "daysInWindow",
+      "elapsedDays",
+      "remainingDays",
+      "freeBudgetCents",
+      "dailyCents",
+      "windowSnapshotCount",
+      "categoryDeviationPercents",
+    ]) {
+      expect(Object.prototype.hasOwnProperty.call(parsed, key)).toBe(true);
     }
   });
 

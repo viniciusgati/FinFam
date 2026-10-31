@@ -99,38 +99,13 @@ describe("MonthSpendCard (renderização)", () => {
     expect(html).toContain("Alerta");
   });
 
-  it("renderiza o subtítulo de consumo quando recebe a prop", () => {
-    const html = render({
-      consumptionLabel:
-        "Consumo de R$ 2.000,00 · R$ 64,52/dia (mês) · não inclui contas fixas",
-    });
-
-    expect(html).toContain("não inclui contas fixas");
-    expect(html).toContain("R$ 2.000,00");
-  });
-
-  it("posiciona o subtítulo de consumo no rodapé, antes do feedback", () => {
-    const html = render({
-      consumptionLabel:
-        "Consumo de R$ 2.000,00 · R$ 64,52/dia (mês) · não inclui contas fixas",
-    });
-
-    const countdownIndex = html.indexOf("8 dias para o fim do ciclo");
-    const consumptionIndex = html.indexOf("não inclui contas fixas");
-    const feedbackIndex = html.indexOf(
-      "Você está gastando abaixo do esperado.",
-    );
-
-    expect(countdownIndex).toBeGreaterThanOrEqual(0);
-    expect(consumptionIndex).toBeGreaterThan(countdownIndex);
-    expect(consumptionIndex).toBeLessThan(feedbackIndex);
-  });
-
-  it("não renderiza número nem texto de consumo sem a prop", () => {
+  it("não renderiza subtítulo de consumo nem orientação duplicada", () => {
     const html = render();
 
     expect(html).not.toContain("não inclui contas fixas");
     expect(html).not.toContain("Consumo de");
+    expect(html).not.toContain("Restam 7 dias no ciclo");
+    expect(html).not.toContain("limite o gasto");
   });
 
   it("aceita className extra (ex.: md:col-span-2)", () => {
@@ -162,17 +137,6 @@ describe("MonthSpendCard (renderização)", () => {
   it("expõe o risco em role=status com aria-live=polite", () => {
     const html = render({ projectedPercent: 248, projectedRisk: true });
 
-    expect(html).toContain('role="status"');
-    expect(html).toContain('aria-live="polite"');
-  });
-
-  it("expõe a mensagem acionável em role=status com aria-live=polite", () => {
-    const html = render({
-      actionableMessage:
-        "Restam 7 dias no ciclo. Para fechar dentro do orçamento, limite o gasto a R$ 50,00 por dia.",
-    });
-
-    expect(html).toContain("Restam 7 dias no ciclo");
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-live="polite"');
   });

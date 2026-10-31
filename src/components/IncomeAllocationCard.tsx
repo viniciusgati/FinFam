@@ -8,8 +8,10 @@ import { formatCents } from "@/lib/money";
 /**
  * Card "Para onde vai a renda": entradas decompostas (fixas + variáveis +
  * total), barra empilhada das saídas e lista textual com o destino de cada real
- * (contas fixas, fatura, avulsos e saldo do mês), além do consumo disponível.
- * Todo o texto/número vem de `buildIncomeAllocationView` (testável sem DOM).
+ * (contas fixas, fatura, avulsos e sobra do mês). Os números duplicados e o
+ * aviso de estouro saíram daqui — o bloco único de recomendação do ciclo
+ * (`SpendAdviceCard`) é a fonte da orientação. Todo o texto/número vem de
+ * `buildIncomeAllocationView` (testável sem DOM).
  */
 export default function IncomeAllocationCard(input: IncomeAllocationInput) {
   const view = buildIncomeAllocationView(input);
@@ -88,32 +90,6 @@ export default function IncomeAllocationCard(input: IncomeAllocationInput) {
               </li>
             ))}
           </ul>
-
-          <p className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3 text-sm">
-            <span className="text-foreground-muted">Consumo disponível</span>
-            <span className="font-semibold tabular-nums text-foreground">
-              {view.consumptionLabel}
-            </span>
-          </p>
-
-          {view.overspent && (
-            <>
-              <p className="mt-1 flex items-center justify-between gap-3 text-sm">
-                <span className="text-foreground-muted">Saldo do mês</span>
-                <span className="font-semibold tabular-nums text-red-300">
-                  {view.balanceLabel}
-                </span>
-              </p>
-              {view.overspentLabel !== null && (
-                <p
-                  role="alert"
-                  className="mt-3 rounded-lg bg-red-950 px-3 py-2 text-sm font-medium text-red-200"
-                >
-                  {view.overspentLabel}
-                </p>
-              )}
-            </>
-          )}
         </>
       )}
     </section>

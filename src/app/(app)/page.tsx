@@ -4,7 +4,6 @@ import {
   resolveCycleReference,
 } from "@/lib/dashboard";
 import {
-  cycleAvailabilityLabel,
   cycleEndCountdownLabel,
   cycleRangeLabel,
   cycleStartCountdownLabel,
@@ -18,7 +17,6 @@ import {
 } from "@/lib/cycle";
 import { defaultSettings, getSettings } from "@/lib/settings";
 import {
-  actionableBudgetMessage,
   computeFinanceStatus,
   dashboardView,
   emptyStateCopy,
@@ -28,10 +26,7 @@ import {
 } from "@/lib/finance";
 import { cycleInvoicePaymentLabel } from "@/lib/invoices";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
-import {
-  consumptionAverageLabel,
-  type DailySeries,
-} from "@/lib/dashboard-series";
+import type { DailySeries } from "@/lib/dashboard-series";
 import CyclePreviewNotice from "@/components/CyclePreviewNotice";
 import {
   buildMonthReviewData,
@@ -40,13 +35,14 @@ import {
 } from "@/lib/ai/month-review";
 import {
   buildFamilyHelpData,
+  buildFamilyInsightInput,
   localFamilyHelp,
 } from "@/lib/ai/family-help";
 import {
   buildFamilyInsights,
   type FamilyInsight,
-  type FamilyInsightInput,
 } from "@/lib/family-insights";
+import { buildSpendAdvice, type SpendAdvice } from "@/lib/spend-advice";
 import RetryButton from "@/components/RetryButton";
 import MonthSelector from "@/components/MonthSelector";
 import DailyConsumptionChart from "@/components/DailyConsumptionChart";
@@ -56,6 +52,7 @@ import PurchaseSimulator from "@/components/PurchaseSimulator";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
 import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
+import SpendAdviceCard from "@/components/SpendAdviceCard";
 import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
 import FamilyHelpCard from "@/components/FamilyHelpCard";
 import type { CategoryBreakdown } from "@/lib/category-breakdown";
@@ -96,7 +93,7 @@ export default async function DashboardPage({
   let invoicePaymentLabel: string | null = null;
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
-  let consumptionLabel: string | null = null;
+  let spendAdvice: SpendAdvice | null = null;
   let categoryBreakdown: CategoryBreakdown | null = null;
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
@@ -174,47 +171,27 @@ export default async function DashboardPage({
       });
     }
 
-    // O subtítulo do card principal só existe no ramo `ok` (com renda e
-    // movimentação). No ciclo corrente ele repete os números do ciclo (igual ao
-    // "Pode gastar por dia"); em ciclo fechado, mostra a média do mês.
+    // Um único bloco de recomendação no ciclo corrente: compara o consumo
+    // variável do ciclo com o orçamento variável (renda − contas fixas). Sem
+    // movimentação não há ritmo a avaliar.
+    spendAdvice = data.hasMovements
+      ? buildSpendAdvice({
+          windowDays: data.series.daysInMonth,
+          elapsedDays: data.series.elapsedDay,
+          incomeCents: data.monthlyIncomeCents,
+          fixedExpensesCents: data.fixedExpensesCents,
+          variableConsumedCents:
+            data.variableExpensesCents + data.cardExpensesCents,
+          isCurrentCycle,
+        })
+      : null;
+
     if (view.state === "ok") {
-      consumptionLabel =
-        allowance !== null
-          ? cycleAvailabilityLabel(allowance)
-          : consumptionAverageLabel(data.consumption);
-
-      // Variação diária só existe no ciclo corrente (ciclo fechado não tem "hoje").
-      const todayVariableSpendCents = isCurrentCycle
-        ? (series.variableDailyCents[series.elapsedDay - 1] ?? 0)
-        : null;
-      const usualDailySpend =
-        allowance !== null
-          ? usualDailySpendCents({
-              variableSpentCents: allowance.variableSpentCents,
-              cardExpensesCents: 0,
-              elapsedDays: allowance.elapsedDays,
-            })
-          : null;
-      const dailyReferenceCents = isCurrentCycle
-        ? usualDailySpend !== null && usualDailySpend > 0
-          ? usualDailySpend
-          : data.consumption.dailyByMonthCents
-        : null;
-
-      const familyInput: FamilyInsightInput = {
+      const familyInput = buildFamilyInsightInput({
         referenceMonthKey,
-        currentCategories: data.categoryBreakdown.items,
-        windowSnapshots: data.snapshots.map((snapshot) => ({
-          monthKey: snapshot.monthKey,
-          categories: snapshot.categories,
-          incomeCents: snapshot.incomeCents,
-          consumedCents: snapshot.consumedCents,
-        })),
-        monthlyIncomeCents: data.monthlyIncomeCents,
-        fixedExpensesCents: data.fixedExpensesCents,
-        todayVariableSpendCents,
-        dailyReferenceCents,
-      };
+        isCurrentCycle,
+        data,
+      });
       familyInsights = buildFamilyInsights(familyInput);
       familyHelpFallback = localFamilyHelp(buildFamilyHelpData(familyInput));
     }
@@ -244,18 +221,6 @@ export default async function DashboardPage({
           variableSpentCents: allowance.variableSpentCents,
           cardExpensesCents: 0,
           elapsedDays: allowance.elapsedDays,
-        })
-      : null;
-
-  const actionableMessage =
-    view.state === "ok" && allowance !== null
-      ? actionableBudgetMessage({
-          hasData: allowance.hasData,
-          level,
-          projectedPercent: view.projectedPercent,
-          freeBudgetCents: allowance.freeBudgetCents,
-          dailyCents: allowance.dailyCents,
-          remainingDays: allowance.remainingDays,
         })
       : null;
 
@@ -324,15 +289,15 @@ export default async function DashboardPage({
             level={level}
             invoiceDue={invoicePaymentLabel ?? ""}
             countdownLabel={countdownLabel}
-            consumptionLabel={consumptionLabel}
             feedback={view.feedback}
-            actionableMessage={actionableMessage}
             projectedPercent={view.projectedPercent}
             projectedRisk={view.projectedRisk}
             incomeCents={incomeCents}
             consumedCents={consumedCents}
             projectedCents={projectedCents}
           />
+
+          {spendAdvice !== null && <SpendAdviceCard advice={spendAdvice} />}
 
           {isCurrentCycle && (
             <div className="grid items-stretch gap-6 md:grid-cols-2">

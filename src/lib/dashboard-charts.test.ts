@@ -172,16 +172,12 @@ describe("buildIncomeAllocationView", () => {
     variableExpensesCents: 10000,
   };
 
-  it("decompõe as entradas e expõe consumo disponível e saldo do mês", () => {
+  it("decompõe as entradas e a renda total", () => {
     const view = buildIncomeAllocationView(baseInput);
 
     expect(view.title).toBe("Para onde vai a renda");
     expect(plain(view.incomeLabel)).toBe("R$ 1.000,00");
     expect(view.totalIncomeCents).toBe(100000);
-    expect(view.consumptionCents).toBe(70000);
-    expect(plain(view.consumptionLabel)).toBe("R$ 700,00");
-    expect(view.balanceCents).toBe(40000);
-    expect(plain(view.balanceLabel)).toBe("R$ 400,00");
 
     const entries = Object.fromEntries(
       view.entriesByType.map((entry) => [entry.key, entry]),
@@ -194,7 +190,7 @@ describe("buildIncomeAllocationView", () => {
     expect(plain(entries.variableIncome.amountLabel)).toBe("R$ 200,00");
   });
 
-  it("decompõe a renda em fixas, fatura, avulsos e saldo", () => {
+  it("decompõe a renda em fixas, fatura, avulsos e sobra", () => {
     const view = buildIncomeAllocationView({
       incomeCents: 1200000,
       fixedIncomeCents: 800000,
@@ -210,31 +206,28 @@ describe("buildIncomeAllocationView", () => {
     expect(byKey.fixed.percent).toBe(25);
     expect(byKey.card.percent).toBe(50);
     expect(byKey.variable.percent).toBe(3);
-    expect(byKey.remaining.label).toBe("Saldo do mês");
+    expect(byKey.remaining.label).toBe("Sobra do mês");
     expect(byKey.remaining.amountCents).toBe(260000);
     expect(byKey.remaining.percent).toBe(22);
     expect(view.rows.reduce((sum, row) => sum + row.percent, 0)).toBe(100);
-    expect(view.consumptionCents).toBe(900000);
-    expect(view.balanceCents).toBe(260000);
-    expect(view.overspent).toBe(false);
-    expect(view.overspentLabel).toBeNull();
     expect(view.isEmpty).toBe(false);
   });
 
-  it("nunca deixa o consumo disponível negativo", () => {
-    const view = buildIncomeAllocationView({
-      ...baseInput,
-      incomeCents: 20000,
-      fixedIncomeCents: 20000,
-      variableIncomeCents: 0,
-      fixedExpensesCents: 30000,
-    });
+  it("não expõe consumo disponível, saldo nem estouro (removidos do card)", () => {
+    const view = buildIncomeAllocationView(baseInput) as unknown as Record<
+      string,
+      unknown
+    >;
 
-    expect(view.consumptionCents).toBe(0);
-    expect(plain(view.consumptionLabel)).toBe("R$ 0,00");
+    expect(view.consumptionCents).toBeUndefined();
+    expect(view.consumptionLabel).toBeUndefined();
+    expect(view.balanceCents).toBeUndefined();
+    expect(view.balanceLabel).toBeUndefined();
+    expect(view.overspent).toBeUndefined();
+    expect(view.overspentLabel).toBeUndefined();
   });
 
-  it("marca estouro quando as saídas passam das entradas, sem linha de saldo", () => {
+  it("sem sobra quando as saídas passam das entradas, sem linha de saldo", () => {
     const view = buildIncomeAllocationView({
       incomeCents: 100000,
       fixedIncomeCents: 80000,
@@ -244,13 +237,7 @@ describe("buildIncomeAllocationView", () => {
       variableExpensesCents: 10000,
     });
 
-    expect(view.overspent).toBe(true);
-    expect(view.balanceCents).toBe(-20000);
-    expect(plain(view.balanceLabel)).toBe("-R$ 200,00");
     expect(view.rows.some((row) => row.key === "remaining")).toBe(false);
-    expect(plain(view.overspentLabel ?? "")).toContain(
-      "o consumo passou a renda em R$ 200,00",
-    );
     expect(view.rows.reduce((sum, row) => sum + row.percent, 0)).toBe(100);
   });
 
@@ -263,8 +250,9 @@ describe("buildIncomeAllocationView", () => {
     expect(aria).toContain("Contas fixas R$ 300,00");
     expect(aria).toContain("Fatura do cartão R$ 200,00");
     expect(aria).toContain("Gastos avulsos R$ 100,00");
-    expect(aria).toContain("consumo disponível R$ 700,00");
-    expect(aria).toContain("saldo do mês R$ 400,00");
+    expect(aria).toContain("Sobra do mês R$ 400,00");
+    expect(aria).not.toContain("consumo disponível");
+    expect(aria).not.toContain("saldo do mês");
   });
 
   it("fica vazio sem renda cadastrada e aponta o CTA para /gastos", () => {
