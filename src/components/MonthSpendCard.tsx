@@ -14,10 +14,7 @@ export interface MonthSpendCardProps {
   invoiceDue: string;
   /** Contador já formatado (ex.: `8 dias para o fim do ciclo`). */
   countdownLabel: string;
-  /** Subtítulo do consumo disponível (`entradas − gastos fixos`) e média diária. */
-  consumptionLabel?: string | null;
   feedback: string;
-  actionableMessage?: string | null;
   projectedPercent?: number;
   projectedRisk?: boolean;
   /** Renda do mês em centavos (mesma base do `%`). */
@@ -34,7 +31,8 @@ export interface MonthSpendCardProps {
  * (janela do ciclo financeiro) e, à direita, os valores em R$ que explicam o
  * número: renda, consumido, disponível e projeção de fechamento. Os rótulos do
  * dinheiro vêm de `buildMonthSpendStats` (função pura testada em
- * month-spend.test.ts).
+ * month-spend.test.ts). A orientação do ciclo fica no bloco único
+ * `SpendAdviceCard`; aqui não há subtítulo de consumo nem mensagem acionável.
  */
 export default function MonthSpendCard({
   backgroundColor,
@@ -42,9 +40,7 @@ export default function MonthSpendCard({
   level,
   invoiceDue,
   countdownLabel,
-  consumptionLabel,
   feedback,
-  actionableMessage,
   projectedPercent,
   projectedRisk = false,
   incomeCents,
@@ -146,21 +142,10 @@ export default function MonthSpendCard({
           </dl>
         </div>
 
-        {actionableMessage && (
-          <p
-            role="status"
-            aria-live="polite"
-            className="rounded-xl bg-black/10 px-4 py-3 text-base font-medium"
-          >
-            {actionableMessage}
-          </p>
-        )}
-
         <footer className="flex flex-col gap-2 border-t border-current/20 pt-4 text-sm">
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1 font-medium opacity-90">
             <span className="uppercase tracking-wide">{invoiceDue}</span>
             <span>{countdownLabel}</span>
-            {consumptionLabel && <span>{consumptionLabel}</span>}
           </p>
 
           <p role="status" aria-live="polite" className="font-medium opacity-90">

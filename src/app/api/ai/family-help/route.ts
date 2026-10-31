@@ -7,8 +7,8 @@ import { chatCompletion, isAiConfigured } from "@/lib/ai/deepseek";
 import {
   buildFamilyHelpData,
   buildFamilyHelpPrompt,
+  buildFamilyInsightInput,
 } from "@/lib/ai/family-help";
-import type { FamilyInsightInput } from "@/lib/family-insights";
 import { getSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
@@ -41,24 +41,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     const reference = resolveCycleReference(requested, new Date(), cycleStartDay);
     const data = await loadCycleDashboardData(reference);
 
-    const input: FamilyInsightInput = {
+    const input = buildFamilyInsightInput({
       referenceMonthKey: reference.cycleKey,
-      currentCategories: data.categoryBreakdown.items,
-      windowSnapshots: data.snapshots.map((snapshot) => ({
-        monthKey: snapshot.monthKey,
-        categories: snapshot.categories,
-        incomeCents: snapshot.incomeCents,
-        consumedCents: snapshot.consumedCents,
-      })),
-      monthlyIncomeCents: data.monthlyIncomeCents,
-      fixedExpensesCents: data.fixedExpensesCents,
-      todayVariableSpendCents: reference.isCurrent
-        ? (data.series.variableDailyCents[data.series.elapsedDay - 1] ?? 0)
-        : null,
-      dailyReferenceCents: reference.isCurrent
-        ? data.consumption.dailyByMonthCents
-        : null,
-    };
+      isCurrentCycle: reference.isCurrent,
+      data,
+    });
 
     const summary = await chatCompletion(
       buildFamilyHelpPrompt(buildFamilyHelpData(input)),

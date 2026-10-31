@@ -252,8 +252,8 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
 - Gráficos em **SVG/CSS puro** (`role="img"` + `aria-label`), sem biblioteca de
   charts:
   - **"Para onde vai a renda"**: barra empilhada + lista com o destino da renda
-    do mês (contas fixas, fatura do cartão, gastos avulsos e o que sobra); se o
-    consumo passar da renda, mostra "no vermelho" com o excesso.
+    do mês (contas fixas, fatura do cartão, gastos avulsos e a sobra); a
+    orientação sobre estouro do ciclo fica no bloco único do §4.7.
   - **"Consumo por dia"**: barras do consumo **variável** do dia (avulsos no
     orçamento pela `date` + parcelas de cartão de compras do próprio mês pela
     data da compra) + marcadores de vencimento (fixas/fatura) no rodapé, fora
@@ -308,8 +308,8 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
 
 ### 4.5 Consumo disponível e média diária
 
-Métrica **informativa** exibida como subtítulo do card principal, ao lado (não
-no lugar) do `%` protagonista e do orçamento livre do ciclo:
+Métrica **informativa** (mantida no histórico/snapshots, não mais exibida como
+subtítulo do card principal — a orientação do ciclo é o bloco único do §4.7):
 
 ```
 consumo_disponivel = max(entradas_do_mes − gastos_fixos_ativos, 0)
@@ -326,10 +326,11 @@ media_diaria       = consumo_disponivel / dias_da_janela   (Math.round)
 - Janelas: **ciclo** (dias da janela), **mês** (dias do mês calendário) e
   **dias decorridos**. `dias <= 0` ⇒ média `R$ 0,00`, sem divisão por zero nem
   `NaN`.
-- UI: no **ciclo corrente**, o subtítulo do card principal exibe o disponível do
-  ciclo (`cycleAvailabilityLabel`) — os mesmos números do "Pode gastar por
-  dia", já líquidos de faturas e avulsos; em **ciclo fechado**, exibe a média da
-  janela mês (`consumptionAverageLabel`).
+- UI: no **ciclo corrente**, o bloco único de recomendação (§4.7) é a fonte da
+  orientação; o `MonthSpendCard` não exibe mais subtítulo de consumo/disponível
+  e o `IncomeAllocationCard` não repete "Consumo disponível", "Saldo do mês" nem
+  "No vermelho". A métrica continua disponível como leitura informativa no
+  histórico/snapshots (§4.6).
 - Quando `gastos_fixos_ativos >= entradas`, o consumo disponível é `0` e o card
   exibe apenas a mensagem de indisponibilidade, sem valores em R$.
 - Implementação: `consumptionAvailableCents`/`consumptionDailyAverageCents`
@@ -364,6 +365,41 @@ origem sejam editados, desativados ou apagados depois.
   `variableDailyCents`/`obligationDailyCents`/split de renda) caem no cálculo ao
   vivo até um `--force`. Snapshots são retidos por tempo indeterminado
   (alvo ≥ 5 anos), sem expurgo automático.
+
+### 4.7 Alerta único de ritmo do ciclo
+
+No **ciclo corrente com dados** o dashboard mostra **um único bloco de
+recomendação** (`buildSpendAdvice`/`SpendAdviceCard`), comparando o **consumo
+variável** do ciclo (avulsos + compras do cartão pela data) com o **orçamento
+variável** `max(renda_ciclo − saídas_fixas, 0)`:
+
+```
+diaria_variavel   = round(orcamento_variavel / dias_da_janela)
+esperado_ate_hoje = diaria_variavel × dias_decorridos
+delta             = consumido_variavel − esperado_ate_hoje
+```
+
+- **Estouro** (`consumido_variavel > orcamento_variavel`) tem precedência sobre
+  os demais estados e substitui o bloco de ritmo: _"Orçamento variável do ciclo
+  estourado em R$ X. Reduza o consumo pelos N dias restantes."_ (vermelho,
+  `role="alert"`/`aria-live="assertive"`).
+- **Adiantado** (`delta > 0`): `dias_adiantado = ceil(delta / diaria_variavel)`;
+  _"Segure o consumo por N dias para se manter dentro do necessário."_ (âmbar).
+- **Atrasado** (`delta < 0`): `dias_atrasado = floor(|delta| / diaria_variavel)`;
+  economia projetada =
+  `max(orcamento_variavel − round(consumido_variavel / dias_decorridos × dias_da_janela), 0)`;
+  _"Você está N dias atrás do consumo esperado. Continue assim para economizar
+  R$ X até o fim do ciclo."_ (âmbar).
+- **No ritmo** (`delta = 0`): _"No ritmo esperado: continue assim para fechar o
+  ciclo dentro do orçamento."_ (verde).
+
+Adiantado/atrasado/no ritmo usam `role="status"`/`aria-live="polite"`.
+**Limites:** o bloco só existe com `isCurrentCycle === true`,
+`diaria_variavel > 0` e `hasMovements === true` (mesma base do estado `ok`);
+em ciclo fechado/futuro, sem renda, sem orçamento variável ou sem movimentação
+nada é renderizado (sem espaço vazio). O `DailyAllowanceCard` segue como única
+fonte de "Ainda tem…/por dia"; `MonthSpendCard` e `IncomeAllocationCard` não
+repetem esses números nem a orientação.
 
 ## 5. Regras de negócio relevantes
 
@@ -414,13 +450,17 @@ são entregas seguintes.
 - **Valores monetários em R$ no dashboard** (história #224 supersede o "apenas
   %" anterior); o percentual continua sendo o protagonista.
 - **Privacidade**: por padrão sem envio para terceiros; tudo no PostgreSQL
-  próprio. Exceção restrita aos recursos de IA (avaliação de mês fechado e
-  simulador), que enviam **somente agregados numéricos** à DeepSeek — nunca
-  nomes, descrições, categorias ou texto do usuário. **Exceção documentada à
-  importação de fatura CSV (história #269):** na classificação de títulos da
-  importação trafegam **apenas títulos de lançamento e rótulos de categoria**
-  já usados pela família para a DeepSeek, e somente nesta função — nenhum outro
-  dado pessoal ou agregado sai do sistema.
+  próprio. Exceção restrita aos recursos de IA (ajuda à família, avaliação de
+  mês fechado e simulador), que enviam **somente agregados numéricos** à
+  DeepSeek — nunca nomes, descrições, categorias ou texto do usuário. A ajuda à
+  família recebe o **agregado numérico completo do ciclo** (renda fixa/variável,
+  saídas, consumo, percentuais, projeção, dias/janela, orçamento livre, diária,
+  snapshots e desvios anônimos); a avaliação de mês fechado mantém os 10 campos
+  numéricos + histórico; o simulador envia apenas os números da simulação.
+  **Exceção documentada à importação de fatura CSV (história #269):** na
+  classificação de títulos da importação trafegam **apenas títulos de lançamento
+  e rótulos de categoria** já usados pela família para a DeepSeek, e somente
+  nesta função — nenhum outro dado pessoal ou agregado sai do sistema.
 - **Acessibilidade**: contraste adequado mesmo com fundo colorido; gráficos e
   estados usam `role`/`aria-label`/`aria-live` e rótulos textuais.
 

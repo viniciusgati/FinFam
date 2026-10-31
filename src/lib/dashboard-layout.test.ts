@@ -54,13 +54,30 @@ describe("layout do dashboard", () => {
   });
 });
 
-describe("mensagem acionável no MonthSpendCard", () => {
-  it("expõe a prop e a renderiza com role=status e aria-live", () => {
+describe("alerta de ritmo único no dashboard", () => {
+  it("o MonthSpendCard não declara consumo nem mensagem acionável", () => {
     const card = readSource("../components/MonthSpendCard.tsx");
 
-    expect(card).toContain("actionableMessage");
-    expect(card).toContain('role="status"');
-    expect(card).toContain('aria-live="polite"');
+    expect(card).not.toContain("consumptionLabel");
+    expect(card).not.toContain("actionableMessage");
+  });
+
+  it("a página calcula e renderiza um único bloco de recomendação", () => {
+    const page = readSource("../app/(app)/page.tsx");
+
+    expect(page).toContain("buildSpendAdvice");
+    expect(page).toContain("<SpendAdviceCard");
+    expect(page.match(/<SpendAdviceCard/g)).toHaveLength(1);
+    expect(page).not.toContain("consumptionLabel=");
+    expect(page).not.toContain("actionableMessage=");
+  });
+
+  it("o IncomeAllocationCard não repete consumo disponível, saldo nem No vermelho", () => {
+    const card = readSource("../components/IncomeAllocationCard.tsx");
+
+    expect(card).not.toContain("Consumo disponível");
+    expect(card).not.toContain("Saldo do mês");
+    expect(card).not.toContain("No vermelho");
   });
 });
 

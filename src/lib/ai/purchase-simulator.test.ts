@@ -126,6 +126,20 @@ describe("buildPurchaseData", () => {
     expect(data.newFreeBudgetCents).toBe(120000);
     expect(data.newDailyCents).toBe(15000);
   });
+
+  it("não inclui rótulos, descrições ou qualquer string", () => {
+    const data = buildPurchaseData({ ...base, purchaseCents: 80000 }) as Record<
+      string,
+      unknown
+    >;
+
+    for (const [key, value] of Object.entries(data)) {
+      expect(typeof value, key).toBe("number");
+    }
+    expect(Object.values(data).some((value) => typeof value === "string")).toBe(
+      false,
+    );
+  });
 });
 
 describe("buildPurchasePrompt — privacidade", () => {

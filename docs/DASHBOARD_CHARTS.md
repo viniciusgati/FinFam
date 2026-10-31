@@ -55,9 +55,11 @@ nem série temporal.
 - **Consumo disponível** (`entradas − gastos fixos`) e média diária por
   mês/dias decorridos/ciclo: `buildConsumptionSummary`/`consumptionAverageLabel`
   (`src/lib/dashboard-series.ts`), sobre `consumptionAvailableCents`/
-  `consumptionDailyAverageCents` (`src/lib/finance.ts`). Já exibido como
-  subtítulo do `MonthSpendCard`: no mês corrente com a janela do **ciclo**
-  (mesmos números do card de diária), em mês fechado com a janela **mês**.
+  `consumptionDailyAverageCents` (`src/lib/finance.ts`). A métrica continua no
+  histórico/snapshots, mas **saiu do dashboard**: o subtítulo do
+  `MonthSpendCard` e as linhas duplicadas do `IncomeAllocationCard` foram
+  removidos (história #295). A orientação do ciclo agora é o bloco único
+  `SpendAdviceCard` (`buildSpendAdvice`, `src/lib/spend-advice.ts`).
   Faturas e avulsos ficam fora da subtração (consumo variável, SPEC §3.2/§3.4).
 
 Observação: `freeBudget`/diária livre **não** alimentam os gráficos nem o `%` —

@@ -148,6 +148,21 @@ describe("POST /api/ai/month-review", () => {
       expect(typeof value).toBe("number");
     }
 
+    expect(parsed).toMatchObject({
+      incomeCents: 500000,
+      fixedExpensesCents: 100000,
+      variableExpensesCents: 50000,
+      cardExpensesCents: 20000,
+      consumedCents: 170000,
+      consumedPercent: 34,
+      daysInMonth: 30,
+      elapsedDay: 30,
+      dailyBudgetCents: 16667,
+      projectedMonthEndCents: 170000,
+      previousMonthsCount: 2,
+      previousMonthsAverageCents: 150000,
+    });
+
     expect(monthlyReviewMock.upsert).toHaveBeenCalledWith({
       where: { monthKey: closedMonth },
       create: { monthKey: closedMonth, summary: "Resumo da IA" },
