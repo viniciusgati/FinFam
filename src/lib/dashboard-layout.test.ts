@@ -81,6 +81,27 @@ describe("layout do dashboard", () => {
 
     expect(page).toContain("<DailyAllowanceCard");
   });
+
+  it("mantém o Pode gastar por dia em largura total na prévia de ciclo futuro", () => {
+    const page = readSource("../app/(app)/page.tsx");
+    const marker = "{(isCurrentCycle || allowance !== null) && (";
+    const start = page.indexOf(marker);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+
+    const block = jsxBlock(page, start);
+    const normalized = block.replace(/\s+/g, " ");
+
+    // Ciclo corrente: duas colunas. Ciclo futuro: container simples, sem
+    // meia coluna, para o card ocupar a largura total do conteúdo.
+    expect(normalized).toContain(
+      'isCurrentCycle ? "grid items-stretch gap-6 md:grid-cols-2" : "grid gap-6"',
+    );
+    expect(block).toContain("<DailyAllowanceCard");
+    expect(jsxBlock(block, block.indexOf("{isCurrentCycle && ("))).toContain(
+      "<QuickExpenseCard",
+    );
+  });
 });
 
 describe("alerta de ritmo único no dashboard", () => {
