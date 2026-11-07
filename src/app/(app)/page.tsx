@@ -299,9 +299,17 @@ export default async function DashboardPage({
 
           {spendAdvice !== null && <SpendAdviceCard advice={spendAdvice} />}
 
-          {isCurrentCycle && (
-            <div className="grid items-stretch gap-6 md:grid-cols-2">
-              <QuickExpenseCard categorySuggestions={categorySuggestions} />
+          {(isCurrentCycle || allowance !== null) && (
+            <div
+              className={
+                isCurrentCycle
+                  ? "grid items-stretch gap-6 md:grid-cols-2"
+                  : "grid gap-6"
+              }
+            >
+              {isCurrentCycle && (
+                <QuickExpenseCard categorySuggestions={categorySuggestions} />
+              )}
               {allowance !== null && (
                 <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />
               )}

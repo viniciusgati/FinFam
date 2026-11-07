@@ -16,6 +16,19 @@ function readSource(relativePath: string): string {
   );
 }
 
+/** Recorta o bloco `{ ... }` que começa em `start` (chaves balanceadas). */
+function jsxBlock(source: string, start: number): string {
+  let depth = 0;
+  for (let index = start; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    else if (source[index] === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  return source.slice(start);
+}
+
 describe("layout do dashboard", () => {
   it("usa largura total, sem max-w nem mx-auto no container", () => {
     const page = readSource("../app/(app)/page.tsx");
@@ -50,7 +63,23 @@ describe("layout do dashboard", () => {
     expect(quick).toBeGreaterThan(gridStart);
     expect(daily).toBeGreaterThan(quick);
     expect(daily).toBeLessThan(gridEnd);
-    expect(page).toContain("{isCurrentCycle && (");
+
+    const quickBlock = jsxBlock(page, page.indexOf("{isCurrentCycle && ("));
+    expect(quickBlock).toContain("<QuickExpenseCard");
+  });
+
+  it("renderiza o Pode gastar por dia fora de qualquer bloco isCurrentCycle", () => {
+    const page = readSource("../app/(app)/page.tsx");
+    const marker = "{isCurrentCycle && (";
+
+    let index = page.indexOf(marker);
+    expect(index).toBeGreaterThanOrEqual(0);
+    while (index >= 0) {
+      expect(jsxBlock(page, index)).not.toContain("<DailyAllowanceCard");
+      index = page.indexOf(marker, index + marker.length);
+    }
+
+    expect(page).toContain("<DailyAllowanceCard");
   });
 });
 

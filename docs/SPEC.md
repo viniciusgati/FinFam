@@ -134,7 +134,8 @@ O dashboard exibe:
    exibido pelo **mês da fatura** (início + 1 ⇒ "novembro de 2026"). O ciclo
    futuro pode ser pré-visualizado (previsão com o que já está lançado: rendas,
    contas fixas e faturas) — "O ciclo começa em N dias" e o aviso "Ciclo
-   futuro".
+   futuro". A prévia também exibe o card **"Pode gastar por dia"** com a diária
+   prevista (§4.1).
 3. **Feedback comparativo**: mensagem textual comparando o mês atual com os
    últimos `N` meses (padrão `N = 4`).
 4. **Cor de fundo** do dashboard, interpolada do verde ao vermelho.
@@ -176,6 +177,15 @@ O dia é limitado ao tamanho do mês (vencimento 31 em mês de 30 vence no dia
 30); como a janela tem 28–31 dias, cada dia-do-mês ocorre no máximo uma vez
 nela. A série diária usa a mesma janela e o eixo é o do ciclo (dia 1 =
 `cycleStartDay`), de modo que `sum(série) === consumido_ciclo`.
+
+Na **pré-visualização de ciclo futuro**, o dashboard também mostra o card
+"Pode gastar por dia" com a **mesma regra/fórmula** do ciclo corrente:
+`(renda − obrigações − avulsos − cartão) / dias do ciclo`, usando `asOf` no
+início da janela (`reference.asOf = window.start`), de modo que todos os dias
+do ciclo contam como restantes. O cartão é consumo (compras/parcelas pela
+data), não obrigação. O conjunto de dados é o mesmo já carregado pela prévia —
+nenhuma consulta adicional é feita; lançamento rápido e simulador de compra
+continuam exclusivos do ciclo corrente.
 
 ### 4.2 Regra de situação (cor)
 
