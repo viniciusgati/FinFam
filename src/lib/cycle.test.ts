@@ -22,6 +22,21 @@ import {
 // Data de referência: 2026-03-25 12:00 em America/Sao_Paulo (UTC-3).
 const NOW = new Date("2026-03-25T15:00:00.000Z");
 
+// Início da janela futura 15/11–14/12 (prévia do dashboard).
+const FUTURE_START = cycleWindowForKey("2026-11", 15).start;
+
+function futureAllowance(input: {
+  incomeCents: number;
+  obligationsCents: number;
+  variableSpentCents: number;
+}) {
+  return dailyAllowanceCents({
+    ...input,
+    cycleStartDay: 15,
+    now: FUTURE_START,
+  });
+}
+
 describe("cycleWindow", () => {
   it("cycleStartDay = 1 usa o mês calendário", () => {
     const window = cycleWindow(NOW, 1);
@@ -161,6 +176,45 @@ describe("dailyAllowanceCents", () => {
     expect(allowance.hasData).toBe(true);
   });
 
+  it("prévia de ciclo futuro conta a janela inteira como dias restantes", () => {
+    const allowance = futureAllowance({
+      incomeCents: 528000,
+      obligationsCents: 135000,
+      variableSpentCents: 20000,
+    });
+
+    expect(allowance.window.cycleKey).toBe("2026-11");
+    expect(allowance.freeBudgetCents).toBe(373000);
+    expect(allowance.remainingDays).toBe(30);
+    expect(allowance.elapsedDays).toBe(1);
+    expect(allowance.dailyCents).toBe(12433);
+    expect(allowance.hasData).toBe(true);
+  });
+
+  it("prévia futura com orçamento esgotado zera a diária", () => {
+    const allowance = futureAllowance({
+      incomeCents: 100000,
+      obligationsCents: 80000,
+      variableSpentCents: 20000,
+    });
+
+    expect(allowance.freeBudgetCents).toBe(0);
+    expect(allowance.dailyCents).toBe(0);
+    expect(allowance.remainingDays).toBe(30);
+  });
+
+  it("prévia futura com orçamento estourado tem diária negativa", () => {
+    const allowance = futureAllowance({
+      incomeCents: 100000,
+      obligationsCents: 115000,
+      variableSpentCents: 0,
+    });
+
+    expect(allowance.freeBudgetCents).toBe(0);
+    expect(allowance.dailyCents).toBe(-500);
+    expect(allowance.remainingDays).toBe(30);
+  });
+
   it("ciclo estourado: orçamento livre 0 e diária negativa (excesso/dia)", () => {
     const allowance = dailyAllowanceCents({
       incomeCents: 100000,
@@ -227,6 +281,54 @@ describe("dailyAllowanceCard", () => {
     expect(card.state).toBe("ready");
     expect(card.label.replace(/\u00a0/g, " ")).toBe("R$ 125,00 por dia");
     expect(card.detail).toBe("26 dias restantes no ciclo");
+  });
+
+  it("prévia futura exibe diária, dias restantes, janela e saldo livre", () => {
+    const card = dailyAllowanceCard(
+      futureAllowance({
+        incomeCents: 528000,
+        obligationsCents: 135000,
+        variableSpentCents: 20000,
+      }),
+    );
+
+    expect(card.state).toBe("ready");
+    expect(card.label.replace(/\u00a0/g, " ")).toBe("R$ 124,33 por dia");
+    expect(card.detail).toBe("30 dias restantes no ciclo");
+    expect(card.periodLabel).toBe("Ciclo financeiro · início dia 15");
+    expect(card.freeBudgetLabel.replace(/\u00a0/g, " ")).toBe(
+      "Ainda tem R$ 3.730,00 até o fim do ciclo",
+    );
+  });
+
+  it("prévia futura esgotada não mostra a linha de saldo livre", () => {
+    const card = dailyAllowanceCard(
+      futureAllowance({
+        incomeCents: 100000,
+        obligationsCents: 80000,
+        variableSpentCents: 20000,
+      }),
+    );
+
+    expect(card.state).toBe("exhausted");
+    expect(card.label.replace(/\u00a0/g, " ")).toBe("R$ 0,00 por dia");
+    expect(card.detail).toBe("Orçamento do ciclo esgotado");
+    expect(card.freeBudgetLabel).toBe("");
+  });
+
+  it("prévia futura estourada mostra a diária negativa", () => {
+    const card = dailyAllowanceCard(
+      futureAllowance({
+        incomeCents: 100000,
+        obligationsCents: 115000,
+        variableSpentCents: 0,
+      }),
+    );
+
+    expect(card.state).toBe("over-budget");
+    expect(card.label.replace(/\u00a0/g, " ")).toBe("-R$ 5,00 por dia");
+    expect(card.detail).toBe("Orçamento do ciclo estourado");
+    expect(card.freeBudgetLabel).toBe("");
   });
 
   it("expõe a janela do ciclo a partir do dia de início", () => {

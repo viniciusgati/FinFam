@@ -444,6 +444,18 @@ describe("loadCycleAllowance — diária restante (regressão #231, moldura do c
 });
 
 describe("loadDashboardData — gastos por categoria", () => {
+  // Relógio fixado: o gate "mês corrente" (`monthKey(referenceDate) ===
+  // monthKey(new Date())`) não pode depender do relógio real de CI — senão
+  // outubro/2026 vira mês fechado e o ramo de snapshot faz consultas extras.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(referenceDate);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("expõe categoryBreakdown sem nenhuma consulta adicional", async () => {
     prismaMock.income.findMany.mockResolvedValue([
       { id: "1", amountCents: 500000, active: true, startMonth: null, endMonth: null },
