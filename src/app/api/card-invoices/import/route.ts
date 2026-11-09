@@ -4,9 +4,14 @@ import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import { prisma } from "@/lib/db";
 import { parseNubankInvoiceCsv } from "@/lib/invoice-csv";
 import {
+  detectInvoiceCompetence,
   IMPORT_FAILURE_MESSAGE,
   planInvoiceImport,
 } from "@/lib/invoice-import";
+import {
+  cardPurchaseLookbackStart,
+  cardPurchaseWindowEnd,
+} from "@/lib/invoices";
 import { resolveTimeZone, zonedTimeToUtc } from "@/lib/time";
 import { firstErrorMessage, invoiceImportSchema } from "@/lib/validation";
 
@@ -92,7 +97,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Cartão não encontrado" }, { status: 400 });
   }
 
-  const existing = await prisma.cardPurchase.findMany({ where: { cardId } });
+  const planMonthKey = detectInvoiceCompetence(parsedCsv.positives, card);
+  if (planMonthKey === null) {
+    return NextResponse.json({ error: NO_VALID_ROWS_ERROR }, { status: 400 });
+  }
+
+  const existing = await prisma.cardPurchase.findMany({
+    where: {
+      cardId,
+      purchaseDate: {
+        gte: cardPurchaseLookbackStart(planMonthKey),
+        lt: cardPurchaseWindowEnd(planMonthKey),
+      },
+    },
+  });
   const plan = planInvoiceImport({
     lines: parsedCsv.positives,
     card,

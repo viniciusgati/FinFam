@@ -1179,3 +1179,34 @@ describe("loadCycleDashboardData — moldura do ciclo", () => {
     expect(data.series.totalExpensesCents).toBe(0);
   });
 });
+
+describe("cardPurchase — limite inferior de lookback (task #359)", () => {
+  it("loadDashboardData consulta a partir de MAX_INSTALLMENTS_TOTAL + 1 meses antes do mês alvo", async () => {
+    await loadDashboardData(referenceDate);
+
+    const [args] = prismaMock.cardPurchase.findMany.mock.calls[0];
+    // Outubro/2026 → lookback 2016-09 (120 + 1 meses antes), no fuso da família.
+    expect(args.where.purchaseDate.gte.toISOString()).toBe(
+      "2016-09-01T03:00:00.000Z",
+    );
+    expect(args.where.purchaseDate.lt.toISOString()).toBe(
+      "2026-11-01T03:00:00.000Z",
+    );
+  });
+
+  it("loadCycleMoney consulta a partir do lookback do mês de início do ciclo", async () => {
+    const now = new Date("2026-10-16T15:00:00.000Z");
+    const reference = resolveCycleReference(undefined, now, 15);
+
+    await loadCycleDashboardData(reference, now);
+
+    const [args] = prismaMock.cardPurchase.findMany.mock.calls[0];
+    // Início do ciclo 15/10/2026 → lookback 2016-09; teto no próximo início.
+    expect(args.where.purchaseDate.gte.toISOString()).toBe(
+      "2016-09-01T03:00:00.000Z",
+    );
+    expect(args.where.purchaseDate.lt.toISOString()).toBe(
+      "2026-11-15T03:00:00.000Z",
+    );
+  });
+});

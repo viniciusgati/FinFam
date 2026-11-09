@@ -1,11 +1,55 @@
 import { describe, expect, it } from "vitest";
 import {
+  excessRuntimeCacheKeys,
   isApiRequest,
   isAuthRequest,
   isNeverCacheRequest,
   isStaticAsset,
+  MAX_RUNTIME_CACHE_ENTRIES,
+  RUNTIME_CACHE_LIMIT,
   strategyFor,
 } from "./sw-strategy";
+
+function keys(count: number): string[] {
+  return Array.from({ length: count }, (_, index) => `/chunk-${index}.js`);
+}
+
+describe("cache runtime do service worker", () => {
+  it("limita o cache runtime a 60 entradas", () => {
+    expect(MAX_RUNTIME_CACHE_ENTRIES).toBe(60);
+    expect(RUNTIME_CACHE_LIMIT).toBe(MAX_RUNTIME_CACHE_ENTRIES);
+  });
+
+  it("não remove nada quando está dentro do teto", () => {
+    expect(excessRuntimeCacheKeys([], 60)).toEqual([]);
+    expect(excessRuntimeCacheKeys(keys(60), 60)).toEqual([]);
+    expect(excessRuntimeCacheKeys(keys(59), 60)).toEqual([]);
+  });
+
+  it("remove as entradas mais antigas quando passa do teto", () => {
+    expect(excessRuntimeCacheKeys(keys(61), 60)).toEqual(["/chunk-0.js"]);
+    expect(excessRuntimeCacheKeys(keys(65), 60)).toEqual([
+      "/chunk-0.js",
+      "/chunk-1.js",
+      "/chunk-2.js",
+      "/chunk-3.js",
+      "/chunk-4.js",
+    ]);
+    expect(excessRuntimeCacheKeys(keys(65))).toHaveLength(5);
+  });
+
+  it("com limite 0 remove todas as entradas", () => {
+    const all = keys(3);
+    expect(excessRuntimeCacheKeys(all, 0)).toEqual(all);
+  });
+
+  it("não muta a lista de entrada", () => {
+    const input = keys(65);
+    const snapshot = [...input];
+    excessRuntimeCacheKeys(input, 60);
+    expect(input).toEqual(snapshot);
+  });
+});
 
 describe("isApiRequest", () => {
   it("reconhece a raiz /api e suas subrotas", () => {

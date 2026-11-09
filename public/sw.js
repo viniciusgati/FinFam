@@ -4,15 +4,20 @@
 // - install: precacheia o app shell (o documento "/offline", manifest e
 //   ícones) — o documento "/" não é precacheado para que, sem rede, a
 //   navegação caia no fallback /offline em vez de servir dados antigos;
-// - activate: remove caches de versões anteriores;
+// - activate: remove caches de versões anteriores (preserva o precache e o
+//   cache runtime atuais);
 // - fetch: cache-first para navegação e assets estáticos, com fallback para o
 //   documento "/offline" precacheado; network-first SEM cache para dados e
 //   autenticação (/api/*, /api/auth/*) — nunca são gravados em cache.
+//   Assets preenchidos sob demanda vão para um cache runtime separado, com
+//   teto de 60 entradas (as mais antigas são removidas).
 //
 // É JavaScript plano servido estaticamente (sem bundling): a predicação repete
 // inline a regra de src/lib/sw-strategy.ts, coberta por testes unitários.
 
 const CACHE_NAME = "finfam-shell-v2";
+const RUNTIME_CACHE_NAME = "finfam-runtime-v1";
+const RUNTIME_CACHE_LIMIT = 60;
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_URLS = [
@@ -27,7 +32,6 @@ const PRECACHE_URLS = [
 const NEXT_STATIC_ASSET_RE = /(?:src|href)="(\/_next\/static\/[^"]+)"/g;
 
 // --- Replica inline de src/lib/sw-strategy.ts -------------------------------
-
 function isApiPath(pathname) {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
@@ -51,6 +55,14 @@ function isStaticAssetPath(pathname) {
     pathname.startsWith("/icons/") ||
     /\.(?:css|js|mjs|woff2?|png|svg|ico|webp)$/.test(pathname)
   );
+}
+
+// Mantém o cache runtime limitado: `Cache.keys()` preserva a ordem de inserção,
+// então removemos as entradas mais antigas que passarem do teto.
+async function pruneRuntimeCache(cache) {
+  const keys = await cache.keys();
+  const excess = keys.slice(0, Math.max(0, keys.length - RUNTIME_CACHE_LIMIT));
+  await Promise.all(excess.map((key) => cache.delete(key)));
 }
 
 // --- Instalação -------------------------------------------------------------
@@ -105,7 +117,7 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => key !== CACHE_NAME && key !== RUNTIME_CACHE_NAME)
           .map((key) => caches.delete(key)),
       );
       await self.clients.claim();
@@ -158,13 +170,21 @@ self.addEventListener("fetch", (event) => {
   // Assets estáticos do shell: cache-first com preenchimento em runtime.
   event.respondWith(
     (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(request);
-      if (cached) return cached;
+      // O precache do shell (`CACHE_NAME`) tem prioridade: os chunks do
+      // /offline continuam disponíveis mesmo que o cache runtime seja podado.
+      const shell = await caches.open(CACHE_NAME);
+      const shellCached = await shell.match(request);
+      if (shellCached) return shellCached;
+
+      const runtime = await caches.open(RUNTIME_CACHE_NAME);
+      const runtimeCached = await runtime.match(request);
+      if (runtimeCached) return runtimeCached;
+
       try {
         const response = await fetch(request);
         if (response.ok && isStaticAssetPath(pathname)) {
-          await cache.put(request, response.clone());
+          await runtime.put(request, response.clone());
+          await pruneRuntimeCache(runtime);
         }
         return response;
       } catch {

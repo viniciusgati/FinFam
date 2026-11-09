@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { isSnapshotTrigger } from "./snapshot-capture";
+import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { ensureClosedMonthSnapshots, isSnapshotTrigger } from "./snapshot-capture";
 
 describe("isSnapshotTrigger", () => {
   it("dispara para mutações nos modelos de domínio", () => {
@@ -30,5 +31,33 @@ describe("isSnapshotTrigger", () => {
     expect(isSnapshotTrigger("AppSettings", "upsert")).toBe(false);
     expect(isSnapshotTrigger("MonthlyReview", "upsert")).toBe(false);
     expect(isSnapshotTrigger(undefined, "create")).toBe(false);
+  });
+});
+
+describe("ensureClosedMonthSnapshots — lookback de compras (task #359)", () => {
+  it("consulta compras a partir do lookback do primeiro mês-alvo, com rangeEnd como teto", async () => {
+    const db = {
+      monthlySnapshot: { findMany: vi.fn().mockResolvedValue([]) },
+      income: { findMany: vi.fn().mockResolvedValue([]) },
+      fixedExpense: { findMany: vi.fn().mockResolvedValue([]) },
+      variableIncome: { findMany: vi.fn().mockResolvedValue([]) },
+      variableExpense: { findMany: vi.fn().mockResolvedValue([]) },
+      cardPurchase: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+
+    // 08/10/2026 12:00 BRT — alvos fechados 2026-08 e 2026-09.
+    await ensureClosedMonthSnapshots(db as unknown as PrismaClient, {
+      now: new Date("2026-10-08T15:00:00.000Z"),
+      months: 2,
+    });
+
+    const [args] = db.cardPurchase.findMany.mock.calls[0];
+    // Primeiro alvo 2026-08 → lookback 2016-07; teto no fim da janela (2026-10).
+    expect(args.where.purchaseDate.gte.toISOString()).toBe(
+      "2016-07-01T03:00:00.000Z",
+    );
+    expect(args.where.purchaseDate.lt.toISOString()).toBe(
+      "2026-10-01T03:00:00.000Z",
+    );
   });
 });

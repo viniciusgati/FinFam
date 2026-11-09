@@ -9,6 +9,8 @@
  */
 import { z } from "zod";
 
+import { MAX_INSTALLMENTS_TOTAL } from "./invoices";
+
 const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 const MONTH_MESSAGE = "Mês inválido (use AAAA-MM)";
 
@@ -105,7 +107,11 @@ const installmentNumberSchema = z
 const installmentsTotalSchema = z
   .number()
   .int("Total de parcelas deve ser um inteiro")
-  .min(1, "O total de parcelas deve ser pelo menos 1");
+  .min(1, "O total de parcelas deve ser pelo menos 1")
+  .max(
+    MAX_INSTALLMENTS_TOTAL,
+    `O total de parcelas deve ser no máximo ${MAX_INSTALLMENTS_TOTAL}`,
+  );
 
 /**
  * `installmentNumber` é apenas metadado: `amountCents` é o valor total da

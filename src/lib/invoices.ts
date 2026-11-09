@@ -18,10 +18,56 @@
  *   (`%`) soma-se à 1ª parcela, garantindo soma exata = `amountCents`.
  */
 
-import { monthKey } from "./finance";
+import { monthKey, shiftMonthKey } from "./finance";
 import { formatCents } from "./money";
 import type { CycleWindow } from "./cycle";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
+
+/**
+ * Limite superior de parcelas de uma compra no cartão. Também define a janela
+ * conservadora de leitura: uma compra só pode competir em um mês se tiver sido
+ * feita, no máximo, `MAX_INSTALLMENTS_TOTAL + 1` meses antes dele.
+ */
+export const MAX_INSTALLMENTS_TOTAL = 120;
+
+/**
+ * Primeiro mês (YYYY-MM) que ainda pode contribuir com parcelas para
+ * `targetMonthKey`: `maxInstallments + 1` meses antes do mês alvo.
+ */
+export function cardPurchaseLookbackMonthKey(
+  targetMonthKey: string,
+  maxInstallments = MAX_INSTALLMENTS_TOTAL,
+): string {
+  return shiftMonthKey(targetMonthKey, -(maxInstallments + 1));
+}
+
+/**
+ * Primeiro instante do mês de lookback de `targetMonthKey` no fuso da família:
+ * limite inferior seguro para consultas de `cardPurchase` cujas parcelas podem
+ * cair na janela alvo. Centraliza a conversão mês → instante UTC.
+ */
+export function cardPurchaseLookbackStart(
+  targetMonthKey: string,
+  timeZone: string = resolveTimeZone(),
+): Date {
+  const [year, month] = cardPurchaseLookbackMonthKey(targetMonthKey)
+    .split("-")
+    .map(Number);
+  return zonedTimeToUtc(year, month, 1, timeZone);
+}
+
+/**
+ * Primeiro instante do mês seguinte a `targetMonthKey` no fuso da família:
+ * teto exclusivo seguro para leituras de competência, já que `dueOffset >= 0`
+ * garante que uma compra de mês posterior nunca compita no mês alvo.
+ */
+export function cardPurchaseWindowEnd(
+  targetMonthKey: string,
+  timeZone: string = resolveTimeZone(),
+): Date {
+  const [year, month] = shiftMonthKey(targetMonthKey, 1).split("-").map(Number);
+  return zonedTimeToUtc(year, month, 1, timeZone);
+}
 
 export interface PurchaseInvoice {
   /** Mês do ciclo de fechamento em que a compra entrou (YYYY-MM). */

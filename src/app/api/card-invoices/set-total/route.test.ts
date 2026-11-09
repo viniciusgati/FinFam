@@ -45,6 +45,29 @@ beforeEach(() => {
 });
 
 describe("POST /api/card-invoices/set-total", () => {
+  it("consulta só as compras capazes de competir no mês alvo (lookback + mês seguinte)", async () => {
+    creditCardMock.findUnique.mockResolvedValue(card);
+    cardPurchaseMock.findMany.mockResolvedValue([existingPurchase]);
+
+    await POST(
+      jsonRequest({ cardId: "card-1", monthKey: "2026-03", totalCents: 50000 }),
+    );
+
+    expect(cardPurchaseMock.findMany).toHaveBeenCalledWith({
+      where: {
+        cardId: "card-1",
+        purchaseDate: {
+          // 120 + 1 meses antes de 2026-03, no fuso da família (horário de
+          // verão de 2016 em São Paulo: UTC-2).
+          gte: new Date("2016-02-01T02:00:00.000Z"),
+          // Primeiro dia do mês seguinte: compra posterior nunca compete em 2026-03.
+          lt: new Date("2026-04-01T03:00:00.000Z"),
+        },
+      },
+      include: { card: true },
+    });
+  });
+
   it("cria o ajuste de fatura à vista quando o alvo é maior (201)", async () => {
     creditCardMock.findUnique.mockResolvedValue(card);
     cardPurchaseMock.findMany.mockResolvedValue([existingPurchase]);
