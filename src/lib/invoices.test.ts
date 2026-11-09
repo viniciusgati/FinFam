@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { cycleWindowForKey, remainingCycleDays } from "./cycle";
 import {
   allocateInstallments,
+  cardPurchaseLookbackMonthKey,
   cycleInvoicePaymentLabel,
   installmentDueDate,
   invoiceDueLabel,
   invoiceDueLabelForWindow,
   invoiceLinesForMonth,
   invoiceLinesForSeries,
+  MAX_INSTALLMENTS_TOTAL,
   purchaseInstallmentsInWindow,
   purchaseInvoice,
   resolveReferenceDate,
@@ -17,6 +19,18 @@ import {
   sumCardExpensesForWindow,
 } from "./invoices";
 import { zonedDateParts } from "./time";
+
+describe("cardPurchaseLookbackMonthKey", () => {
+  it("recua MAX_INSTALLMENTS_TOTAL + 1 meses do mês alvo", () => {
+    expect(MAX_INSTALLMENTS_TOTAL).toBe(120);
+    expect(cardPurchaseLookbackMonthKey("2026-11")).toBe("2016-10");
+    expect(cardPurchaseLookbackMonthKey("2026-01")).toBe("2015-12");
+  });
+
+  it("respeita um limite de parcelas customizado", () => {
+    expect(cardPurchaseLookbackMonthKey("2026-11", 1)).toBe("2026-09");
+  });
+});
 
 describe("purchaseInvoice", () => {
   it("coloca a compra antes do fechamento no próprio mês", () => {

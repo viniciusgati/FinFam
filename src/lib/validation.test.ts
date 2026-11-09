@@ -117,6 +117,28 @@ describe("cardPurchaseCreateSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("aceita 120 parcelas e rejeita 121 com mensagem pt-BR", () => {
+    expect(
+      cardPurchaseCreateSchema.safeParse({
+        ...validPurchase,
+        installmentNumber: 1,
+        installmentsTotal: 120,
+      }).success,
+    ).toBe(true);
+
+    const parsed = cardPurchaseCreateSchema.safeParse({
+      ...validPurchase,
+      installmentNumber: 1,
+      installmentsTotal: 121,
+    });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toBe(
+        "O total de parcelas deve ser no máximo 120",
+      );
+    }
+  });
 });
 
 describe("cardPurchaseUpdateSchema", () => {
@@ -133,6 +155,20 @@ describe("cardPurchaseUpdateSchema", () => {
         installmentsTotal: 2,
       }).success,
     ).toBe(false);
+  });
+
+  it("aceita 120 parcelas e rejeita 121 com mensagem pt-BR", () => {
+    expect(
+      cardPurchaseUpdateSchema.safeParse({ installmentsTotal: 120 }).success,
+    ).toBe(true);
+
+    const parsed = cardPurchaseUpdateSchema.safeParse({ installmentsTotal: 121 });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toBe(
+        "O total de parcelas deve ser no máximo 120",
+      );
+    }
   });
 });
 
