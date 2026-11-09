@@ -14,6 +14,7 @@
 
 import type { PrismaClient } from "@prisma/client";
 import { categoryKey } from "./categories";
+import { cardPurchaseLookbackStart } from "./invoices";
 import {
   buildSnapshot,
   hasSnapshotData,
@@ -198,7 +199,12 @@ export async function ensureClosedMonthSnapshots(
         where: { date: { gte: rangeStart, lt: rangeEnd } },
       }),
       db.cardPurchase.findMany({
-        where: { purchaseDate: { lt: rangeEnd } },
+        where: {
+          purchaseDate: {
+            gte: cardPurchaseLookbackStart(targets[0], timeZone),
+            lt: rangeEnd,
+          },
+        },
         include: { card: true },
       }),
     ]);

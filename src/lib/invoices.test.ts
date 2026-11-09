@@ -3,6 +3,7 @@ import { cycleWindowForKey, remainingCycleDays } from "./cycle";
 import {
   allocateInstallments,
   cardPurchaseLookbackMonthKey,
+  cardPurchaseLookbackStart,
   cycleInvoicePaymentLabel,
   installmentDueDate,
   invoiceDueLabel,
@@ -29,6 +30,17 @@ describe("cardPurchaseLookbackMonthKey", () => {
 
   it("respeita um limite de parcelas customizado", () => {
     expect(cardPurchaseLookbackMonthKey("2026-11", 1)).toBe("2026-09");
+  });
+});
+
+describe("cardPurchaseLookbackStart", () => {
+  it("retorna a meia-noite do mês de lookback no fuso informado", () => {
+    expect(
+      cardPurchaseLookbackStart("2026-10", "America/Sao_Paulo").toISOString(),
+    ).toBe("2016-09-01T03:00:00.000Z");
+    expect(
+      cardPurchaseLookbackStart("2026-01", "America/Sao_Paulo").toISOString(),
+    ).toBe("2015-12-01T02:00:00.000Z"); // horário de verão (UTC-2)
   });
 });
 

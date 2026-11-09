@@ -41,6 +41,21 @@ export function cardPurchaseLookbackMonthKey(
   return shiftMonthKey(targetMonthKey, -(maxInstallments + 1));
 }
 
+/**
+ * Primeiro instante do mês de lookback de `targetMonthKey` no fuso da família:
+ * limite inferior seguro para consultas de `cardPurchase` cujas parcelas podem
+ * cair na janela alvo. Centraliza a conversão mês → instante UTC.
+ */
+export function cardPurchaseLookbackStart(
+  targetMonthKey: string,
+  timeZone: string = resolveTimeZone(),
+): Date {
+  const [year, month] = cardPurchaseLookbackMonthKey(targetMonthKey)
+    .split("-")
+    .map(Number);
+  return zonedTimeToUtc(year, month, 1, timeZone);
+}
+
 export interface PurchaseInvoice {
   /** Mês do ciclo de fechamento em que a compra entrou (YYYY-MM). */
   cycleMonthKey: string;

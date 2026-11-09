@@ -28,6 +28,7 @@ import {
   shiftMonthKey,
 } from "./finance";
 import {
+  cardPurchaseLookbackStart,
   invoiceLinesForSeries,
   purchaseInstallmentsInWindow,
   sumCardExpensesForMonth,
@@ -309,7 +310,12 @@ export async function loadDashboardData(
       where: { date: { gte: variableQuery.start, lt: variableQuery.end } },
     }),
     prisma.cardPurchase.findMany({
-      where: { purchaseDate: { lt: end } },
+      where: {
+        purchaseDate: {
+          gte: cardPurchaseLookbackStart(currentMonthKey, timeZone),
+          lt: end,
+        },
+      },
       include: { card: true },
     }),
     prisma.monthlySnapshot.findMany({
@@ -586,7 +592,12 @@ async function loadCycleMoney(reference: CycleReference): Promise<CycleMoney> {
       where: { date: { gte: window.start, lt: upper } },
     }),
     prisma.cardPurchase.findMany({
-      where: { purchaseDate: { lt: window.nextStart } },
+      where: {
+        purchaseDate: {
+          gte: cardPurchaseLookbackStart(monthKey(window.start), timeZone),
+          lt: window.nextStart,
+        },
+      },
       include: { card: true },
     }),
   ]);
