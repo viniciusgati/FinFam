@@ -26,8 +26,13 @@ import {
 } from "@/lib/finance";
 import { cycleInvoicePaymentLabel } from "@/lib/invoices";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
+import {
+  buildDashboardLayout,
+  type DashboardBlock,
+} from "@/lib/dashboard-layout";
 import type { DailySeries } from "@/lib/dashboard-series";
 import CyclePreviewNotice from "@/components/CyclePreviewNotice";
+import DashboardZones from "@/components/DashboardZones";
 import {
   buildMonthReviewData,
   localMonthReview,
@@ -224,6 +229,29 @@ export default async function DashboardPage({
         })
       : null;
 
+  // Os blocos disponíveis viram zonas de decisão (Resumo → Ações →
+  // Compromissos → Explorar). Cada condicional de exibição vira o estado do
+  // bloco: o que não pode ser exibido entra como `error` e fica fora das zonas.
+  const blocks: DashboardBlock[] = [
+    { id: "month-spend", state: "ok" },
+    { id: "spend-advice", state: spendAdvice !== null ? "ok" : "error" },
+    { id: "quick-expense", state: isCurrentCycle ? "ok" : "error" },
+    { id: "daily-allowance", state: allowance !== null ? "ok" : "error" },
+    {
+      id: "purchase-simulator",
+      state: allowance !== null && isCurrentCycle ? "ok" : "error",
+    },
+    { id: "income-allocation", state: "ok" },
+    { id: "daily-consumption", state: "ok" },
+    {
+      id: "category-breakdown",
+      state: categoryBreakdown !== null ? "ok" : "error",
+    },
+    { id: "family-help", state: "ok" },
+    { id: "month-review", state: "ok" },
+  ];
+  const { zones } = buildDashboardLayout(blocks);
+
   return (
     <div className="flex w-full flex-col gap-6">
       <MonthNavigation
@@ -281,85 +309,117 @@ export default async function DashboardPage({
         )}
 
         {view.state === "ok" && series !== null && (
-          <>
-            <MonthSpendCard
-              backgroundColor={backgroundColor}
-              percent={view.percent}
-              level={level}
-              invoiceDue={invoicePaymentLabel ?? ""}
-              countdownLabel={countdownLabel}
-              feedback={view.feedback}
-              projectedPercent={view.projectedPercent}
-              projectedRisk={view.projectedRisk}
-              incomeCents={incomeCents}
-              consumedCents={consumedCents}
-              projectedCents={projectedCents}
-            />
+          <DashboardZones
+            zones={zones}
+            renderZone={(zone) => {
+              switch (zone.id) {
+                case "summary":
+                  return (
+                    <>
+                      <MonthSpendCard
+                        backgroundColor={backgroundColor}
+                        percent={view.percent}
+                        level={level}
+                        invoiceDue={invoicePaymentLabel ?? ""}
+                        countdownLabel={countdownLabel}
+                        feedback={view.feedback}
+                        projectedPercent={view.projectedPercent}
+                        projectedRisk={view.projectedRisk}
+                        incomeCents={incomeCents}
+                        consumedCents={consumedCents}
+                        projectedCents={projectedCents}
+                      />
 
-            {spendAdvice !== null && <SpendAdviceCard advice={spendAdvice} />}
+                      {spendAdvice !== null && (
+                        <SpendAdviceCard advice={spendAdvice} />
+                      )}
+                    </>
+                  );
+                case "actions":
+                  return (
+                    <>
+                      {(isCurrentCycle || allowance !== null) && (
+                        <div
+                          className={
+                            isCurrentCycle
+                              ? "grid items-stretch gap-6 md:grid-cols-2"
+                              : "grid gap-6"
+                          }
+                        >
+                          {isCurrentCycle && (
+                            <QuickExpenseCard
+                              categorySuggestions={categorySuggestions}
+                            />
+                          )}
+                          {allowance !== null && (
+                            <DailyAllowanceCard
+                              card={dailyAllowanceCard(allowance)}
+                            />
+                          )}
+                        </div>
+                      )}
 
-            {(isCurrentCycle || allowance !== null) && (
-              <div
-                className={
-                  isCurrentCycle
-                    ? "grid items-stretch gap-6 md:grid-cols-2"
-                    : "grid gap-6"
-                }
-              >
-                {isCurrentCycle && (
-                  <QuickExpenseCard categorySuggestions={categorySuggestions} />
-                )}
-                {allowance !== null && (
-                  <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />
-                )}
-              </div>
-            )}
+                      {allowance !== null && isCurrentCycle && (
+                        <PurchaseSimulator
+                          key={referenceMonthKey}
+                          freeBudgetCents={allowance.freeBudgetCents}
+                          dailyCents={allowance.dailyCents}
+                          remainingDays={allowance.remainingDays}
+                          usualDailySpendCents={usualDailySpend}
+                        />
+                      )}
+                    </>
+                  );
+                case "commitments":
+                  return (
+                    <>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <IncomeAllocationCard
+                          incomeCents={incomeCents}
+                          fixedIncomeCents={fixedIncomeCents}
+                          variableIncomeCents={variableIncomeCents}
+                          fixedExpensesCents={fixedExpensesCents}
+                          cardExpensesCents={cardExpensesCents}
+                          variableExpensesCents={variableExpensesCents}
+                        />
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <IncomeAllocationCard
-                incomeCents={incomeCents}
-                fixedIncomeCents={fixedIncomeCents}
-                variableIncomeCents={variableIncomeCents}
-                fixedExpensesCents={fixedExpensesCents}
-                cardExpensesCents={cardExpensesCents}
-                variableExpensesCents={variableExpensesCents}
-              />
+                        <DailyConsumptionChart
+                          variableDailyCents={series.variableDailyCents}
+                          obligationDailyCents={series.obligationDailyCents}
+                          elapsedDay={series.elapsedDay}
+                          highlightDay={
+                            isCurrentCycle ? series.elapsedDay : undefined
+                          }
+                        />
+                      </div>
 
-              <DailyConsumptionChart
-                variableDailyCents={series.variableDailyCents}
-                obligationDailyCents={series.obligationDailyCents}
-                elapsedDay={series.elapsedDay}
-                highlightDay={isCurrentCycle ? series.elapsedDay : undefined}
-              />
-            </div>
+                      {categoryBreakdown !== null && (
+                        <CategoryBreakdownCard breakdown={categoryBreakdown} />
+                      )}
+                    </>
+                  );
+                case "explore":
+                  return (
+                    <>
+                      <FamilyHelpCard
+                        insights={familyInsights}
+                        fallback={familyHelpFallback}
+                        monthKey={referenceMonthKey}
+                      />
 
-            {categoryBreakdown !== null && (
-              <CategoryBreakdownCard breakdown={categoryBreakdown} />
-            )}
-
-            <FamilyHelpCard
-              insights={familyInsights}
-              fallback={familyHelpFallback}
-              monthKey={referenceMonthKey}
-            />
-
-            <MonthReviewPanel
-              key={referenceMonthKey}
-              monthKey={referenceMonthKey}
-              eligible={isClosedCycle}
-              localSummary={localMonthSummary}
-            />
-
-            {allowance !== null && isCurrentCycle && (
-              <PurchaseSimulator
-                key={referenceMonthKey}
-                freeBudgetCents={allowance.freeBudgetCents}
-                dailyCents={allowance.dailyCents}
-                remainingDays={allowance.remainingDays}
-                usualDailySpendCents={usualDailySpend}
-              />
-            )}
-          </>
+                      <MonthReviewPanel
+                        key={referenceMonthKey}
+                        monthKey={referenceMonthKey}
+                        eligible={isClosedCycle}
+                        localSummary={localMonthSummary}
+                      />
+                    </>
+                  );
+                default:
+                  return null;
+              }
+            }}
+          />
         )}
       </MonthNavigation>
     </div>

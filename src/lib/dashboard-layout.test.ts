@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import {
+  buildDashboardLayout,
+  type DashboardBlock,
+  type DashboardBlockId,
+} from "./dashboard-layout";
 
 /**
  * Guarda o layout do dashboard (história #232, refinada na #233 e revisada):
@@ -182,6 +187,23 @@ describe("skeleton de carregamento da rota", () => {
     expect(skeleton).toContain("Carregando…");
   });
 
+  it("exibe as quatro zonas de decisão na ordem canônica", () => {
+    const skeleton = readSource("../components/DashboardSkeleton.tsx");
+    const titles = ["Resumo do ciclo", "Ações", "Compromissos", "Explorar"];
+
+    let previous = -1;
+    for (const title of titles) {
+      const index = skeleton.indexOf(title);
+      expect(index).toBeGreaterThan(previous);
+      previous = index;
+    }
+
+    expect(skeleton.match(/<h2/g)).toHaveLength(titles.length);
+    expect(skeleton.match(/animate-pulse/g)?.length).toBeGreaterThanOrEqual(
+      titles.length,
+    );
+  });
+
   it("o loading.tsx da rota usa o mesmo skeleton", () => {
     const loading = readSource("../app/(app)/loading.tsx");
 
@@ -271,5 +293,245 @@ describe("estados de navegação e onboarding do ciclo", () => {
     expect(page).toContain("emptyStateCopy(view.reason)");
     expect(page).not.toContain("Cadastrar entradas");
     expect(page).not.toContain('href="/entradas"');
+  });
+});
+
+const ALL_DASHBOARD_BLOCKS: DashboardBlock[] = [
+  { id: "month-spend", state: "ok" },
+  { id: "spend-advice", state: "ok" },
+  { id: "quick-expense", state: "ok" },
+  { id: "daily-allowance", state: "ok" },
+  { id: "purchase-simulator", state: "ok" },
+  { id: "income-allocation", state: "ok" },
+  { id: "daily-consumption", state: "ok" },
+  { id: "category-breakdown", state: "ok" },
+  { id: "family-help", state: "ok" },
+  { id: "month-review", state: "ok" },
+];
+
+describe("zonas de decisão do dashboard", () => {
+  it("organiza os 10 blocos ok nas quatro zonas na ordem canônica", () => {
+    const { zones, failed } = buildDashboardLayout(ALL_DASHBOARD_BLOCKS);
+
+    expect(failed).toEqual([]);
+    expect(zones.map((zone) => zone.id)).toEqual([
+      "summary",
+      "actions",
+      "commitments",
+      "explore",
+    ]);
+    expect(zones.map((zone) => zone.title)).toEqual([
+      "Resumo do ciclo",
+      "Ações",
+      "Compromissos",
+      "Explorar",
+    ]);
+    expect(zones.map((zone) => zone.priority)).toEqual([1, 2, 3, 4]);
+
+    expect(zones[0].blocks).toEqual([
+      { id: "month-spend", state: "ok" },
+      { id: "spend-advice", state: "ok" },
+    ]);
+    expect(zones[1].blocks).toEqual([
+      { id: "quick-expense", state: "ok" },
+      { id: "daily-allowance", state: "ok" },
+      { id: "purchase-simulator", state: "ok" },
+    ]);
+    expect(zones[2].blocks).toEqual([
+      { id: "income-allocation", state: "ok" },
+      { id: "daily-consumption", state: "ok" },
+      { id: "category-breakdown", state: "ok" },
+    ]);
+    expect(zones[3].blocks).toEqual([
+      { id: "family-help", state: "ok" },
+      { id: "month-review", state: "ok" },
+    ]);
+  });
+
+  it("remove blocos em error das zonas e os lista em failed", () => {
+    const blocks: DashboardBlock[] = ALL_DASHBOARD_BLOCKS.map((block) =>
+      block.id === "daily-consumption" || block.id === "family-help"
+        ? { ...block, state: "error" as const }
+        : block,
+    );
+
+    const { zones, failed } = buildDashboardLayout(blocks);
+
+    expect(failed).toEqual(["daily-consumption", "family-help"]);
+    expect(zones.map((zone) => zone.id)).toEqual([
+      "summary",
+      "actions",
+      "commitments",
+      "explore",
+    ]);
+    expect(zones[2].blocks.map((block) => block.id)).toEqual([
+      "income-allocation",
+      "category-breakdown",
+    ]);
+    expect(zones[3].blocks.map((block) => block.id)).toEqual(["month-review"]);
+  });
+
+  it("omite uma zona quando todos os seus blocos estão em error", () => {
+    const blocks: DashboardBlock[] = ALL_DASHBOARD_BLOCKS.map((block) =>
+      block.id === "family-help" || block.id === "month-review"
+        ? { ...block, state: "error" as const }
+        : block,
+    );
+
+    const { zones, failed } = buildDashboardLayout(blocks);
+
+    expect(failed).toEqual(["family-help", "month-review"]);
+    expect(zones.map((zone) => zone.id)).toEqual([
+      "summary",
+      "actions",
+      "commitments",
+    ]);
+  });
+
+  it("preserva empty e future na zona correta com o estado original", () => {
+    const blocks: DashboardBlock[] = ALL_DASHBOARD_BLOCKS.map((block) => {
+      if (block.id === "month-spend") return { ...block, state: "empty" as const };
+      if (block.id === "month-review") return { ...block, state: "future" as const };
+      return block;
+    });
+
+    const { zones, failed } = buildDashboardLayout(blocks);
+
+    expect(failed).toEqual([]);
+    expect(zones.map((zone) => zone.id)).toEqual([
+      "summary",
+      "actions",
+      "commitments",
+      "explore",
+    ]);
+    expect(zones[0].blocks).toEqual([
+      { id: "month-spend", state: "empty" },
+      { id: "spend-advice", state: "ok" },
+    ]);
+    expect(zones[3].blocks).toEqual([
+      { id: "family-help", state: "ok" },
+      { id: "month-review", state: "future" },
+    ]);
+  });
+
+  it("impõe a ordem canônica com entrada embaralhada, deduplica e ignora desconhecidos", () => {
+    const shuffled: DashboardBlock[] = [
+      { id: "month-review", state: "ok" },
+      { id: "quick-expense", state: "ok" },
+      { id: "category-breakdown", state: "ok" },
+      { id: "month-spend", state: "ok" },
+      { id: "daily-consumption", state: "ok" },
+      { id: "spend-advice", state: "ok" },
+      { id: "daily-allowance", state: "ok" },
+      { id: "purchase-simulator", state: "ok" },
+      { id: "income-allocation", state: "ok" },
+      { id: "family-help", state: "ok" },
+      { id: "month-spend", state: "error" },
+      { id: "unknown-block" as DashboardBlockId, state: "ok" },
+    ];
+
+    const { zones, failed } = buildDashboardLayout(shuffled);
+
+    expect(failed).toEqual([]);
+    expect(zones.map((zone) => zone.id)).toEqual([
+      "summary",
+      "actions",
+      "commitments",
+      "explore",
+    ]);
+    expect(zones[0].blocks.map((block) => block.id)).toEqual([
+      "month-spend",
+      "spend-advice",
+    ]);
+    expect(zones[1].blocks.map((block) => block.id)).toEqual([
+      "quick-expense",
+      "daily-allowance",
+      "purchase-simulator",
+    ]);
+    expect(zones[2].blocks.map((block) => block.id)).toEqual([
+      "income-allocation",
+      "daily-consumption",
+      "category-breakdown",
+    ]);
+    expect(zones[3].blocks.map((block) => block.id)).toEqual([
+      "family-help",
+      "month-review",
+    ]);
+  });
+
+  it("mantém a primeira ocorrência na deduplicação de ids", () => {
+    const blocks: DashboardBlock[] = [
+      { id: "month-spend", state: "error" },
+      { id: "month-spend", state: "ok" },
+      { id: "spend-advice", state: "ok" },
+    ];
+
+    const { zones, failed } = buildDashboardLayout(blocks);
+
+    expect(failed).toEqual(["month-spend"]);
+    expect(zones).toHaveLength(1);
+    expect(zones[0].blocks).toEqual([{ id: "spend-advice", state: "ok" }]);
+  });
+
+  it("retorna zonas e failed vazios para uma lista sem blocos conhecidos", () => {
+    const { zones, failed } = buildDashboardLayout([
+      { id: "unknown-block" as DashboardBlockId, state: "ok" },
+    ]);
+
+    expect(zones).toEqual([]);
+    expect(failed).toEqual([]);
+  });
+});
+
+describe("página do dashboard em zonas de decisão", () => {
+  const DASHBOARD_COMPONENTS = [
+    "MonthSpendCard",
+    "SpendAdviceCard",
+    "QuickExpenseCard",
+    "DailyAllowanceCard",
+    "PurchaseSimulator",
+    "IncomeAllocationCard",
+    "DailyConsumptionChart",
+    "CategoryBreakdownCard",
+    "FamilyHelpCard",
+    "MonthReviewPanel",
+  ];
+
+  it("renderiza cada um dos 10 blocos exatamente uma vez na fonte", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    for (const component of DASHBOARD_COMPONENTS) {
+      expect(page.match(new RegExp(`<${component}[\\s/>]`, "g"))).toHaveLength(
+        1,
+      );
+    }
+  });
+
+  it("monta as zonas com buildDashboardLayout e as entrega ao DashboardZones", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    expect(page).toContain("buildDashboardLayout");
+    expect(page).toContain("<DashboardZones");
+    expect(page).toContain("zones={zones}");
+
+    const okIndex = page.indexOf('view.state === "ok" && series !== null');
+    const zonesIndex = page.indexOf("<DashboardZones");
+    expect(okIndex).toBeGreaterThanOrEqual(0);
+    expect(zonesIndex).toBeGreaterThan(okIndex);
+  });
+
+  it("define os quatro títulos de zona na ordem canônica", () => {
+    const page = readSource(DASHBOARD_PAGE);
+    expect(page).toContain('from "@/lib/dashboard-layout"');
+
+    const layoutModule = readSource("../lib/dashboard-layout.ts");
+    const titles = ["Resumo do ciclo", "Ações", "Compromissos", "Explorar"];
+
+    let previous = -1;
+    for (const title of titles) {
+      const index = layoutModule.indexOf(`title: "${title}"`);
+      expect(index).toBeGreaterThan(previous);
+      previous = index;
+    }
   });
 });

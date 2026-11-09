@@ -71,6 +71,7 @@ describe("sugestões nas páginas", () => {
     const page = readSource("../app/(app)/page.tsx");
 
     expect(page).toContain("loadCategorySuggestions");
-    expect(page).toContain("<QuickExpenseCard categorySuggestions={categorySuggestions} />");
+    expect(page).toContain("<QuickExpenseCard");
+    expect(page).toContain("categorySuggestions={categorySuggestions}");
   });
 });
