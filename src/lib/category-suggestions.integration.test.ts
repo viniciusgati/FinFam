@@ -81,4 +81,51 @@ describe("loadCategorySuggestions — integração com PostgreSQL", () => {
   it("devolve [] quando não há categorias cadastradas", async () => {
     await expect(loadCategorySuggestions()).resolves.toEqual([]);
   });
+
+  it("com volume grande e 7 categorias por tabela devolve no máximo 21 sugestões", async () => {
+    const card = await prisma.creditCard.create({
+      data: { name: "Nubank", closingDay: 20, dueDay: 5 },
+    });
+
+    const categoriesFor = (prefix: string) =>
+      Array.from({ length: 7 }, (_, index) => `${prefix} ${index}`);
+
+    const variableCategories = categoriesFor("Variável");
+    const fixedCategories = categoriesFor("Fixa");
+    const cardCategories = categoriesFor("Cartão");
+
+    await prisma.variableExpense.createMany({
+      data: Array.from({ length: 10_000 }, (_, index) => ({
+        description: `Lançamento ${index}`,
+        amountCents: 100,
+        date: new Date(2026, 9, (index % 28) + 1),
+        category: variableCategories[index % variableCategories.length],
+      })),
+    });
+
+    await prisma.fixedExpense.createMany({
+      data: Array.from({ length: 10_000 }, (_, index) => ({
+        name: `Fixa ${index}`,
+        amountCents: 100,
+        category: fixedCategories[index % fixedCategories.length],
+      })),
+    });
+
+    await prisma.cardPurchase.createMany({
+      data: Array.from({ length: 10_000 }, (_, index) => ({
+        cardId: card.id,
+        description: `Compra ${index}`,
+        amountCents: 100,
+        purchaseDate: new Date(2026, 9, (index % 28) + 1),
+        installmentsTotal: 1,
+        category: cardCategories[index % cardCategories.length],
+      })),
+    });
+
+    const suggestions = await loadCategorySuggestions();
+
+    expect(suggestions.length).toBeLessThanOrEqual(21);
+    expect(suggestions).toHaveLength(21);
+    expect(new Set(suggestions).size).toBe(21);
+  }, 60_000);
 });

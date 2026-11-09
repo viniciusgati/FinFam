@@ -7,11 +7,12 @@ const { prismaMock, txCardPurchaseMock, classifyInvoiceTitlesMock } =
       creditCard: { findUnique: vi.fn() },
       cardPurchase: {
         findMany: vi.fn(),
+        groupBy: vi.fn(),
         deleteMany: vi.fn(),
         createMany: vi.fn(),
       },
-      variableExpense: { findMany: vi.fn() },
-      fixedExpense: { findMany: vi.fn() },
+      variableExpense: { findMany: vi.fn(), groupBy: vi.fn() },
+      fixedExpense: { findMany: vi.fn(), groupBy: vi.fn() },
       $transaction: vi.fn(
         async (
           fn: (tx: { cardPurchase: typeof txCardPurchase }) => Promise<unknown>,
@@ -162,6 +163,11 @@ beforeEach(() => {
   );
   prismaMock.variableExpense.findMany.mockResolvedValue([]);
   prismaMock.fixedExpense.findMany.mockResolvedValue([]);
+  prismaMock.variableExpense.groupBy.mockResolvedValue([]);
+  prismaMock.fixedExpense.groupBy.mockResolvedValue([]);
+  prismaMock.cardPurchase.groupBy.mockResolvedValue(
+    familyHistory.map((row) => ({ category: row.category })),
+  );
   prismaMock.$transaction.mockImplementation(
     async (fn: (tx: { cardPurchase: typeof txCardPurchaseMock }) => unknown) =>
       fn({ cardPurchase: txCardPurchaseMock }),
