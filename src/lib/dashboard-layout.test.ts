@@ -465,3 +465,56 @@ describe("zonas de decisão do dashboard", () => {
     expect(failed).toEqual([]);
   });
 });
+
+describe("página do dashboard em zonas de decisão", () => {
+  const DASHBOARD_COMPONENTS = [
+    "MonthSpendCard",
+    "SpendAdviceCard",
+    "QuickExpenseCard",
+    "DailyAllowanceCard",
+    "PurchaseSimulator",
+    "IncomeAllocationCard",
+    "DailyConsumptionChart",
+    "CategoryBreakdownCard",
+    "FamilyHelpCard",
+    "MonthReviewPanel",
+  ];
+
+  it("renderiza cada um dos 10 blocos exatamente uma vez na fonte", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    for (const component of DASHBOARD_COMPONENTS) {
+      expect(page.match(new RegExp(`<${component}[\\s/>]`, "g"))).toHaveLength(
+        1,
+      );
+    }
+  });
+
+  it("monta as zonas com buildDashboardLayout e as entrega ao DashboardZones", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    expect(page).toContain("buildDashboardLayout");
+    expect(page).toContain("<DashboardZones");
+    expect(page).toContain("zones={zones}");
+
+    const okIndex = page.indexOf('view.state === "ok" && series !== null');
+    const zonesIndex = page.indexOf("<DashboardZones");
+    expect(okIndex).toBeGreaterThanOrEqual(0);
+    expect(zonesIndex).toBeGreaterThan(okIndex);
+  });
+
+  it("define os quatro títulos de zona na ordem canônica", () => {
+    const page = readSource(DASHBOARD_PAGE);
+    expect(page).toContain('from "@/lib/dashboard-layout"');
+
+    const layoutModule = readSource("../lib/dashboard-layout.ts");
+    const titles = ["Resumo do ciclo", "Ações", "Compromissos", "Explorar"];
+
+    let previous = -1;
+    for (const title of titles) {
+      const index = layoutModule.indexOf(`title: "${title}"`);
+      expect(index).toBeGreaterThan(previous);
+      previous = index;
+    }
+  });
+});
