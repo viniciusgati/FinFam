@@ -187,6 +187,23 @@ describe("skeleton de carregamento da rota", () => {
     expect(skeleton).toContain("Carregando…");
   });
 
+  it("exibe as quatro zonas de decisão na ordem canônica", () => {
+    const skeleton = readSource("../components/DashboardSkeleton.tsx");
+    const titles = ["Resumo do ciclo", "Ações", "Compromissos", "Explorar"];
+
+    let previous = -1;
+    for (const title of titles) {
+      const index = skeleton.indexOf(title);
+      expect(index).toBeGreaterThan(previous);
+      previous = index;
+    }
+
+    expect(skeleton.match(/<h2/g)).toHaveLength(titles.length);
+    expect(skeleton.match(/animate-pulse/g)?.length).toBeGreaterThanOrEqual(
+      titles.length,
+    );
+  });
+
   it("o loading.tsx da rota usa o mesmo skeleton", () => {
     const loading = readSource("../app/(app)/loading.tsx");
 
