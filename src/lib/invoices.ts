@@ -56,6 +56,19 @@ export function cardPurchaseLookbackStart(
   return zonedTimeToUtc(year, month, 1, timeZone);
 }
 
+/**
+ * Primeiro instante do mês seguinte a `targetMonthKey` no fuso da família:
+ * teto exclusivo seguro para leituras de competência, já que `dueOffset >= 0`
+ * garante que uma compra de mês posterior nunca compita no mês alvo.
+ */
+export function cardPurchaseWindowEnd(
+  targetMonthKey: string,
+  timeZone: string = resolveTimeZone(),
+): Date {
+  const [year, month] = shiftMonthKey(targetMonthKey, 1).split("-").map(Number);
+  return zonedTimeToUtc(year, month, 1, timeZone);
+}
+
 export interface PurchaseInvoice {
   /** Mês do ciclo de fechamento em que a compra entrou (YYYY-MM). */
   cycleMonthKey: string;

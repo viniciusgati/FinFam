@@ -92,6 +92,16 @@ const existingRows = [
     installmentNumber: 1,
     installmentsTotal: 1,
   },
+  {
+    id: "parcelada-antiga",
+    cardId: "card-1",
+    description: "Loja Velha",
+    amountCents: 80000,
+    purchaseDate: new Date(Date.UTC(2015, 0, 10, 12)),
+    category: null,
+    installmentNumber: 1,
+    installmentsTotal: 8,
+  },
 ];
 
 const familyHistory = [
@@ -132,8 +142,23 @@ beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.creditCard.findUnique.mockResolvedValue(card);
   prismaMock.cardPurchase.findMany.mockImplementation(
-    (args: { where?: { category?: unknown; cardId?: string } }) =>
-      Promise.resolve(args.where?.category ? familyHistory : existingRows),
+    (args: {
+      where?: {
+        category?: unknown;
+        cardId?: string;
+        purchaseDate?: { gte: Date; lt: Date };
+      };
+    }) => {
+      if (args.where?.category) return Promise.resolve(familyHistory);
+      const window = args.where?.purchaseDate;
+      if (!window) return Promise.resolve(existingRows);
+      return Promise.resolve(
+        existingRows.filter(
+          (row) =>
+            row.purchaseDate >= window.gte && row.purchaseDate < window.lt,
+        ),
+      );
+    },
   );
   prismaMock.variableExpense.findMany.mockResolvedValue([]);
   prismaMock.fixedExpense.findMany.mockResolvedValue([]);
@@ -175,6 +200,24 @@ describe("POST /api/card-invoices/import — dryRun", () => {
     expect(prismaMock.cardPurchase.createMany).not.toHaveBeenCalled();
     // DeepSeek só na confirmação (não no preview).
     expect(classifyInvoiceTitlesMock).not.toHaveBeenCalled();
+  });
+
+  it("busca as compras existentes na janela de lookback da competência detectada", async () => {
+    await POST(
+      jsonRequest({ cardId: "card-1", csv: EXAMPLE_CSV, dryRun: true }),
+    );
+
+    expect(prismaMock.cardPurchase.findMany).toHaveBeenCalledWith({
+      where: {
+        cardId: "card-1",
+        purchaseDate: {
+          // 120 + 1 meses antes de 2026-09, no fuso da família.
+          gte: new Date("2016-08-01T03:00:00.000Z"),
+          // Primeiro dia do mês seguinte: compra posterior nunca compete em 2026-09.
+          lt: new Date("2026-10-01T03:00:00.000Z"),
+        },
+      },
+    });
   });
 });
 
@@ -274,6 +317,23 @@ describe("POST /api/card-invoices/import — confirmação", () => {
     };
     expect(createArgs.data).toHaveLength(1);
     expect(createArgs.data[0].description).toBe("Padaria Central");
+  });
+
+  it("não casa parcelada fora do lookback: ela não pode ter parcela na competência", async () => {
+    const csv = ["date,title,amount", "2026-09-05,Loja Velha - Parcela 2/8,100,00"].join(
+      "\n",
+    );
+
+    const response = await POST(jsonRequest({ cardId: "card-1", csv }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      monthKey: "2026-09",
+      imported: 1,
+      removed: 1,
+      matched: 0,
+      ignored: 0,
+    });
   });
 
   it("falha na classificação não bloqueia a importação (categorias vazias)", async () => {

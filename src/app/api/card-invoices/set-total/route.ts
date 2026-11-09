@@ -4,6 +4,10 @@ import {
   adjustmentPurchaseDate,
   computeInvoiceAdjustment,
 } from "@/lib/invoice-adjustment";
+import {
+  cardPurchaseLookbackStart,
+  cardPurchaseWindowEnd,
+} from "@/lib/invoices";
 import { formatCents } from "@/lib/money";
 import { firstErrorMessage, invoiceSetTotalSchema } from "@/lib/validation";
 
@@ -36,7 +40,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const purchases = await prisma.cardPurchase.findMany({
-    where: { cardId },
+    where: {
+      cardId,
+      purchaseDate: {
+        gte: cardPurchaseLookbackStart(monthKey),
+        lt: cardPurchaseWindowEnd(monthKey),
+      },
+    },
     include: { card: true },
   });
 
