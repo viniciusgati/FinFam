@@ -954,3 +954,304 @@ Leituras-chave desta rodada: `src/components/GastosManager.tsx:69,250-259,292,52
 `public/sw.js:97,108-111`; `src/components/SettingsForm.tsx:12-13`;
 `src/lib/env.test.ts:17`.
 
+# Rodada 6 — Encaixe das ondas 2–3 e onboarding de meta/comprometimento (task #360)
+
+> Fase 2 (auditor-ux) da task #360 ("Sugestões de melhorias"), após a análise
+> de lacunas em `docs/ANALISE_MELHORIAS.md`. O foco aqui **não** é repetir as
+> lacunas já catalogadas, e sim avaliar se as tarefas 2–10 (ondas 1–3) cabem nos
+> fluxos atuais, se os estados de feedback/onboarding suportam os conceitos
+> novos (meta, comprometimento, limite, vencimentos) e onde a interface vai
+> quebrar se as propostas forem empilhadas sem hierarquia. Verificado no código
+> da branch `autoia/task-360` (base `9944962`) e no gate real. **Nenhum código
+> de produção foi alterado** — apenas este documento.
+
+## Fluxos do usuário
+
+- **Login (`/login`)** — usuário/senha, `autoComplete` correto, botão
+  "Entrando...", erro em `role="alert"` que distingue credencial inválida de
+  má configuração (`login/page.tsx:16-65`). Fluxo claro e completo.
+- **Dashboard (`/`)** — no ciclo corrente empilha **10 blocos** nesta ordem:
+  card principal de `%` (`MonthSpendCard`), alerta único (`SpendAdviceCard`),
+  lançamento rápido + diária (grade de 2), alocação da renda + consumo diário,
+  categorias, ajuda à família, avaliação do mês e simulador "Posso comprar?"
+  (`src/app/(app)/page.tsx:285-361`). Erro e vazio têm tela própria com CTA;
+  ciclo futuro tem `CyclePreviewNotice`; navegação de mês mostra o intervalo do
+  ciclo (`page.tsx:240-281`, `MonthSelector.tsx:78-96`).
+- **Lançamento rápido (dashboard)** — quatro campos (data, descrição, valor,
+  categoria), erro por campo, botão "Salvando...", sucesso "Gasto criado" em
+  `role="status"` e `router.refresh()` (`QuickExpenseCard.tsx:93-190`). Sem
+  seletor de entrada/saída, forma de pagamento ou status; envia sempre
+  `paymentMethod: "PIX"` e `paid: true` (`quick-expense.ts:35,92-96`).
+- **Gastos (`/gastos`)** — seletor de 25 meses, formulário completo (inclui
+  "Pago" marcado por padrão, `GastosManager.tsx:74,484-488`), total do mês,
+  lista com "Pago"/"Em aberto" por linha (`:557`), edição, exclusão com
+  confirmação (`:300`) e mensagem de "criado em outro mês". Mês futuro é
+  bloqueado com `FutureMonthNotice` (`gastos/page.tsx:54-56`). **Não há busca
+  nem filtro**; o total é único e não separa pago de em aberto.
+- **Entradas (`/entradas`)** — duas seções na mesma página: entradas fixas
+  (`FixedItemsManager`, ciclo de vida por ativação/desativação) e entradas
+  avulsas com seletor de mês (`ExtraIncomesManager`). O mês futuro mostra
+  `FutureMonthNotice` no lugar do manager de avulsos (`entradas/page.tsx:75-113`).
+- **Saídas (`/saidas`)** — só contas fixas, com "Desativar"/"Reativar"
+  (`FixedItemsManager.tsx:345`). Não mostra vencimentos ou término de vigência
+  na listagem.
+- **Cartões (`/cartoes`)** — importador CSV no topo, depois cadastro de cartões,
+  ajuste do total da fatura e lista de compras. O limite aparece **apenas como
+  texto na linha do cartão** ("Limite R$ …" / "Sem limite",
+  `CreditCardsManager.tsx:903-905`), sem usado/disponível/utilização.
+- **Histórico (`/historico`)** — seletor de mês, tabela comparativa, gráfico,
+  insights e timeline de snapshots; estados de erro/vazio/futuro com CTA
+  (`HistoryView.tsx:22-66`). Sem glossário e sem ação de exportar.
+- **Configurações (`/configuracoes`)** — uma única seção/campo: dia de início
+  do ciclo, com dois textos de ajuda e salvamento com sucesso/erro
+  (`SettingsForm.tsx:12-13,71-122`). Se a leitura falhar, o formulário continua
+  editável com o default `cycleStartDay=1` (`configuracoes/page.tsx:10-31`).
+- **Navegação/feedback global** — trilho com 7 itens e rótulos
+  (`navigation.ts:17-23`); em ≥768px o trilho **colapsa sozinho após 5 s** sem
+  interação e passa a mostrar só ícones, com "Fixar menu" em ícone
+  (`AppNav.tsx:50-59`, `nav-collapse.ts:8`). O `loading.tsx` do grupo é o
+  `DashboardSkeleton`, usado por qualquer rota filha sem loading próprio.
+
+## Problemas de usabilidade
+
+- **P0 — Dashboard sem hierarquia de decisão** — dez blocos de mesmo peso
+  disputam a primeira tela (`page.tsx:285-361`). Hoje o usuário já precisa
+  rolar para achar o simulador; acrescentar "a pagar", "comprometido", "próximos
+  vencimentos" e "meta" como mais cards empilhados transforma o dashboard num
+  relatório. As ondas 2–3 são boas informações, mas **não cabem no formato atual
+  sem uma zona secundária/agrupamento**.
+- **P0 — Onboarding inexistente para os conceitos que as propostas adicionam** —
+  não há `/ajuda` nem glossário no app (`ls src/app/(app)` não tem `ajuda`);
+  o único texto conceitual é `CYCLE_START_HELP` em Configurações
+  (`SettingsForm.tsx:12-13`). "Ciclo", "% da renda consumida", "consumo
+  disponível", "competência da fatura", "diária" e "em aberto" já aparecem sem
+  definição; "meta", "comprometido", "limite disponível" e "envelope" chegariam
+  ao mesmo vazio. O risco é o usuário interpretar números novos como
+  contraditórios aos que já existem.
+- **P0 — "Em aberto" é um rótulo sem leitura agregada e sem ação** — o status é
+  exibido linha a linha (`GastosManager.tsx:557`) e o formulário nasce com
+  "Pago" marcado (`:74`), mas não há total "a pagar", contagem, filtro por
+  status nem ação de marcar como pago em lote; o dashboard não usa `paid`
+  (grep sem uso em `src/lib/dashboard.ts` e `page.tsx`). O usuário não consegue
+  responder "quanto ainda falta pagar?" — exatamente a informação que a tarefa
+  2 quer expor.
+- **P1 — Limite do cartão é decorativo** — o valor só aparece no cadastro e na
+  linha do cartão (`CreditCardsManager.tsx:903-905,982`); não há "usado",
+  "disponível", `%` de utilização nem alerta. Um número que não muda nenhuma
+  decisão ocupa espaço e pode dar falsa sensação de controle.
+- **P1 — Parcelas futuras invisíveis no ponto de decisão** — `allocateInstallments`
+  alimenta só a fatura da janela (`invoices.ts:108`; `dashboard.ts:637-641`).
+  O usuário vê "quanto pode gastar por dia" sem ver que os próximos ciclos já
+  têm parcelas comprometidas; é a lacuna mais provável de gerar gasto
+  indesejado depois que a meta for introduzida.
+- **P1 — Lançamento rápido otimista e mais estreito que o formulário** — o card
+  do dashboard sempre grava PIX + pago (`quick-expense.ts:35`) e, se a data for
+  alterada para outro mês/ciclo, ainda anuncia só "Gasto criado"
+  (`QuickExpenseCard.tsx:186`), enquanto `/gastos` já usa
+  `savedElsewhereMessage` para o mesmo caso. O usuário pode lançar algo que não
+  aparece no ciclo que está olhando e não saber onde foi.
+- **P1 — `/gastos` não acompanha o volume do uso** — a tela carrega o mês
+  inteiro e oferece apenas o seletor de mês; não há busca por descrição nem
+  filtro por categoria/pagamento/status (`grep` vazio no manager e na página).
+  Com o uso familiar, achar um lançamento específico vira rolagem.
+- **P1 — Configurações é fina demais para receber meta + exportação** — a página
+  inteira é um campo (`configuracoes/page.tsx:20-31`). Colocar meta, exportação
+  e futuros envelopes no mesmo bloco sem seções, explicação e prévia do efeito
+  transforma uma tela simples numa lista de inputs sem contexto. Além disso, em
+  falha de leitura o formulário segue habilitado com `cycleStartDay=1`
+  (`SettingsForm.tsx:16-31`), permitindo sobrescrever a configuração real.
+- **P1 — Importação de fatura é destrutiva sem confirmação** — o botão
+  "Substituir competência" fica habilitado assim que há cartão + arquivo, **sem
+  exigir pré-visualização** (`InvoiceImportPanel.tsx:218-227,370-377`), e não há
+  `window.confirm`; o texto avisa que substitui os lançamentos à vista, mas um
+  toque acidental apaga/reescreve a competência.
+- **P2 — Skeleton global engana rotas que não são o dashboard** — `gastos/` e
+  `configuracoes/` não têm `loading.tsx`, então herdam
+  `src/app/(app)/loading.tsx` → `DashboardSkeleton`, que mostra "Gastos por
+  categoria" e blocos de dashboard (`DashboardSkeleton.tsx:19-24`). Quem abre
+  Configurações num tablet lento vê um esqueleto de outra tela.
+- **P2 — Auto-colapso esconde os rótulos da navegação** — após 5 s sem
+  interação, o trilho vira só ícones (`AppNav.tsx:50-59`). Para a família, que
+  pode não reconhecer os ícones, a descoberta das telas piora; o "Fixar" também
+  é um ícone sem texto visível (só `sr-only`).
+- **P2 — "Saídas" × "Gastos" não revelam fixo × avulso na navegação** — os
+  rótulos (`navigation.ts:18-20`) só ficam claros nos títulos internos ("Saídas
+  fixas"/"Gastos avulsos"). É atrito de vocabulário que o glossário deve
+  resolver, mas também pede rótulos melhores.
+- **P2 — Navegação de mês duplicada** — `gastos/page.tsx:25-31` reimplementa
+  `addMonths`, enquanto `entradas/page.tsx:28-33` usa `shiftMonthKey`
+  (`finance.ts:90`). Hoje o comportamento coincide, mas as duas telas podem
+  divergir em regra de ano/limite — dívida de consistência que já foi apontada
+  na rodada 5 e segue aberta.
+- **P3 — Sem exportação/backup** — nenhuma rota/tela permite tirar os dados da
+  família; confiança e continuidade ficam dependentes do banco. É a tarefa 9 e
+  deve entrar em Configurações com explicação do que sai no arquivo.
+
+## Recomendações priorizadas
+
+- **R1 (P0) — Definir a arquitetura do dashboard antes de acrescentar cards** —
+  organizar em zonas: "Resumo do ciclo" (card principal + alerta), "Ações"
+  (lançamento rápido/entrada + simulador), "Compromissos" (a pagar, parcelas
+  futuras, vencimentos, limite) e "Explorar" (gráficos, categorias, ajuda,
+  avaliação). Limitar a primeira dobra ao resumo + ação e colocar o restante
+  abaixo/dobrável. Benefício: as ondas 2–3 entram sem transformar o dashboard
+  numa parede de cards e sem competir com a decisão "posso gastar hoje?".
+- **R2 (P0) — Glossário e onboarding antes de meta/comprometimento** — criar
+  `/ajuda` com conteúdo em função pura (`src/lib/glossary.ts`) e um `?`/link
+  "Entenda os termos" nos cards que usam ciclo, `%`, competência, em aberto,
+  comprometido, limite e meta; primeira visita pode exibir um aviso curto com
+  link. Benefício: elimina a maior fonte de interpretação errada — justamente a
+  que mais cresce quando as ondas 2–3 introduzem conceitos novos.
+- **R3 (P0) — "A pagar" acionável, não só informativo** — card/linha com
+  contagem + total de `paid=false` no ciclo e no mês, item "Em aberto" no topo
+  de `/gastos` e ação "marcar como pago" (individual ou em lote) no ponto onde
+  o total é exibido. No lançamento rápido, deixar explícito que o gasto nasce
+  pago ou oferecer o mesmo checkbox. Benefício: entrega a tarefa 2 com o ciclo
+  fechado (ver → agir) e evita dinheiro comprometido parecer disponível.
+- **R4 (P1) — Utilização do limite com rótulo e alerta textual** — em
+  `/cartoes`, mostrar usado/disponível/% e um alerta ≥80%/≥100% com texto (não
+  só cor), tratando `limitCents = null` como "sem limite". Benefício: transforma
+  um dado já cadastrado em decisão de compra; a tarefa 4 fica verificável sem
+  migration.
+- **R5 (P1) — Um bloco único de "Compromissos futuros"** — combinar parcelas
+  dos próximos 1–3 meses e próximos vencimentos/fim de vigência (tarefas 3 e 6)
+  num só card da zona "Compromissos", com total por mês e ordenação por data.
+  Benefício: evita dois cards competindo e responde "o que já tem destino?"
+  antes de o usuário ver "quanto pode gastar por dia".
+- **R6 (P1) — Meta de economia em Configurações com prévia e card dedicado** —
+  seção "Meta de economia/reserva" com período explícito (ciclo ou mês),
+  explicação do cálculo e prévia ("isso equivale a R$ X por dia"); no dashboard,
+  card com alvo/guardado/falta e integração com o texto de economia que já
+  existe em `spend-advice.ts:119-125`. Benefício: a tarefa 5 ganha onboarding
+  no próprio lugar em que é configurada e não vira só mais um número no topo.
+- **R7 (P1) — Busca e filtros em `/gastos` com estado visível** — filtros por
+  descrição/categoria/pagamento/status persistidos na URL, "chips" do que está
+  ativo, botão "Limpar" e vazio específico ("nenhum gasto com esses filtros");
+  manter distintos o total filtrado e o total do mês. Benefício: tarefa 8 sem
+  esconder o total nem fazer o usuário perder o contexto do mês.
+- **R8 (P1) — Corrigir a confiança nas telas de borda** — desabilitar o
+  formulário de Configurações quando a leitura falhar (com "Tentar novamente")
+  e exigir pré-visualização + confirmação antes de "Substituir competência" na
+  importação de fatura. Benefício: impede que um erro de carregamento ou um
+  toque acidental sobrescreva configuração/fatura.
+- **R9 (P2) — Skeletons e navegação coerentes com a rota** — criar skeletons
+  próprios para `/gastos` e `/configuracoes` (ou um genérico sem conteúdo de
+  dashboard) e manter rótulos visíveis na navegação (colapsar só por ação
+  explícita ou após interação; "Fixar" com texto à vista). Benefício: o feedback
+  de carregamento não mente e a família continua achando as telas no tablet.
+- **R10 (P2) — Entrada rápida de receita com seletor claro** — alternar
+  despesa/entrada no card do dashboard, com rótulo, cor e mensagem de sucesso
+  próprios ("Entrada criada"), reutilizando `/api/variable-incomes` (tarefa 7).
+  Benefício: paridade com o lançamento de gasto sem ambiguidade sobre o que foi
+  criado.
+- **R11 (P2) — Exportação/backup explicada em Configurações** — link "Baixar
+  meus dados" com texto do que está incluído e formato (JSON/CSV), atrás de
+  `GET /api/export` autenticado (tarefa 9). Benefício: confiança e
+  portabilidade; prepara o relatório mensal (tarefa 18).
+- **R12 (P3) — Vocabulário e consistência de telas** — renomear/rotular
+  "Saídas fixas" e "Gastos avulsos" também na navegação (ou subtítulo no item),
+  extrair `addMonths` para `month-navigation.ts` e remover a duplicação de
+  `gastos/page.tsx:25-31`. Benefício: reduz interpretação errada e evita
+  divergência futura entre telas.
+
+**Encaixe das ondas 2–3:** as tarefas 3, 4, 5 e 6 são as de maior valor, mas
+todas competem pelo mesmo espaço do dashboard; sem R1/R2 elas aumentam o ruído.
+A ordem recomendada é **R1 e R2 primeiro** (estrutura + onboarding), depois
+R3/R4/R5/R6 (compromissos e meta), depois R7–R11 (conveniência/dados). As
+tarefas 11–18 continuam opcionais e não devem ser puxadas para o dashboard sem
+essa hierarquia.
+
+## Evidência
+
+Comandos e saídas reais desta rodada (apenas `docs/USABILITY_AUDIT.md` alterado;
+nenhum código de produção):
+
+```text
+$ git branch --show-current
+autoia/task-360
+$ git status --short
+(limpo antes deste documento)
+
+$ npm run typecheck
+TYPECHECK_EXIT=0
+$ npm run lint
+✖ 1 problem (0 errors, 1 warning)  # src/lib/env.test.ts:17 '_omitted' (pré-existente)
+LINT_EXIT=0
+$ npm test
+ Test Files  80 passed (80)
+      Tests  886 passed (886)
+TEST_EXIT=0
+$ npm run build
+ ✓ Compiled successfully
+ BUILD_EXIT=0
+
+$ grep -nE "<(MonthSpendCard|SpendAdviceCard|QuickExpenseCard|DailyAllowanceCard|IncomeAllocationCard|DailyConsumptionChart|CategoryBreakdownCard|FamilyHelpCard|MonthReviewPanel|PurchaseSimulator)" "src/app/(app)/page.tsx"
+285 MonthSpendCard · 299 SpendAdviceCard · 310 QuickExpenseCard
+313 DailyAllowanceCard · 319 IncomeAllocationCard · 328 DailyConsumptionChart
+337 CategoryBreakdownCard · 340 FamilyHelpCard · 346 MonthReviewPanel
+354 PurchaseSimulator                    # 10 blocos no estado "ok"
+
+$ ls "src/app/(app)"
+cartoes configuracoes entradas gastos historico layout.tsx loading.tsx
+page.tsx saidas                         # não existe /ajuda
+
+$ grep -rniE "filtro|filtrar|busca|pesquisar|search" src/components/GastosManager.tsx "src/app/(app)/gastos/page.tsx"
+src/app/(app)/gastos/page.tsx:45:  searchParams,
+src/app/(app)/gastos/page.tsx:47:  searchParams: Promise<{ mes?: string | string[] }>;
+src/app/(app)/gastos/page.tsx:49:  const params = await searchParams;
+                                        # nenhum filtro/busca de lançamentos
+
+$ grep -rniE "quick.*income|entrada rápida|QuickIncome" src/components "src/app/(app)"
+src/components/ExtraIncomesManager.tsx:171,226       # só a tela /entradas
+
+$ grep -rniE "em aberto|a pagar|openExpense|open-expense" src/lib src/app src/components | grep -v test
+src/lib/invoices.ts:457,461            # "Faturas a pagar no ciclo" (fatura, não avulso)
+src/components/GastosManager.tsx:557   # rótulo por linha; nenhum agregado
+$ grep -n "paid" src/lib/dashboard.ts "src/app/(app)/page.tsx"
+                                        # dashboard não consome paid
+
+$ grep -n "limitCents" src/components/CreditCardsManager.tsx src/lib/validation.ts | grep -v test
+CreditCardsManager.tsx:19,330,409,411,903,904,982
+validation.ts:88                        # exibição/cadastro; sem usado/disponível
+
+$ grep -n "cycleStartDay" src/lib/settings.ts src/lib/validation.ts
+settings.ts:12,23,32,37,43,45,47 · validation.ts:192
+                                        # única configuração existente
+
+$ grep -n "savings\|meta\|goal\|envelope\|orcamento\|budget" src/lib src/app --include=*.ts --include=*.tsx | grep -v test
+(nenhum resultado)                      # meta/envelopes ainda não existem
+
+$ grep -n "state: \"\|message:" src/lib/history.ts | head
+→ error/empty/future/ok; sem glossário/exportação
+
+$ ls "src/app/(app)/gastos" "src/app/(app)/configuracoes"
+gastos: page.tsx                        # sem loading.tsx próprio
+configuracoes: page.tsx                 # herda DashboardSkeleton
+
+$ sed -n '19,24p' src/components/DashboardSkeleton.tsx
+→ "Gastos por categoria" + blocos de dashboard
+
+$ sed -n '218,227p' src/components/InvoiceImportPanel.tsx
+→ actionsDisabled = !cardId || !hasFile || busy !== null
+  (confirma sem exigir pré-visualização; sem window.confirm)
+
+$ sed -n '50,59p' src/components/AppNav.tsx · sed -n '8p' src/lib/nav-collapse.ts
+→ auto-colapso após NAV_AUTO_COLLAPSE_MS = 5000; rótulos viram ícones
+
+$ sed -n '25,31p' "src/app/(app)/gastos/page.tsx" · sed -n '28,33p' "src/app/(app)/entradas/page.tsx"
+→ gastos reimplementa addMonths; entradas usa shiftMonthKey (finance.ts:90)
+
+$ grep -n "paid\|Pago" src/components/GastosManager.tsx
+74: paid: true (default) · 484-488 checkbox "Pago" · 557 "Pago"/"Em aberto"
+```
+
+Leituras-chave: `src/app/(app)/page.tsx:285-361`; `QuickExpenseCard.tsx:93-190`;
+`src/lib/quick-expense.ts:35,92-96`; `GastosManager.tsx:74,300,484-488,532,557`;
+`src/app/(app)/gastos/page.tsx:25-31,54-56`; `CreditCardsManager.tsx:903-905,982`;
+`InvoiceImportPanel.tsx:218-227,370-377`; `SettingsForm.tsx:12-13,16-31,71-122`;
+`src/app/(app)/configuracoes/page.tsx:20-31`; `AppNav.tsx:50-59`;
+`src/lib/nav-collapse.ts:8`; `navigation.ts:17-23`;
+`src/lib/spend-advice.ts:119-125`; `src/lib/invoices.ts:108,457-461`;
+`src/lib/dashboard.ts:637-641`; `HistoryView.tsx:22-66`;
+`src/app/login/page.tsx:16-65`.
+
