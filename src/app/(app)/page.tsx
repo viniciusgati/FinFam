@@ -44,7 +44,7 @@ import {
 } from "@/lib/family-insights";
 import { buildSpendAdvice, type SpendAdvice } from "@/lib/spend-advice";
 import RetryButton from "@/components/RetryButton";
-import MonthSelector from "@/components/MonthSelector";
+import MonthNavigation from "@/components/MonthNavigation";
 import DailyConsumptionChart from "@/components/DailyConsumptionChart";
 import IncomeAllocationCard from "@/components/IncomeAllocationCard";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
@@ -226,7 +226,7 @@ export default async function DashboardPage({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <MonthSelector
+      <MonthNavigation
         monthKey={referenceMonthKey}
         isCurrentMonth={isNextDisabled}
         basePath="/"
@@ -234,134 +234,134 @@ export default async function DashboardPage({
           referenceWindow ? cycleRangeLabel(referenceWindow) : undefined
         }
         queryMonthShift={cycleStartDay === 1 ? 0 : 1}
-      />
+      >
+        {isFutureCycle && <CyclePreviewNotice />}
 
-      {isFutureCycle && <CyclePreviewNotice />}
-
-      {view.state === "error" && (
-        <section
-          role="alert"
-          aria-live="assertive"
-          className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center"
-        >
-          <header className="space-y-1">
-            <p className="text-sm font-medium uppercase tracking-widest text-subtle">
-              FinFam
-            </p>
-            <h1 className="text-3xl font-bold text-foreground">
-              Não foi possível carregar seus dados. Tente novamente.
-            </h1>
-          </header>
-
-          <RetryButton />
-        </section>
-      )}
-
-      {view.state === "empty" && (
-        <section className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl border border-dashed border-border-strong bg-surface p-8 text-center">
-          <header className="space-y-1">
-            <p className="text-sm font-medium uppercase tracking-widest text-subtle">
-              FinFam
-            </p>
-            <h1 className="text-3xl font-bold text-foreground">
-              {emptyStateCopy(view.reason).title}
-            </h1>
-          </header>
-
-          <p className="text-lg text-foreground-muted">
-            {emptyStateCopy(view.reason).body}
-          </p>
-
-          <Link
-            href={emptyStateCopy(view.reason).ctaHref}
-            className="rounded-lg bg-emerald-600 px-6 py-3 text-lg font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+        {view.state === "error" && (
+          <section
+            role="alert"
+            aria-live="assertive"
+            className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl p-8 text-center"
           >
-            {emptyStateCopy(view.reason).ctaLabel}
-          </Link>
-        </section>
-      )}
+            <header className="space-y-1">
+              <p className="text-sm font-medium uppercase tracking-widest text-subtle">
+                FinFam
+              </p>
+              <h1 className="text-3xl font-bold text-foreground">
+                Não foi possível carregar seus dados. Tente novamente.
+              </h1>
+            </header>
 
-      {view.state === "ok" && series !== null && (
-        <>
-          <MonthSpendCard
-            backgroundColor={backgroundColor}
-            percent={view.percent}
-            level={level}
-            invoiceDue={invoicePaymentLabel ?? ""}
-            countdownLabel={countdownLabel}
-            feedback={view.feedback}
-            projectedPercent={view.projectedPercent}
-            projectedRisk={view.projectedRisk}
-            incomeCents={incomeCents}
-            consumedCents={consumedCents}
-            projectedCents={projectedCents}
-          />
+            <RetryButton />
+          </section>
+        )}
 
-          {spendAdvice !== null && <SpendAdviceCard advice={spendAdvice} />}
+        {view.state === "empty" && (
+          <section className="mx-auto flex min-h-[50vh] w-full max-w-xl flex-col items-center justify-center gap-6 rounded-2xl border border-dashed border-border-strong bg-surface p-8 text-center">
+            <header className="space-y-1">
+              <p className="text-sm font-medium uppercase tracking-widest text-subtle">
+                FinFam
+              </p>
+              <h1 className="text-3xl font-bold text-foreground">
+                {emptyStateCopy(view.reason).title}
+              </h1>
+            </header>
 
-          {(isCurrentCycle || allowance !== null) && (
-            <div
-              className={
-                isCurrentCycle
-                  ? "grid items-stretch gap-6 md:grid-cols-2"
-                  : "grid gap-6"
-              }
+            <p className="text-lg text-foreground-muted">
+              {emptyStateCopy(view.reason).body}
+            </p>
+
+            <Link
+              href={emptyStateCopy(view.reason).ctaHref}
+              className="rounded-lg bg-emerald-600 px-6 py-3 text-lg font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
             >
-              {isCurrentCycle && (
-                <QuickExpenseCard categorySuggestions={categorySuggestions} />
-              )}
-              {allowance !== null && (
-                <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />
-              )}
-            </div>
-          )}
+              {emptyStateCopy(view.reason).ctaLabel}
+            </Link>
+          </section>
+        )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <IncomeAllocationCard
+        {view.state === "ok" && series !== null && (
+          <>
+            <MonthSpendCard
+              backgroundColor={backgroundColor}
+              percent={view.percent}
+              level={level}
+              invoiceDue={invoicePaymentLabel ?? ""}
+              countdownLabel={countdownLabel}
+              feedback={view.feedback}
+              projectedPercent={view.projectedPercent}
+              projectedRisk={view.projectedRisk}
               incomeCents={incomeCents}
-              fixedIncomeCents={fixedIncomeCents}
-              variableIncomeCents={variableIncomeCents}
-              fixedExpensesCents={fixedExpensesCents}
-              cardExpensesCents={cardExpensesCents}
-              variableExpensesCents={variableExpensesCents}
+              consumedCents={consumedCents}
+              projectedCents={projectedCents}
             />
 
-            <DailyConsumptionChart
-              variableDailyCents={series.variableDailyCents}
-              obligationDailyCents={series.obligationDailyCents}
-              elapsedDay={series.elapsedDay}
-              highlightDay={isCurrentCycle ? series.elapsedDay : undefined}
+            {spendAdvice !== null && <SpendAdviceCard advice={spendAdvice} />}
+
+            {(isCurrentCycle || allowance !== null) && (
+              <div
+                className={
+                  isCurrentCycle
+                    ? "grid items-stretch gap-6 md:grid-cols-2"
+                    : "grid gap-6"
+                }
+              >
+                {isCurrentCycle && (
+                  <QuickExpenseCard categorySuggestions={categorySuggestions} />
+                )}
+                {allowance !== null && (
+                  <DailyAllowanceCard card={dailyAllowanceCard(allowance)} />
+                )}
+              </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <IncomeAllocationCard
+                incomeCents={incomeCents}
+                fixedIncomeCents={fixedIncomeCents}
+                variableIncomeCents={variableIncomeCents}
+                fixedExpensesCents={fixedExpensesCents}
+                cardExpensesCents={cardExpensesCents}
+                variableExpensesCents={variableExpensesCents}
+              />
+
+              <DailyConsumptionChart
+                variableDailyCents={series.variableDailyCents}
+                obligationDailyCents={series.obligationDailyCents}
+                elapsedDay={series.elapsedDay}
+                highlightDay={isCurrentCycle ? series.elapsedDay : undefined}
+              />
+            </div>
+
+            {categoryBreakdown !== null && (
+              <CategoryBreakdownCard breakdown={categoryBreakdown} />
+            )}
+
+            <FamilyHelpCard
+              insights={familyInsights}
+              fallback={familyHelpFallback}
+              monthKey={referenceMonthKey}
             />
-          </div>
 
-          {categoryBreakdown !== null && (
-            <CategoryBreakdownCard breakdown={categoryBreakdown} />
-          )}
-
-          <FamilyHelpCard
-            insights={familyInsights}
-            fallback={familyHelpFallback}
-            monthKey={referenceMonthKey}
-          />
-
-          <MonthReviewPanel
-            key={referenceMonthKey}
-            monthKey={referenceMonthKey}
-            eligible={isClosedCycle}
-            localSummary={localMonthSummary}
-          />
-
-          {allowance !== null && isCurrentCycle && (
-            <PurchaseSimulator
+            <MonthReviewPanel
               key={referenceMonthKey}
-              freeBudgetCents={allowance.freeBudgetCents}
-              dailyCents={allowance.dailyCents}
-              remainingDays={allowance.remainingDays}
-              usualDailySpendCents={usualDailySpend}
+              monthKey={referenceMonthKey}
+              eligible={isClosedCycle}
+              localSummary={localMonthSummary}
             />
-          )}
-        </>
-      )}
+
+            {allowance !== null && isCurrentCycle && (
+              <PurchaseSimulator
+                key={referenceMonthKey}
+                freeBudgetCents={allowance.freeBudgetCents}
+                dailyCents={allowance.dailyCents}
+                remainingDays={allowance.remainingDays}
+                usualDailySpendCents={usualDailySpend}
+              />
+            )}
+          </>
+        )}
+      </MonthNavigation>
     </div>
   );
 }

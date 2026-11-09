@@ -174,12 +174,18 @@ describe("layout do histórico (evolução dos meses)", () => {
 
 describe("skeleton de carregamento da rota", () => {
   it("expõe status acessível e o texto Carregando…", () => {
+    const skeleton = readSource("../components/DashboardSkeleton.tsx");
+
+    expect(skeleton).toContain('aria-busy="true"');
+    expect(skeleton).toContain('role="status"');
+    expect(skeleton).toContain('aria-live="polite"');
+    expect(skeleton).toContain("Carregando…");
+  });
+
+  it("o loading.tsx da rota usa o mesmo skeleton", () => {
     const loading = readSource("../app/(app)/loading.tsx");
 
-    expect(loading).toContain('aria-busy="true"');
-    expect(loading).toContain('role="status"');
-    expect(loading).toContain('aria-live="polite"');
-    expect(loading).toContain("Carregando…");
+    expect(loading).toContain("<DashboardSkeleton />");
   });
 });
 
@@ -207,18 +213,34 @@ describe("seção Gastos por categoria no dashboard", () => {
     expect(errorBlock).toContain("<RetryButton");
   });
 
-  it("o loading.tsx tem skeleton Gastos por categoria acessível", () => {
-    const loading = readSource("../app/(app)/loading.tsx");
+  it("o skeleton tem a seção Gastos por categoria acessível", () => {
+    const skeleton = readSource("../components/DashboardSkeleton.tsx");
 
-    expect(loading).toContain("Gastos por categoria");
-    expect(loading).toContain('aria-busy="true"');
-    expect(loading).toContain('role="status"');
+    expect(skeleton).toContain("Gastos por categoria");
+    expect(skeleton).toContain('aria-busy="true"');
+    expect(skeleton).toContain('role="status"');
   });
 });
 
 const DASHBOARD_PAGE = "../app/(app)/page.tsx";
 const HISTORY_PAGE = "../app/(app)/historico/page.tsx";
 const HISTORY_VIEW = "../components/HistoryView.tsx";
+
+describe("feedback de carregamento da navegação do dashboard", () => {
+  it("envolve o conteúdo no MonthNavigation (skeleton enquanto isPending)", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    expect(page).toContain("<MonthNavigation");
+    expect(page).toContain("</MonthNavigation>");
+    expect(page).not.toContain("<MonthSelector");
+  });
+
+  it("exibe o dashboard só depois do skeleton (fora do estado pendente)", () => {
+    const view = readSource("../components/MonthNavigation.tsx");
+
+    expect(view).toContain("{isPending ? <DashboardSkeleton /> : children}");
+  });
+});
 
 describe("estados de navegação e onboarding do ciclo", () => {
   it("pré-visualiza ciclo futuro no dashboard e mantém o aviso no histórico", () => {
