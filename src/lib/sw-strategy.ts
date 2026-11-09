@@ -10,6 +10,26 @@
  */
 export type SwStrategy = "network-first" | "cache-first";
 
+/**
+ * Teto de entradas do cache runtime (assets do app preenchidos sob demanda).
+ * A ordem de `Cache.keys()` é a de inserção; ao exceder o teto removemos as
+ * entradas mais antigas. O precache do shell (`finfam-shell-*`) é separado e
+ * não é afetado por este limite.
+ */
+export const MAX_RUNTIME_CACHE_ENTRIES = 60;
+export const RUNTIME_CACHE_LIMIT = MAX_RUNTIME_CACHE_ENTRIES;
+
+/**
+ * Retorna as chaves excedentes (as mais antigas) que devem sair do cache
+ * runtime para respeitar `max` entradas. Não muta a entrada.
+ */
+export function excessRuntimeCacheKeys(
+  keys: readonly string[],
+  max: number = MAX_RUNTIME_CACHE_ENTRIES,
+): string[] {
+  return keys.slice(0, Math.max(0, keys.length - max));
+}
+
 const AUTH_PATHNAMES = new Set([
   "/api/auth",
   "/api/auth/login",
