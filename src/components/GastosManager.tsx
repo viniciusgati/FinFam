@@ -19,6 +19,7 @@ import {
   openExpensesEmptyText,
   openMonthSummaryText,
   setExpensePaid,
+  withMarkingOpen,
   type OpenExpensesSummary,
 } from "@/lib/open-expenses";
 import MaskedInput from "@/components/MaskedInput";
@@ -179,8 +180,8 @@ export default function GastosManager({
 
   const filteringOpen = initialStatus === "open";
   const visibleExpenses = useMemo(
-    () => filterByStatus(expenses, initialStatus),
-    [expenses, initialStatus],
+    () => filterByStatus(withMarkingOpen(expenses, markingId), initialStatus),
+    [expenses, initialStatus, markingId],
   );
   const monthName =
     monthOptions.find((option) => option.value === mes)?.label ?? mes;
@@ -665,7 +666,7 @@ export default function GastosManager({
                     <span className="tabular-nums font-semibold text-foreground">
                       {formatBRL(expense.amountCents)}
                     </span>
-                    {!expense.paid ? (
+                    {!expense.paid || marking ? (
                       <button
                         type="button"
                         onClick={() => handleMarkPaid(expense)}
