@@ -71,7 +71,7 @@ describe("AppNav (markup estático)", () => {
     expect(active).toContain('aria-current="page"');
     expect(active).toContain("border-emerald-500");
     expect(active).toContain("bg-emerald-500/15");
-    expect(active).toContain('title="Gastos"');
+    expect(active).toContain('title="Gastos avulsos"');
 
     const inactive = linkSlice(html, "/");
     expect(inactive).not.toContain('aria-current="page"');
