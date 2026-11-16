@@ -129,3 +129,69 @@ describe("buildSpendAdvice — limites", () => {
     expect(buildSpendAdvice(input({ windowDays: 0 }))).toBeNull();
   });
 });
+
+describe("buildSpendAdvice — meta de economia", () => {
+  it("sem meta (omitida ou 0) mantém o orçamento variável atual", () => {
+    const semMeta = buildSpendAdvice(input({ variableConsumedCents: 70000 }));
+    const metaZero = buildSpendAdvice(
+      input({ variableConsumedCents: 70000, savingsGoalCents: 0 }),
+    );
+
+    expect(semMeta).toEqual(metaZero);
+    expect(metaZero?.state).toBe("on-pace");
+  });
+
+  it("desconta a meta da diária: R$ 5.000 − R$ 2.000 − R$ 1.000 em 30 dias = R$ 66,67", () => {
+    const advice = buildSpendAdvice(
+      input({
+        windowDays: 30,
+        elapsedDays: 10,
+        incomeCents: 500000,
+        fixedExpensesCents: 200000,
+        savingsGoalCents: 100000,
+        // round((500000 − 200000 − 100000) / 30) = 6667/dia × 10 = 66670.
+        variableConsumedCents: 66670,
+      }),
+    );
+
+    expect(advice?.state).toBe("on-pace");
+  });
+
+  it("usa diária de 6667 centavos: 1 centavo acima do esperado já fica adiantado", () => {
+    // Com diária 10000 (sem descontar a meta) o esperado seria 100000 e este
+    // consumo cairia em "atrasado"; com a meta, o esperado é 66670.
+    const advice = buildSpendAdvice(
+      input({
+        windowDays: 30,
+        elapsedDays: 10,
+        incomeCents: 500000,
+        fixedExpensesCents: 200000,
+        savingsGoalCents: 100000,
+        variableConsumedCents: 66671,
+      }),
+    );
+
+    expect(advice?.state).toBe("ahead");
+  });
+
+  it("meta maior ou igual à renda menos as fixas zera o orçamento e não gera alerta", () => {
+    expect(
+      buildSpendAdvice(
+        input({
+          incomeCents: 500000,
+          fixedExpensesCents: 200000,
+          savingsGoalCents: 300000,
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      buildSpendAdvice(
+        input({
+          incomeCents: 500000,
+          fixedExpensesCents: 200000,
+          savingsGoalCents: 500000,
+        }),
+      ),
+    ).toBeNull();
+  });
+});

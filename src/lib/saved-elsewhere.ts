@@ -20,3 +20,45 @@ export function savedElsewhereMessage({
   if (savedMonthKey === selectedMonthKey) return baseMessage;
   return `${baseMessage} para outro mês (${monthLabel(savedMonthKey)}).`;
 }
+
+interface CycleSavedElsewhereInput {
+  baseMessage: string;
+  savedDate: string;
+  selectedMonthKey: string;
+  windowStart?: string;
+  windowNextStart?: string;
+}
+
+/**
+ * Versão ciente da janela do ciclo exibido: qualquer data em
+ * `[windowStart, windowNextStart)` conta como "dentro", mesmo quando o ciclo
+ * começa depois do dia 1. Fora da janela, a mensagem informa o mês da data.
+ */
+export function cycleSavedElsewhereMessage({
+  baseMessage,
+  savedDate,
+  selectedMonthKey,
+  windowStart,
+  windowNextStart,
+}: CycleSavedElsewhereInput): string {
+  const savedMonthKey = savedDate.slice(0, 7);
+
+  if (windowStart && windowNextStart) {
+    const inWindow =
+      savedDate >= windowStart && savedDate < windowNextStart;
+    if (inWindow) return baseMessage;
+
+    return savedElsewhereMessage({
+      baseMessage,
+      savedMonthKey,
+      selectedMonthKey:
+        savedMonthKey === selectedMonthKey ? "" : selectedMonthKey,
+    });
+  }
+
+  return savedElsewhereMessage({
+    baseMessage,
+    savedMonthKey,
+    selectedMonthKey,
+  });
+}

@@ -45,4 +45,15 @@ describe("SettingsForm", () => {
     expect(source).toContain("TermHelpLink");
     expect(source).toContain('termId="ciclo"');
   });
+
+  it("oferece o campo opcional de meta e envia centavos (vazio vira null)", () => {
+    const source = readSource("./SettingsForm.tsx");
+
+    expect(source).toContain("Meta de economia por ciclo");
+    expect(source).toContain("savingsGoalInputToCents");
+    expect(source).toContain("savingsGoalPreview");
+    expect(source).toContain("cycleWindowDays");
+    expect(source).toContain("savingsGoalCents");
+    expect(source).toContain("disabled={saving}");
+  });
 });

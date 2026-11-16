@@ -5,6 +5,7 @@ import {
   creditCardCreateSchema,
   creditCardUpdateSchema,
   invoiceSetTotalSchema,
+  settingsUpdateSchema,
 } from "./validation";
 
 const validCard = {
@@ -192,6 +193,63 @@ describe("invoiceSetTotalSchema", () => {
     ).toBe(false);
     expect(
       invoiceSetTotalSchema.safeParse({ ...validInput, totalCents: 1.5 }).success,
+    ).toBe(false);
+  });
+});
+
+describe("settingsUpdateSchema", () => {
+  it("aceita cycleStartDay sozinho (meta omitida)", () => {
+    expect(settingsUpdateSchema.safeParse({ cycleStartDay: 1 }).success).toBe(
+      true,
+    );
+  });
+
+  it("aceita meta inteira >= 0 e null", () => {
+    expect(
+      settingsUpdateSchema.safeParse({
+        cycleStartDay: 10,
+        savingsGoalCents: 50000,
+      }).success,
+    ).toBe(true);
+    expect(
+      settingsUpdateSchema.safeParse({
+        cycleStartDay: 10,
+        savingsGoalCents: 0,
+      }).success,
+    ).toBe(true);
+    expect(
+      settingsUpdateSchema.safeParse({
+        cycleStartDay: 10,
+        savingsGoalCents: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejeita meta negativa com mensagem pt-BR", () => {
+    const parsed = settingsUpdateSchema.safeParse({
+      cycleStartDay: 1,
+      savingsGoalCents: -1,
+    });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toBe(
+        "Meta de economia deve ser maior ou igual a zero",
+      );
+    }
+  });
+
+  it("rejeita meta fracionária e string", () => {
+    expect(
+      settingsUpdateSchema.safeParse({
+        cycleStartDay: 1,
+        savingsGoalCents: 100.5,
+      }).success,
+    ).toBe(false);
+    expect(
+      settingsUpdateSchema.safeParse({
+        cycleStartDay: 1,
+        savingsGoalCents: "100",
+      }).success,
     ).toBe(false);
   });
 });

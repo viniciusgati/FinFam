@@ -1,27 +1,47 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
   type FormEvent,
 } from "react";
-import type { PaymentMethod } from "@/lib/variable-expenses";
-import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
+import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/variable-expenses";
 import {
-  filterByStatus,
+  NO_CATEGORY_LABEL,
+  categoryLabel,
+  collectCategorySuggestions,
+  normalizeCategoryLabel,
+} from "@/lib/categories";
+import {
   MARK_PAID_ERROR_MESSAGE,
   MARK_PAID_NOT_FOUND_MESSAGE,
   MARK_PAID_SUCCESS_MESSAGE,
-  openExpensesEmptyText,
   openMonthSummaryText,
   setExpensePaid,
   withMarkingOpen,
   type OpenExpensesSummary,
 } from "@/lib/open-expenses";
+import {
+  CLEAR_FILTERS_LABEL,
+  NO_CATEGORY_FILTER,
+  activeExpenseFilterChips,
+  buildExpenseFilterQuery,
+  canonicalSearchTerm,
+  filteredExpensesEmptyText,
+  filteredTotalText,
+  filterExpenses,
+  hasActiveExpenseFilters,
+  monthTotalText,
+  removeExpenseFilter,
+  sumExpenseAmounts,
+  visibleExpensesCountText,
+  type ExpenseFilterKey,
+  type ExpenseFilters,
+} from "@/lib/expense-filters";
 import MaskedInput from "@/components/MaskedInput";
 import TermHelpLink from "@/components/TermHelpLink";
 import CategoryDatalist, {
@@ -54,7 +74,7 @@ interface GastosManagerProps {
   currentMes: string;
   monthOptions: MonthOption[];
   initialExpenses: ExpenseDTO[];
-  initialStatus?: string | null;
+  initialFilters?: ExpenseFilters;
   categorySuggestions: string[];
 }
 
@@ -64,6 +84,14 @@ const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   PIX: "PIX",
   CREDIT: "Crédito",
 };
+
+const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "", label: "Todos" },
+  { value: "open", label: "Em aberto" },
+  { value: "paid", label: "Pago" },
+];
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 type FieldErrors = Partial<Record<"description" | "amount" | "date", string>>;
 
@@ -145,12 +173,17 @@ export default function GastosManager({
   currentMes,
   monthOptions,
   initialExpenses,
-  initialStatus,
+  initialFilters,
   categorySuggestions,
 }: GastosManagerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [expenses, setExpenses] = useState<ExpenseDTO[]>(initialExpenses);
+  const [filters, setFilters] = useState<ExpenseFilters>(() => initialFilters ?? {});
+  const [searchText, setSearchText] = useState(() =>
+    canonicalSearchTerm(initialFilters?.q),
+  );
+  const syncedUrlRef = useRef(false);
   const [form, setForm] = useState<FormState>(() => emptyForm(today));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -165,35 +198,95 @@ export default function GastosManager({
     return () => clearTimeout(timer);
   }, [feedback]);
 
+  useEffect(() => {
+    const term = canonicalSearchTerm(searchText);
+    if (term === canonicalSearchTerm(filters.q)) return;
+    const timer = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, q: term || null }));
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchText, filters.q]);
+
+  useEffect(() => {
+    if (!syncedUrlRef.current) {
+      syncedUrlRef.current = true;
+      return;
+    }
+    const query = buildExpenseFilterQuery(mes, filters);
+    window.history.replaceState(null, "", `${window.location.pathname}?${query}`);
+  }, [mes, filters]);
+
   const totalCents = useMemo(
     () => expenses.reduce((sum, expense) => sum + expense.amountCents, 0),
     [expenses],
   );
 
   const openSummary = useMemo<OpenExpensesSummary>(() => {
-    const open = filterByStatus(expenses, "open");
+    const open = expenses.filter((expense) => !expense.paid);
     return {
       totalCents: open.reduce((sum, expense) => sum + expense.amountCents, 0),
       count: open.length,
     };
   }, [expenses]);
 
-  const filteringOpen = initialStatus === "open";
   const visibleExpenses = useMemo(
-    () => filterByStatus(withMarkingOpen(expenses, markingId), initialStatus),
-    [expenses, initialStatus, markingId],
+    () => filterExpenses(withMarkingOpen(expenses, markingId), filters),
+    [expenses, filters, markingId],
   );
+  const visibleTotalCents = useMemo(
+    () => sumExpenseAmounts(visibleExpenses),
+    [visibleExpenses],
+  );
+  const filtersActive = hasActiveExpenseFilters(filters);
+  const chips = activeExpenseFilterChips(filters);
+  const categoryOptions = useMemo(() => {
+    const options = collectCategorySuggestions(
+      expenses.map((expense) => expense.category),
+    ).map((label) => ({ value: label, label }));
+
+    const hasUncategorized = expenses.some((expense) => expense.category === null);
+    if (hasUncategorized) {
+      options.push({ value: NO_CATEGORY_FILTER, label: NO_CATEGORY_LABEL });
+    }
+
+    const selected = filters.category;
+    if (
+      typeof selected === "string" &&
+      selected !== "" &&
+      selected !== NO_CATEGORY_FILTER &&
+      !options.some((option) => option.value === selected)
+    ) {
+      options.push({ value: selected, label: selected });
+    }
+
+    return options;
+  }, [expenses, filters.category]);
   const monthName =
     monthOptions.find((option) => option.value === mes)?.label ?? mes;
-  const allExpensesHref = `/gastos?mes=${encodeURIComponent(mes)}`;
 
   function handleMonthChange(value: string) {
     if (value === mes) return;
+    const pendingFilters: ExpenseFilters = {
+      ...filters,
+      q: canonicalSearchTerm(searchText) || null,
+    };
+    const href =
+      value === currentMes && !hasActiveExpenseFilters(pendingFilters)
+        ? "/gastos"
+        : `/gastos?${buildExpenseFilterQuery(value, pendingFilters)}`;
     startTransition(() => {
-      router.push(
-        value === currentMes ? "/gastos" : `/gastos?mes=${encodeURIComponent(value)}`,
-      );
+      router.push(href);
     });
+  }
+
+  function handleRemoveFilter(key: ExpenseFilterKey) {
+    setFilters((prev) => removeExpenseFilter(prev, key));
+    if (key === "q") setSearchText("");
+  }
+
+  function handleClearFilters() {
+    setFilters({});
+    setSearchText("");
   }
 
   function validate(isoDate: string | null): FieldErrors {
@@ -446,19 +539,108 @@ export default function GastosManager({
         </span>
       </div>
 
-      {filteringOpen ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
-          <p className="font-medium text-foreground">
-            Mostrando somente gastos em aberto
-          </p>
-          <Link
-            href={allExpensesHref}
-            className="font-medium text-emerald-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+      <div className="grid gap-3 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted sm:col-span-2">
+          Buscar por descrição
+          <input
+            type="search"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Ex.: mercado"
+            className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
+          Categoria
+          <select
+            value={filters.category ?? ""}
+            onChange={(event) =>
+              setFilters((prev) => ({
+                ...prev,
+                category: event.target.value || null,
+              }))
+            }
+            className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
           >
-            Ver todos os gastos
-          </Link>
+            <option value="">Todas</option>
+            {categoryOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
+          Forma de pagamento
+          <select
+            value={filters.payment ?? ""}
+            onChange={(event) =>
+              setFilters((prev) => ({
+                ...prev,
+                payment: event.target.value || null,
+              }))
+            }
+            className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+          >
+            <option value="">Todas</option>
+            {PAYMENT_METHODS.map((method) => (
+              <option key={method} value={method}>
+                {PAYMENT_LABELS[method]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
+          Status
+          <select
+            value={filters.status ?? ""}
+            onChange={(event) =>
+              setFilters((prev) => ({
+                ...prev,
+                status: event.target.value || null,
+              }))
+            }
+            className="rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {chips.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => handleRemoveFilter(chip.key)}
+              aria-label={`Remover filtro ${chip.label}`}
+              className="flex items-center gap-1 rounded-full border border-border-strong bg-surface-raised px-3 py-1 text-sm font-medium text-foreground transition hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+            >
+              {chip.label}
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="rounded-lg border border-border-strong px-3 py-1 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+          >
+            {CLEAR_FILTERS_LABEL}
+          </button>
         </div>
       ) : null}
+
+      <p role="status" aria-live="polite" className="sr-only">
+        {visibleExpensesCountText(visibleExpenses.length, expenses.length)}
+      </p>
 
       <div aria-live="assertive" role="alert" className="min-h-5">
         {feedback?.type === "error" ? (
@@ -610,24 +792,33 @@ export default function GastosManager({
             </h2>
             <TermHelpLink termId="em-aberto" />
           </div>
-          <p className="text-sm text-foreground-muted">
-            Total do mês:{" "}
-            <strong className="text-base font-bold tabular-nums text-foreground">
-              {formatBRL(totalCents)}
-            </strong>
-          </p>
+          <div className="flex flex-col items-end gap-1 text-sm text-foreground-muted">
+            <p className="font-semibold tabular-nums text-foreground">
+              {monthTotalText(totalCents)}
+            </p>
+            {filtersActive ? (
+              <p className="font-semibold tabular-nums text-emerald-300">
+                {filteredTotalText(
+                  visibleTotalCents,
+                  visibleExpenses.length,
+                  expenses.length,
+                )}
+              </p>
+            ) : null}
+          </div>
         </div>
 
         {visibleExpenses.length === 0 ? (
-          filteringOpen ? (
+          filtersActive ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-foreground-muted">
-              <p>{openExpensesEmptyText(monthName)}</p>
-              <Link
-                href={allExpensesHref}
+              <p>{filteredExpensesEmptyText(monthName)}</p>
+              <button
+                type="button"
+                onClick={handleClearFilters}
                 className="font-medium text-emerald-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
               >
-                Ver todos os gastos
-              </Link>
+                {CLEAR_FILTERS_LABEL}
+              </button>
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-center text-foreground-muted">
