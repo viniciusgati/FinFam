@@ -5,11 +5,16 @@
  * faixa válida é 1–28 para que todo mês tenha o dia (meses curtos nunca
  * quebram o ciclo). O default é 1, ou seja, o ciclo coincide com o mês
  * calendário — preservando o comportamento anterior do dashboard.
+ *
+ * `savingsGoalCents` é a meta de economia por ciclo, em centavos. `null`
+ * significa "sem meta" e é o default (retrocompatível com bancos que ainda
+ * não tinham a coluna).
  */
 import { prisma } from "./db";
 
 export interface AppSettings {
   cycleStartDay: number;
+  savingsGoalCents: number | null;
 }
 
 export const CYCLE_START_DAY_MIN = 1;
@@ -20,7 +25,7 @@ export const SETTINGS_SINGLETON_ID = "singleton";
 
 /** Configuração usada quando ainda não há linha persistida. Pura. */
 export function defaultSettings(): AppSettings {
-  return { cycleStartDay: 1 };
+  return { cycleStartDay: 1, savingsGoalCents: null };
 }
 
 /** Lê a configuração global; devolve o default quando a linha não existe. */
@@ -29,20 +34,37 @@ export async function getSettings(): Promise<AppSettings> {
     where: { id: SETTINGS_SINGLETON_ID },
   });
   if (!row) return defaultSettings();
-  return { cycleStartDay: row.cycleStartDay };
+  return {
+    cycleStartDay: row.cycleStartDay,
+    savingsGoalCents: row.savingsGoalCents ?? null,
+  };
 }
 
-/** Grava (upsert) a configuração global do singleton. */
+/**
+ * Grava (upsert) a configuração global do singleton.
+ *
+ * `savingsGoalCents` omitido mantém o valor persistido; `null` limpa a meta.
+ */
 export async function updateSettings(input: {
   cycleStartDay: number;
+  savingsGoalCents?: number | null;
 }): Promise<AppSettings> {
   const row = await prisma.appSettings.upsert({
     where: { id: SETTINGS_SINGLETON_ID },
     create: {
       id: SETTINGS_SINGLETON_ID,
       cycleStartDay: input.cycleStartDay,
+      savingsGoalCents: input.savingsGoalCents ?? null,
     },
-    update: { cycleStartDay: input.cycleStartDay },
+    update: {
+      cycleStartDay: input.cycleStartDay,
+      ...(input.savingsGoalCents !== undefined
+        ? { savingsGoalCents: input.savingsGoalCents }
+        : {}),
+    },
   });
-  return { cycleStartDay: row.cycleStartDay };
+  return {
+    cycleStartDay: row.cycleStartDay,
+    savingsGoalCents: row.savingsGoalCents ?? null,
+  };
 }

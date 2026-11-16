@@ -8,10 +8,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/gastos",
 }));
 
-function render(props: {
-  initialExpanded?: boolean;
-  initialPinned?: boolean;
-} = {}): string {
+function render(props: { initialExpanded?: boolean } = {}): string {
   return renderToStaticMarkup(createElement(AppNav, props));
 }
 
@@ -23,6 +20,14 @@ function linkSlice(html: string, href: string): string {
   return html.slice(start, end + "</a>".length);
 }
 
+function buttonSlice(html: string, marker: string): string {
+  const markerIndex = html.indexOf(marker);
+  expect(markerIndex).toBeGreaterThanOrEqual(0);
+  const start = html.lastIndexOf("<button", markerIndex);
+  const end = html.indexOf(">", markerIndex) + 1;
+  return html.slice(start, end);
+}
+
 describe("AppNav (markup estático)", () => {
   it("mantém a topbar mobile com hamburger, aria-expanded e aria-controls", () => {
     const html = render();
@@ -30,7 +35,6 @@ describe("AppNav (markup estático)", () => {
     expect(html).toContain("md:hidden");
     expect(html).toContain("☰");
     expect(html).toContain("Abrir menu");
-    expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('aria-controls="app-menu"');
     expect(html).not.toContain('aria-pressed="true"');
   });
@@ -47,7 +51,7 @@ describe("AppNav (markup estático)", () => {
       expect(link).toContain(`>${item.label}</span>`);
       expect(link).not.toContain("md:sr-only");
     }
-    expect((html.match(/<svg/g) ?? []).length).toBe(9); // 8 itens + fixar
+    expect((html.match(/<svg/g) ?? []).length).toBe(9); // 8 itens + colapsar
   });
 
   it("menu colapsado: md:w-16, rótulos só em md:sr-only com title, ícone visível", () => {
@@ -61,7 +65,7 @@ describe("AppNav (markup estático)", () => {
       expect(link).toContain(`md:sr-only">${item.label}</span>`);
       expect(link).toContain("<svg");
     }
-    expect((html.match(/<svg/g) ?? []).length).toBe(9); // 8 itens + fixar
+    expect((html.match(/<svg/g) ?? []).length).toBe(9); // 8 itens + expandir
   });
 
   it("rota ativa mantém borda esmeralda, fundo e aria-current também colapsada", () => {
@@ -71,39 +75,34 @@ describe("AppNav (markup estático)", () => {
     expect(active).toContain('aria-current="page"');
     expect(active).toContain("border-emerald-500");
     expect(active).toContain("bg-emerald-500/15");
-    expect(active).toContain('title="Gastos"');
+    expect(active).toContain('title="Gastos avulsos"');
 
     const inactive = linkSlice(html, "/");
     expect(inactive).not.toContain('aria-current="page"');
     expect(inactive).toContain('title="Dashboard"');
   });
 
-  it("botão de fixar sem fixar: aria-pressed=false e estilo normal", () => {
-    const html = render({ initialPinned: false });
-    const start = html.indexOf('aria-pressed="false"');
-    expect(start).toBeGreaterThanOrEqual(0);
-    const pinButton = html.slice(
-      html.lastIndexOf("<button", start),
-      html.indexOf(">", start) + 1,
-    );
+  it("menu expandido: controle tem aria-expanded=true, aria-controls e nome Recolher menu", () => {
+    const html = render({ initialExpanded: true });
+    const button = buttonSlice(html, 'title="Recolher menu"');
 
-    expect(pinButton).toContain('title="Fixar menu"');
-    expect(pinButton).not.toContain("aria-expanded"); // aria-expanded é só do hamburger
-    expect(html).not.toContain("bg-emerald-600");
+    expect(button).toContain('aria-expanded="true"');
+    expect(button).toContain('aria-controls="app-menu"');
+    expect(button).toContain("Recolher menu");
+    expect(html).toContain('<span class="sr-only">Recolher menu</span>');
+    expect(html).not.toContain("Fixar menu");
+    expect(html).not.toContain("Desfixar menu");
   });
 
-  it("botão de fixar fixado: aria-pressed=true, estilo destacado e rótulo Desfixar menu", () => {
-    const html = render({ initialPinned: true });
-    const start = html.indexOf('aria-pressed="true"');
-    expect(start).toBeGreaterThanOrEqual(0);
-    const pinButton = html.slice(
-      html.lastIndexOf("<button", start),
-      html.indexOf(">", start) + 1,
-    );
+  it("menu recolhido: controle tem aria-expanded=false, aria-controls e nome Expandir menu", () => {
+    const html = render({ initialExpanded: false });
+    const button = buttonSlice(html, 'title="Expandir menu"');
 
-    expect(pinButton).toContain('title="Desfixar menu"');
-    expect(pinButton).toContain("bg-emerald-600");
-    expect(pinButton).not.toContain("aria-expanded");
-    expect(html.includes('title="Fixar menu"')).toBe(false);
+    expect(button).toContain('aria-expanded="false"');
+    expect(button).toContain('aria-controls="app-menu"');
+    expect(button).toContain("Expandir menu");
+    expect(html).toContain('<span class="sr-only">Expandir menu</span>');
+    expect(html).not.toContain("Fixar menu");
+    expect(html).not.toContain("Desfixar menu");
   });
 });

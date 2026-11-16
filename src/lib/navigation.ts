@@ -17,8 +17,8 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/entradas", label: "Entradas", icon: "entradas" },
-  { href: "/saidas", label: "Saídas", icon: "saidas" },
-  { href: "/gastos", label: "Gastos", icon: "gastos" },
+  { href: "/saidas", label: "Saídas fixas", icon: "saidas" },
+  { href: "/gastos", label: "Gastos avulsos", icon: "gastos" },
   { href: "/cartoes", label: "Cartões", icon: "cartoes" },
   { href: "/historico", label: "Histórico", icon: "historico" },
   { href: "/configuracoes", label: "Configurações", icon: "configuracoes" },

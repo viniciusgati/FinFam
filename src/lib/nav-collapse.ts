@@ -1,62 +1,35 @@
 /**
- * Regras puras do trilho de navegação colapsável (≥768px).
+ * Persistência da preferência de menu expandido/recolhido (≥768px).
  *
- * Nenhum efeito de UI aqui: o componente `AppNav` combina estas funções com
- * um timer de 5000ms; os testes cobrem apenas esta lógica.
+ * O estado só muda por ação explícita do usuário (botão de recolher/expandir).
+ * Nenhum efeito de UI aqui: `AppNav` consome estas funções.
  */
 
-/** Milissemundos sem interação antes de o menu colapsar sozinho. */
-export const NAV_AUTO_COLLAPSE_MS = 5000;
-
-/** Chave de persistência do estado "fixado" no `localStorage`. */
-export const NAV_PINNED_STORAGE_KEY = "finfam.nav.pinned";
-
-export interface NavCollapseState {
-  /** Menu fixado (impede o colapso automático). */
-  pinned: boolean;
-  /** Timestamp da última interação (hover/foco/clique) no menu. */
-  lastInteractionAt: number;
-}
-
-/** Registra uma interação em `now`, reiniciando a contagem do auto-colapso. */
-export function touchNav(
-  state: NavCollapseState,
-  now: number,
-): NavCollapseState {
-  return { ...state, lastInteractionAt: now };
-}
-
-/** Verdadeiro quando passou do limite sem interação (ignora `pinned`). */
-export function isNavIdle(state: NavCollapseState, now: number): boolean {
-  return now - state.lastInteractionAt >= NAV_AUTO_COLLAPSE_MS;
-}
-
-/** O menu deve estar expandido em `now`? Fixado ou ainda "quentinho" ⇒ sim. */
-export function navExpanded(state: NavCollapseState, now: number): boolean {
-  return state.pinned || !isNavIdle(state, now);
-}
+/** Chave de persistência do estado expandido no `localStorage`. */
+export const NAV_EXPANDED_STORAGE_KEY = "finfam.nav.expanded";
 
 /**
- * Lê `finfam.nav.pinned` do `localStorage`. Retorna `false` em SSR,
- * incognito ou qualquer ambiente sem `localStorage` — sem lançar exceção.
+ * Lê `finfam.nav.expanded` do `localStorage`. O menu inicia expandido, então
+ * ausência de valor, SSR, incognito ou qualquer erro resultam em `true` —
+ * sem lançar exceção.
  */
-export function readNavPinned(): boolean {
+export function readNavExpanded(): boolean {
   try {
-    if (typeof localStorage === "undefined") return false;
-    return localStorage.getItem(NAV_PINNED_STORAGE_KEY) === "true";
+    if (typeof localStorage === "undefined") return true;
+    return localStorage.getItem(NAV_EXPANDED_STORAGE_KEY) !== "false";
   } catch {
-    return false;
+    return true;
   }
 }
 
 /**
- * Grava `finfam.nav.pinned` ("true"/"false"). Silencioso quando o
- * `localStorage` não está disponível (SSR/incognito).
+ * Grava `finfam.nav.expanded` ("true"/"false"). Silencioso quando o
+ * `localStorage` não está disponível (SSR/incognito) ou lança erro.
  */
-export function writeNavPinned(pinned: boolean): void {
+export function writeNavExpanded(expanded: boolean): void {
   try {
     if (typeof localStorage === "undefined") return;
-    localStorage.setItem(NAV_PINNED_STORAGE_KEY, pinned ? "true" : "false");
+    localStorage.setItem(NAV_EXPANDED_STORAGE_KEY, expanded ? "true" : "false");
   } catch {
     // Preferência não persistida; o estado em memória continua válido.
   }

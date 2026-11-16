@@ -17,6 +17,7 @@ import {
   type DailyAllowance,
 } from "@/lib/cycle";
 import { defaultSettings, getSettings } from "@/lib/settings";
+import { savingsGoalProgress } from "@/lib/savings-goal";
 import {
   computeFinanceStatus,
   dashboardView,
@@ -67,6 +68,7 @@ import SpendAdviceCard from "@/components/SpendAdviceCard";
 import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
 import FutureCommitmentsCard from "@/components/FutureCommitmentsCard";
 import OpenExpensesCard from "@/components/OpenExpensesCard";
+import SavingsGoalCard from "@/components/SavingsGoalCard";
 import FamilyHelpCard from "@/components/FamilyHelpCard";
 import type { CategoryBreakdown } from "@/lib/category-breakdown";
 import type { FutureCommitmentMonth } from "@/lib/future-commitments";
@@ -130,6 +132,7 @@ export default async function DashboardPage({
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
   let cycleStartDay = defaultSettings().cycleStartDay;
+  let savingsGoalCents = defaultSettings().savingsGoalCents ?? 0;
   let referenceMonthKey = monthKey(now);
   let referenceWindow: CycleWindow | null = null;
   let isCurrentCycle = false;
@@ -138,7 +141,9 @@ export default async function DashboardPage({
   let isNextDisabled = true;
 
   try {
-    cycleStartDay = (await getSettings()).cycleStartDay;
+    const settings = await getSettings();
+    cycleStartDay = settings.cycleStartDay;
+    savingsGoalCents = settings.savingsGoalCents ?? 0;
     const reference = resolveCycleReference(mes, now, cycleStartDay);
     referenceMonthKey = reference.cycleKey;
     referenceWindow = reference.window;
@@ -212,8 +217,8 @@ export default async function DashboardPage({
     }
 
     // Um único bloco de recomendação no ciclo corrente: compara o consumo
-    // variável do ciclo com o orçamento variável (renda − contas fixas). Sem
-    // movimentação não há ritmo a avaliar.
+    // variável do ciclo com o orçamento variável (renda − contas fixas − meta
+    // de economia). Sem movimentação não há ritmo a avaliar.
     spendAdvice = data.hasMovements
       ? buildSpendAdvice({
           windowDays: data.series.daysInMonth,
@@ -222,6 +227,7 @@ export default async function DashboardPage({
           fixedExpensesCents: data.fixedExpensesCents,
           variableConsumedCents:
             data.variableExpensesCents + data.cardExpensesCents,
+          savingsGoalCents,
           isCurrentCycle,
         })
       : null;
@@ -263,6 +269,18 @@ export default async function DashboardPage({
     ? await loadCategorySuggestions()
     : [];
 
+  // Guardado estimado do ciclo = orçamento variável que sobrou até agora
+  // (`allowance.freeBudgetCents`, nunca negativo). Sem diária calculada não há
+  // progresso para acompanhar.
+  const savingsGoal =
+    allowance !== null
+      ? savingsGoalProgress({
+          goalCents: savingsGoalCents,
+          savedCents: allowance.freeBudgetCents,
+          remainingDays: allowance.remainingDays,
+        })
+      : null;
+
   // Os blocos disponíveis viram zonas de decisão (Resumo → Ações →
   // Compromissos → Explorar). Cada condicional de exibição vira o estado do
   // bloco: o que não pode ser exibido entra como `error` e fica fora das zonas.
@@ -281,6 +299,7 @@ export default async function DashboardPage({
       id: "category-breakdown",
       state: categoryBreakdown !== null ? "ok" : "error",
     },
+    { id: "savings-goal", state: savingsGoal !== null ? "ok" : "error" },
     {
       id: "future-commitments",
       state: hasFutureCommitments ? "ok" : "empty",
@@ -450,6 +469,10 @@ export default async function DashboardPage({
 
                       {categoryBreakdown !== null && (
                         <CategoryBreakdownCard breakdown={categoryBreakdown} />
+                      )}
+
+                      {savingsGoal !== null && (
+                        <SavingsGoalCard progress={savingsGoal} />
                       )}
 
                       <FutureCommitmentsCard

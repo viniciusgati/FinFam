@@ -17,8 +17,8 @@ describe("NAV_ITEMS", () => {
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
       "Dashboard",
       "Entradas",
-      "Saídas",
-      "Gastos",
+      "Saídas fixas",
+      "Gastos avulsos",
       "Cartões",
       "Histórico",
       "Configurações",
