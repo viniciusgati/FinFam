@@ -114,6 +114,13 @@ describe("InvoiceImportPanel — estado inicial", () => {
     expect(html).not.toContain("Fatura substituída");
     expect(html).not.toContain("a importar");
   });
+
+  it("leva ao glossário da competência", () => {
+    const html = renderPanel();
+
+    expect(html).toContain('href="/ajuda#competencia"');
+    expect(html).toContain('aria-label="Saiba mais sobre Competência"');
+  });
 });
 
 describe("textos puros do painel", () => {

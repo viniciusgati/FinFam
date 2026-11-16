@@ -305,12 +305,14 @@ const ALL_DASHBOARD_BLOCKS: DashboardBlock[] = [
   { id: "income-allocation", state: "ok" },
   { id: "daily-consumption", state: "ok" },
   { id: "category-breakdown", state: "ok" },
+  { id: "future-commitments", state: "ok" },
+  { id: "open-expenses", state: "ok" },
   { id: "family-help", state: "ok" },
   { id: "month-review", state: "ok" },
 ];
 
 describe("zonas de decisão do dashboard", () => {
-  it("organiza os 10 blocos ok nas quatro zonas na ordem canônica", () => {
+  it("organiza os 12 blocos ok nas quatro zonas na ordem canônica", () => {
     const { zones, failed } = buildDashboardLayout(ALL_DASHBOARD_BLOCKS);
 
     expect(failed).toEqual([]);
@@ -341,6 +343,8 @@ describe("zonas de decisão do dashboard", () => {
       { id: "income-allocation", state: "ok" },
       { id: "daily-consumption", state: "ok" },
       { id: "category-breakdown", state: "ok" },
+      { id: "future-commitments", state: "ok" },
+      { id: "open-expenses", state: "ok" },
     ]);
     expect(zones[3].blocks).toEqual([
       { id: "family-help", state: "ok" },
@@ -367,6 +371,8 @@ describe("zonas de decisão do dashboard", () => {
     expect(zones[2].blocks.map((block) => block.id)).toEqual([
       "income-allocation",
       "category-breakdown",
+      "future-commitments",
+      "open-expenses",
     ]);
     expect(zones[3].blocks.map((block) => block.id)).toEqual(["month-review"]);
   });
@@ -425,6 +431,8 @@ describe("zonas de decisão do dashboard", () => {
       { id: "daily-allowance", state: "ok" },
       { id: "card-adjustment", state: "ok" },
       { id: "income-allocation", state: "ok" },
+      { id: "future-commitments", state: "ok" },
+      { id: "open-expenses", state: "ok" },
       { id: "family-help", state: "ok" },
       { id: "month-spend", state: "error" },
       { id: "unknown-block" as DashboardBlockId, state: "ok" },
@@ -452,6 +460,8 @@ describe("zonas de decisão do dashboard", () => {
       "income-allocation",
       "daily-consumption",
       "category-breakdown",
+      "future-commitments",
+      "open-expenses",
     ]);
     expect(zones[3].blocks.map((block) => block.id)).toEqual([
       "family-help",
@@ -481,6 +491,41 @@ describe("zonas de decisão do dashboard", () => {
     expect(zones).toEqual([]);
     expect(failed).toEqual([]);
   });
+
+  it("inclui future-commitments na zona commitments após category-breakdown", () => {
+    const { zones, failed } = buildDashboardLayout([
+      { id: "future-commitments", state: "ok" },
+    ]);
+
+    expect(failed).toEqual([]);
+    expect(zones).toHaveLength(1);
+    expect(zones[0].id).toBe("commitments");
+    expect(zones[0].blocks.map((block) => block.id)).toEqual([
+      "future-commitments",
+    ]);
+
+    const withCategory = buildDashboardLayout([
+      { id: "category-breakdown", state: "ok" },
+      { id: "future-commitments", state: "ok" },
+    ]);
+    expect(withCategory.zones[0].blocks.map((block) => block.id)).toEqual([
+      "category-breakdown",
+      "future-commitments",
+    ]);
+  });
+
+  it("move future-commitments para failed quando o estado é error", () => {
+    const { zones, failed } = buildDashboardLayout([
+      { id: "income-allocation", state: "ok" },
+      { id: "future-commitments", state: "error" },
+    ]);
+
+    expect(failed).toEqual(["future-commitments"]);
+    expect(zones).toHaveLength(1);
+    expect(zones[0].blocks.map((block) => block.id)).toEqual([
+      "income-allocation",
+    ]);
+  });
 });
 
 describe("página do dashboard em zonas de decisão", () => {
@@ -493,11 +538,13 @@ describe("página do dashboard em zonas de decisão", () => {
     "IncomeAllocationCard",
     "DailyConsumptionChart",
     "CategoryBreakdownCard",
+    "FutureCommitmentsCard",
+    "OpenExpensesCard",
     "FamilyHelpCard",
     "MonthReviewPanel",
   ];
 
-  it("renderiza cada um dos 10 blocos exatamente uma vez na fonte", () => {
+  it("renderiza cada um dos 12 blocos exatamente uma vez na fonte", () => {
     const page = readSource(DASHBOARD_PAGE);
 
     for (const component of DASHBOARD_COMPONENTS) {
@@ -505,6 +552,20 @@ describe("página do dashboard em zonas de decisão", () => {
         1,
       );
     }
+  });
+
+  it("inclui o bloco A pagar na zona de Compromissos", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    const commitmentsIndex = page.indexOf('case "commitments":');
+    const openIndex = page.indexOf("<OpenExpensesCard");
+    const exploreIndex = page.indexOf('case "explore":');
+
+    expect(commitmentsIndex).toBeGreaterThanOrEqual(0);
+    expect(openIndex).toBeGreaterThan(commitmentsIndex);
+    expect(openIndex).toBeLessThan(exploreIndex);
+    expect(page).toContain('{ id: "open-expenses", state: "ok" }');
+    expect(page).toContain("loadOpenCycleExpenses");
   });
 
   it("monta as zonas com buildDashboardLayout e as entrega ao DashboardZones", () => {

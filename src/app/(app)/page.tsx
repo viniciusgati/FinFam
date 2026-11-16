@@ -1,8 +1,10 @@
 import Link from "next/link";
 import {
   loadCycleDashboardData,
+  loadOpenCycleExpenses,
   resolveCycleReference,
 } from "@/lib/dashboard";
+import type { OpenExpensesSummary } from "@/lib/open-expenses";
 import {
   cycleEndCountdownLabel,
   cycleRangeLabel,
@@ -63,8 +65,15 @@ import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
 import SpendAdviceCard from "@/components/SpendAdviceCard";
 import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
+import FutureCommitmentsCard from "@/components/FutureCommitmentsCard";
+import OpenExpensesCard from "@/components/OpenExpensesCard";
 import FamilyHelpCard from "@/components/FamilyHelpCard";
 import type { CategoryBreakdown } from "@/lib/category-breakdown";
+import type { FutureCommitmentMonth } from "@/lib/future-commitments";
+import type {
+  UpcomingBill,
+  UpcomingEndingSoon,
+} from "@/lib/upcoming";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +114,11 @@ export default async function DashboardPage({
   let spendAdvice: SpendAdvice | null = null;
   let categoryBreakdown: CategoryBreakdown | null = null;
   let cardAdjustmentData: CardAdjustmentData | null = null;
+  let futureCommitments: FutureCommitmentMonth[] = [];
+  let upcomingBills: UpcomingBill[] = [];
+  let endingSoon: UpcomingEndingSoon[] = [];
+  let hasFutureCommitments = false;
+  let openExpenses: OpenExpensesSummary = { totalCents: 0, count: 0 };
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
   let cycleStartDay = defaultSettings().cycleStartDay;
@@ -126,6 +140,7 @@ export default async function DashboardPage({
     isNextDisabled = reference.isFuture;
 
     const data = await loadCycleDashboardData(reference, now);
+    openExpenses = await loadOpenCycleExpenses(now);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
     // O contador do card principal segue o estado do ciclo: no corrente, dias
@@ -149,6 +164,13 @@ export default async function DashboardPage({
       data.invoicePaymentCents ?? 0,
     );
     categoryBreakdown = data.categoryBreakdown;
+    futureCommitments = data.futureCommitments ?? [];
+    upcomingBills = data.upcoming?.bills ?? [];
+    endingSoon = data.upcoming?.endingSoon ?? [];
+    hasFutureCommitments =
+      futureCommitments.some((month) => month.totalCents > 0) ||
+      upcomingBills.length > 0 ||
+      endingSoon.length > 0;
     localMonthSummary = localMonthReview(
       buildMonthReviewData(
         monthReviewSnapshotFrom(data),
@@ -251,6 +273,11 @@ export default async function DashboardPage({
       id: "category-breakdown",
       state: categoryBreakdown !== null ? "ok" : "error",
     },
+    {
+      id: "future-commitments",
+      state: hasFutureCommitments ? "ok" : "empty",
+    },
+    { id: "open-expenses", state: "ok" },
     { id: "family-help", state: "ok" },
     { id: "month-review", state: "ok" },
   ];
@@ -399,6 +426,14 @@ export default async function DashboardPage({
                       {categoryBreakdown !== null && (
                         <CategoryBreakdownCard breakdown={categoryBreakdown} />
                       )}
+
+                      <FutureCommitmentsCard
+                        months={futureCommitments}
+                        bills={upcomingBills}
+                        endingSoon={endingSoon}
+                      />
+
+                      <OpenExpensesCard summary={openExpenses} />
                     </>
                   );
                 case "explore":

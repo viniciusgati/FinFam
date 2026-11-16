@@ -8,6 +8,7 @@ import {
 import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
 import { formatCents, parseAmountToCents } from "@/lib/money";
 import MaskedInput from "@/components/MaskedInput";
+import TermHelpLink from "@/components/TermHelpLink";
 import CategoryDatalist, {
   CATEGORY_DATALIST_ID,
 } from "@/components/CategoryDatalist";
@@ -666,9 +667,12 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
 
       <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">
-            Fatura de {referenceLabel}
-          </h2>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold text-foreground">
+              Fatura de {referenceLabel}
+            </h2>
+            <TermHelpLink termId="competencia" />
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -848,8 +852,11 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
       )}
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Cartões</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold text-foreground">Cartões</h2>
+            <TermHelpLink termId="limite-disponivel" />
+          </div>
           {cards.length > 0 && (
             <button
               type="button"

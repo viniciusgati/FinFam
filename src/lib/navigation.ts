@@ -5,7 +5,8 @@ export type NavIconName =
   | "gastos"
   | "cartoes"
   | "historico"
-  | "configuracoes";
+  | "configuracoes"
+  | "ajuda";
 
 export interface NavItem {
   href: string;
@@ -21,6 +22,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/cartoes", label: "Cartões", icon: "cartoes" },
   { href: "/historico", label: "Histórico", icon: "historico" },
   { href: "/configuracoes", label: "Configurações", icon: "configuracoes" },
+  { href: "/ajuda", label: "Ajuda", icon: "ajuda" },
 ];
 
 /**

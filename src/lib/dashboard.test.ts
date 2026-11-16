@@ -22,6 +22,7 @@ import {
   loadCycleAllowance,
   loadCycleDashboardData,
   loadDashboardData,
+  loadOpenCycleExpenses,
   resolveCycleReference,
 } from "./dashboard";
 import { computeFinanceStatus, dashboardView } from "./finance";
@@ -1103,6 +1104,64 @@ describe("loadCycleDashboardData — moldura do ciclo", () => {
     expect(data.invoicePaymentCents).toBe(10000);
   });
 
+  it("expõe compromissos futuros e vencimentos do ciclo a partir do mês-base", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      {
+        id: "aluguel",
+        name: "Aluguel",
+        amountCents: 150000,
+        dueDay: 31,
+        category: "Casa",
+        active: true,
+        startMonth: null,
+        endMonth: "2026-12",
+      },
+    ]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([
+      {
+        id: "p-antiga",
+        description: "Compra do ciclo passado",
+        amountCents: 10000,
+        purchaseDate: new Date("2026-09-20T12:00:00.000Z"),
+        category: null,
+        installmentsTotal: 1,
+        card: { id: "c", name: "Itau", closingDay: 15, dueDay: 21 },
+      },
+      {
+        id: "p-parcelada",
+        description: "Compra parcelada",
+        amountCents: 40000,
+        purchaseDate: new Date("2026-10-16T12:00:00.000Z"),
+        category: null,
+        installmentsTotal: 3,
+        card: { id: "c", name: "Itau", closingDay: 15, dueDay: 21 },
+      },
+    ]);
+
+    const data = await loadCycleDashboardData(reference, now);
+
+    // Mês-base: fatura de novembro/2026 (ciclo começa no dia 15) → projeta
+    // dezembro/2026, janeiro/2027 e fevereiro/2027.
+    expect(data.futureCommitments?.map((month) => month.monthKey)).toEqual([
+      "2026-12",
+      "2027-01",
+      "2027-02",
+    ]);
+    expect(data.futureCommitments?.map((month) => month.totalCents)).toEqual([
+      13333, 13333, 0,
+    ]);
+    expect(data.upcoming?.bills).toEqual([
+      { name: "Fatura Itau", dueDate: "2026-10-21", amountCents: 10000 },
+      { name: "Aluguel", dueDate: "2026-10-31", amountCents: 150000 },
+    ]);
+    expect(data.upcoming?.endingSoon).toEqual([
+      { name: "Aluguel", endMonth: "2026-12" },
+    ]);
+  });
+
   it("consulta avulsos só na janela do ciclo, limitada a amanhã", async () => {
     prismaMock.income.findMany.mockResolvedValue([]);
     prismaMock.fixedExpense.findMany.mockResolvedValue([]);
@@ -1208,5 +1267,56 @@ describe("cardPurchase — limite inferior de lookback (task #359)", () => {
     expect(args.where.purchaseDate.lt.toISOString()).toBe(
       "2026-11-15T03:00:00.000Z",
     );
+  });
+});
+
+describe("loadOpenCycleExpenses — a pagar do ciclo (task #364)", () => {
+  const now = new Date("2026-10-16T15:00:00.000Z");
+
+  beforeEach(() => {
+    prismaMock.appSettings.findUnique.mockResolvedValue({
+      id: "singleton",
+      cycleStartDay: 15,
+    });
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+  });
+
+  it("consulta só os não pagos na janela [início, próximoInício) do ciclo, sem filtro de método", async () => {
+    await loadOpenCycleExpenses(now);
+
+    const [args] = prismaMock.variableExpense.findMany.mock.calls[0];
+    expect(args.where.paid).toBe(false);
+    expect(args.where.date.gte.toISOString()).toBe("2026-10-15T03:00:00.000Z");
+    expect(args.where.date.lt.toISOString()).toBe("2026-11-15T03:00:00.000Z");
+    expect(args.where).not.toHaveProperty("paymentMethod");
+  });
+
+  it("soma e conta todos os retornos, inclusive no crédito", async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        id: "pix",
+        amountCents: 5000,
+        date: new Date("2026-10-20T12:00:00.000Z"),
+        paid: false,
+        paymentMethod: "PIX",
+      },
+      {
+        id: "credito",
+        amountCents: 3000,
+        date: new Date("2026-11-10T12:00:00.000Z"),
+        paid: false,
+        paymentMethod: "CREDIT",
+      },
+    ]);
+
+    const summary = await loadOpenCycleExpenses(now);
+
+    expect(summary).toEqual({ totalCents: 8000, count: 2 });
+  });
+
+  it("lista vazia devolve zero", async () => {
+    const summary = await loadOpenCycleExpenses(now);
+
+    expect(summary).toEqual({ totalCents: 0, count: 0 });
   });
 });

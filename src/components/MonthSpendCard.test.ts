@@ -140,4 +140,15 @@ describe("MonthSpendCard (renderização)", () => {
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-live="polite"');
   });
+
+  it("leva ao glossário do ciclo e do percentual consumido", () => {
+    const html = render();
+
+    expect(html).toContain('href="/ajuda#ciclo"');
+    expect(html).toContain('aria-label="Saiba mais sobre Ciclo financeiro"');
+    expect(html).toContain('href="/ajuda#percentual-consumido"');
+    expect(html).toContain(
+      'aria-label="Saiba mais sobre % da renda consumida"',
+    );
+  });
 });

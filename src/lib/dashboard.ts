@@ -36,9 +36,21 @@ import {
   type PurchaseWindowInstallment,
 } from "./invoices";
 import {
+  buildFutureCommitments,
+  type FutureCommitmentMonth,
+} from "./future-commitments";
+import {
+  buildUpcomingCommitments,
+  type UpcomingCommitments,
+} from "./upcoming";
+import {
   buildDashboardDataFromSnapshot,
   isCompleteSnapshot,
 } from "./snapshot-month";
+import {
+  sumOpenExpenses,
+  type OpenExpensesSummary,
+} from "./open-expenses";
 import { defaultSettings, getSettings } from "./settings";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
@@ -97,6 +109,16 @@ export interface DashboardData extends FinanceInput {
    * com `consumedCents`.
    */
   categoryBreakdown: CategoryBreakdown;
+  /**
+   * Parcelas de cartão dos 3 meses estritamente seguintes ao mês-base (o mês da
+   * fatura exibida), somadas por cartão. Presente no dashboard do ciclo.
+   */
+  futureCommitments?: FutureCommitmentMonth[];
+  /**
+   * Vencimentos do ciclo (fixas + faturas) e avisos de contas perto de terminar,
+   * derivados da mesma janela e mês-base do bloco "Compromissos futuros".
+   */
+  upcoming?: UpcomingCommitments;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -753,6 +775,30 @@ export async function loadCycleDashboardData(
     cycleDays,
   });
 
+  // Mês-base da projeção: o mês da fatura exibida. Com o ciclo começando no dia
+  // 1, `cycleKey` já é esse mês; começando depois, a fatura é a do mês seguinte.
+  const referenceMonthKey = shiftMonthKey(
+    reference.cycleKey,
+    reference.window.startDay === 1 ? 0 : 1,
+  );
+  const cards = [
+    ...new Map(
+      money.cardPurchases.map((purchase) => [purchase.card.id, purchase.card]),
+    ).values(),
+  ];
+  const futureCommitments = buildFutureCommitments(
+    money.cardPurchases,
+    referenceMonthKey,
+  );
+  const upcoming = buildUpcomingCommitments({
+    cycle: reference.window,
+    fixedExpenses: money.fixedExpenses,
+    cards,
+    purchases: money.cardPurchases,
+    referenceMonthKey,
+    timeZone,
+  });
+
   return {
     monthlyIncomeCents: money.monthlyIncomeCents,
     fixedIncomeCents: money.fixedIncomeCents,
@@ -780,6 +826,8 @@ export async function loadCycleDashboardData(
       cardPurchases: money.cardPurchases,
       timeZone,
     }),
+    futureCommitments,
+    upcoming,
     referenceDate: reference.asOf,
     periodDays: cycleDays,
     elapsedDays: series.elapsedDay,
@@ -818,4 +866,42 @@ export async function loadCycleAllowance(
     now,
     timeZone,
   });
+}
+
+/**
+ * Total em aberto ("a pagar") do **ciclo corrente**: gastos avulsos com
+ * `paid = false` cuja `date` cai em `[início, próximoInício)` da janela do
+ * ciclo. É uma leitura dedicada — **não** filtra `paymentMethod`, porque "a
+ * pagar" é sobre quitação e inclui gastos no crédito (ver open-expenses.ts).
+ *
+ * Não reutiliza `loadCycleMoney`: aquele recorte é de orçamento e exclui
+ * `CREDIT`, além de limitar o avulso até o dia de `asOf`.
+ */
+export async function loadOpenCycleExpenses(
+  now: Date = new Date(),
+): Promise<OpenExpensesSummary> {
+  const timeZone = resolveTimeZone();
+  const { cycleStartDay } = await getSettings();
+  const window = cycleWindow(now, cycleStartDay, timeZone);
+
+  const expenses = await prisma.variableExpense.findMany({
+    where: {
+      paid: false,
+      date: { gte: window.start, lt: window.nextStart },
+    },
+    select: { id: true, amountCents: true, date: true, paid: true },
+  });
+
+  return sumOpenExpenses(
+    expenses.map((item) => ({
+      id: item.id,
+      amountCents: item.amountCents,
+      date: item.date.toISOString(),
+      paid: item.paid,
+    })),
+    {
+      from: window.start.toISOString(),
+      to: window.nextStart.toISOString(),
+    },
+  );
 }
