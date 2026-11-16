@@ -380,6 +380,7 @@ export default async function DashboardPage({
                           {isCurrentCycle && (
                             <QuickExpenseCard
                               categorySuggestions={categorySuggestions}
+                              cards={cardAdjustmentData?.cards ?? []}
                             />
                           )}
                           {allowance !== null && (

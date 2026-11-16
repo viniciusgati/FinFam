@@ -23,6 +23,7 @@ const FIELD_CLASSES =
 
 interface QuickExpenseCardProps {
   categorySuggestions?: string[];
+  cards?: { id: string; name: string }[];
 }
 
 export default function QuickExpenseCard({
