@@ -4,6 +4,7 @@ import {
   buildCycleDailySeries,
   buildDailySeries,
   consumptionAverageLabel,
+  projectMonthEndCents,
 } from "./dashboard-series";
 import { cycleWindowForKey } from "./cycle";
 
@@ -164,6 +165,75 @@ describe("buildDailySeries — calendário", () => {
     expect(series.entriesCents).toBe(310000);
     expect(series.dailyBudgetCents).toBe(10000);
     expect(series.projectedMonthEndCents).toBe(Math.round((4000 / 15) * 31));
+  });
+});
+
+describe("projectMonthEndCents", () => {
+  const zeros = (length: number): number[] => new Array<number>(length).fill(0);
+
+  it("soma a fixa do dia 1 uma única vez (não vira taxa diária)", () => {
+    const obligations = zeros(30);
+    obligations[0] = 120000;
+
+    expect(
+      projectMonthEndCents({
+        obligationDailyCents: obligations,
+        variableDailyCents: zeros(30),
+        elapsedDay: 1,
+        totalDays: 30,
+      }),
+    ).toBe(120000);
+  });
+
+  it("extrapola apenas o variável decorrido, mantendo a fixa futura inteira", () => {
+    const obligations = zeros(31);
+    obligations[5] = 120000; // fixa vence no dia 6
+    const variable = zeros(31);
+    variable[1] = 5000; // variável no dia 2
+
+    expect(
+      projectMonthEndCents({
+        obligationDailyCents: obligations,
+        variableDailyCents: variable,
+        elapsedDay: 2,
+        totalDays: 31,
+      }),
+    ).toBe(197500); // 120000 + round(5000 / 2 * 31)
+  });
+
+  it("em janela fechada é igual ao total de obrigações + variável", () => {
+    const obligations = zeros(31);
+    obligations[0] = 30000;
+    obligations[20] = 50000;
+    const variable = zeros(31);
+    variable[0] = 1000;
+    variable[15] = 4000;
+
+    expect(
+      projectMonthEndCents({
+        obligationDailyCents: obligations,
+        variableDailyCents: variable,
+        elapsedDay: 31,
+        totalDays: 31,
+      }),
+    ).toBe(85000);
+  });
+
+  it("com elapsedDay 0 não extrapola: só obrigações + variável registrados", () => {
+    const obligations = zeros(31);
+    obligations[0] = 120000;
+    const variable = zeros(31);
+    variable[1] = 1000;
+    variable[2] = 2000;
+
+    expect(
+      projectMonthEndCents({
+        obligationDailyCents: obligations,
+        variableDailyCents: variable,
+        elapsedDay: 0,
+        totalDays: 31,
+      }),
+    ).toBe(123000);
   });
 });
 
