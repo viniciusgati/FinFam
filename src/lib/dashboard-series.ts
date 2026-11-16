@@ -95,6 +95,50 @@ function dayIndex(day: number, totalDays: number): number {
   return clamped - 1;
 }
 
+export interface ProjectMonthEndInput {
+  obligationDailyCents: number[];
+  variableDailyCents: number[];
+  /** Dias já decorridos na janela (0 = janela ainda não começou). */
+  elapsedDay: number;
+  /** Dias totais da janela (mês civil ou ciclo). */
+  totalDays: number;
+}
+
+/**
+ * Projeção de fechamento da janela.
+ *
+ * As obrigações (fixas + parcelas de cartão de compras anteriores) são
+ * conhecidas e entram **uma única vez** no total; apenas o consumo variável é
+ * extrapolado pelo ritmo diário. Sem dias decorridos (`elapsedDay = 0`) não há
+ * extrapolação: entram apenas as obrigações e o variável já registrado.
+ */
+export function projectMonthEndCents(input: ProjectMonthEndInput): number {
+  const obligationTotal = input.obligationDailyCents.reduce(
+    (total, value) => total + value,
+    0,
+  );
+  const variableTotal = input.variableDailyCents.reduce(
+    (total, value) => total + value,
+    0,
+  );
+
+  const elapsedDay = Math.min(
+    Math.max(Math.trunc(input.elapsedDay), 0),
+    input.variableDailyCents.length,
+  );
+  if (elapsedDay <= 0) {
+    return obligationTotal + variableTotal;
+  }
+
+  const variableElapsed = input.variableDailyCents
+    .slice(0, elapsedDay)
+    .reduce((total, value) => total + value, 0);
+
+  return Math.round(
+    obligationTotal + (variableElapsed / elapsedDay) * input.totalDays,
+  );
+}
+
 /**
  * Monta a série diária do mês de `referenceDate`.
  *
@@ -162,10 +206,12 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
   const entriesCents = Math.max(input.incomeCents ?? 0, 0);
   const dailyBudgetCents =
     totalDays > 0 ? Math.round(entriesCents / totalDays) : 0;
-  const projectedMonthEndCents =
-    elapsedDay > 0
-      ? Math.round((running / elapsedDay) * totalDays)
-      : 0;
+  const projectedMonthEndCents = projectMonthEndCents({
+    obligationDailyCents: obligations,
+    variableDailyCents: variable,
+    elapsedDay,
+    totalDays,
+  });
 
   return {
     daysInMonth: totalDays,
@@ -272,10 +318,12 @@ export function buildCycleDailySeries(
   const entriesCents = Math.max(input.incomeCents ?? 0, 0);
   const dailyBudgetCents =
     totalDays > 0 ? Math.round(entriesCents / totalDays) : 0;
-  const projectedMonthEndCents =
-    elapsedDay > 0
-      ? Math.round((running / elapsedDay) * totalDays)
-      : 0;
+  const projectedMonthEndCents = projectMonthEndCents({
+    obligationDailyCents: obligations,
+    variableDailyCents: variable,
+    elapsedDay,
+    totalDays,
+  });
 
   return {
     daysInMonth: totalDays,

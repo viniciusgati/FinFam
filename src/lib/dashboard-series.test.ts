@@ -4,6 +4,7 @@ import {
   buildCycleDailySeries,
   buildDailySeries,
   consumptionAverageLabel,
+  projectMonthEndCents,
 } from "./dashboard-series";
 import { cycleWindowForKey } from "./cycle";
 
@@ -167,6 +168,101 @@ describe("buildDailySeries — calendário", () => {
   });
 });
 
+describe("buildDailySeries — projeção de fechamento", () => {
+  it("fixa do dia 1 entra uma única vez (não infla a projeção)", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: new Date(Date.UTC(2026, 9, 1, 12)), // 01/10/2026
+      incomeCents: 100000,
+      fixedExpenses: [{ amountCents: 30000, dueDay: 1 }],
+    });
+
+    expect(series.elapsedDay).toBe(1);
+    expect(series.projectedMonthEndCents).toBe(30000);
+  });
+
+  it("inclui fixa com vencimento futuro ainda não decorrido", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: new Date(Date.UTC(2026, 9, 1, 12)), // 01/10/2026
+      fixedExpenses: [{ amountCents: 30000, dueDay: 20 }],
+    });
+
+    expect(series.elapsedDay).toBe(1);
+    expect(series.cumulativeExpensesCents).toEqual([0]);
+    expect(series.projectedMonthEndCents).toBe(30000);
+  });
+});
+
+describe("projectMonthEndCents", () => {
+  const zeros = (length: number): number[] => new Array<number>(length).fill(0);
+
+  it("soma a fixa do dia 1 uma única vez (não vira taxa diária)", () => {
+    const obligations = zeros(30);
+    obligations[0] = 120000;
+
+    expect(
+      projectMonthEndCents({
+        obligationDailyCents: obligations,
+        variableDailyCents: zeros(30),
+        elapsedDay: 1,
+        totalDays: 30,
+      }),
+    ).toBe(120000);
+  });
+
+  it("extrapola apenas o variável decorrido, mantendo a fixa futura inteira", () => {
+    const obligations = zeros(31);
+    obligations[5] = 120000; // fixa vence no dia 6
+    const variable = zeros(31);
+    variable[1] = 5000; // variável no dia 2
+
+    expect(
+      projectMonthEndCents({
+        obligationDailyCents: obligations,
+        variableDailyCents: variable,
+        elapsedDay: 2,
+        totalDays: 31,
+      }),
+    ).toBe(197500); // 120000 + round(5000 / 2 * 31)
+  });
+
+  it("em janela fechada é igual ao total de obrigações + variável", () => {
+    const obligations = zeros(31);
+    obligations[0] = 30000;
+    obligations[20] = 50000;
+    const variable = zeros(31);
+    variable[0] = 1000;
+    variable[15] = 4000;
+
+    expect(
+      projectMonthEndCents({
+        obligationDailyCents: obligations,
+        variableDailyCents: variable,
+        elapsedDay: 31,
+        totalDays: 31,
+      }),
+    ).toBe(85000);
+  });
+
+  it("com elapsedDay 0 não extrapola: só obrigações + variável registrados", () => {
+    const obligations = zeros(31);
+    obligations[0] = 120000;
+    const variable = zeros(31);
+    variable[1] = 1000;
+    variable[2] = 2000;
+
+    expect(
+      projectMonthEndCents({
+        obligationDailyCents: obligations,
+        variableDailyCents: variable,
+        elapsedDay: 0,
+        totalDays: 31,
+      }),
+    ).toBe(123000);
+  });
+});
+
 describe("buildConsumptionSummary", () => {
   const base = {
     incomeCents: 500000,
@@ -297,7 +393,21 @@ describe("buildCycleDailySeries — eixo do ciclo", () => {
     );
     expect(series.cumulativeExpensesCents).toEqual([0, 5000]);
     expect(series.dailyBudgetCents).toBe(Math.round(500000 / 31));
-    expect(series.projectedMonthEndCents).toBe(Math.round((5000 / 2) * 31));
+    // Obrigação inteira (120000) + apenas o variável decorrido extrapolado.
+    expect(series.projectedMonthEndCents).toBe(197500);
+  });
+
+  it("fixa no primeiro dia do ciclo não infla a projeção", () => {
+    const series = buildCycleDailySeries({
+      cycle,
+      now: at("2026-10-15T15:00:00.000Z"),
+      fixedExpenses: [
+        { amountCents: 30000, dueDate: at("2026-10-15T03:00:00.000Z") },
+      ],
+    });
+
+    expect(series.elapsedDay).toBe(1);
+    expect(series.projectedMonthEndCents).toBe(30000);
   });
 
   it("compra de cartão fora da janela não entra na série", () => {
