@@ -118,6 +118,21 @@ export function setExpensePaid<T extends { id: string; paid: boolean }>(
   return items.map((item) => (item.id === id ? { ...item, paid } : item));
 }
 
+/**
+ * Mantém a linha em processo de marcação como "em aberto" até o PATCH
+ * responder. Sem isso, a atualização otimista de `paid` remove a linha do
+ * filtro `status=open` e esconde o estado "Marcando..." antes do 200.
+ */
+export function withMarkingOpen<T extends { id: string; paid: boolean }>(
+  items: T[],
+  markingId: string | null,
+): T[] {
+  if (markingId === null) return items;
+  return items.map((item) =>
+    item.id === markingId ? { ...item, paid: false } : item,
+  );
+}
+
 /** `Nenhum gasto em aberto` / `1 gasto em aberto` / `N gastos em aberto`. */
 export function openExpenseCountLabel(count: number): string {
   if (count <= 0) return "Nenhum gasto em aberto";

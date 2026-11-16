@@ -17,7 +17,8 @@ Card principal e apoio:
 - `DailyAllowanceCard` — "Pode gastar por dia" e saldo livre do ciclo em R$.
 - `DayRatingBadge` — "Avaliação do dia".
 - `MonthReviewPanel` — avaliação de mês fechado (IA opcional + fallback local).
-- `PurchaseSimulator` — "posso comprar?".
+- `QuickCardAdjustmentCard` — "Ajuste rápido do cartão" (substituiu o
+  `PurchaseSimulator` na zona "Ações"; história #374).
 
 Gráficos (SVG/CSS puro, sem biblioteca; `role="img"` + `aria-label`):
 
