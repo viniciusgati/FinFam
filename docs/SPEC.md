@@ -427,7 +427,8 @@ origem sejam editados, desativados ou apagados depois.
 No **ciclo corrente com dados** o dashboard mostra **um único bloco de
 recomendação** (`buildSpendAdvice`/`SpendAdviceCard`), comparando o **consumo
 variável** do ciclo (avulsos + compras do cartão pela data) com o **orçamento
-variável** `max(renda_ciclo − saídas_fixas, 0)`:
+variável** `max(renda_ciclo − saídas_fixas − meta_economia, 0)`, onde a meta de
+economia é opcional (`savingsGoalCents`; `null`/`0` = sem meta):
 
 ```
 diaria_variavel   = round(orcamento_variavel / dias_da_janela)
