@@ -39,6 +39,10 @@ import {
   buildDashboardDataFromSnapshot,
   isCompleteSnapshot,
 } from "./snapshot-month";
+import {
+  sumOpenExpenses,
+  type OpenExpensesSummary,
+} from "./open-expenses";
 import { defaultSettings, getSettings } from "./settings";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
@@ -818,4 +822,42 @@ export async function loadCycleAllowance(
     now,
     timeZone,
   });
+}
+
+/**
+ * Total em aberto ("a pagar") do **ciclo corrente**: gastos avulsos com
+ * `paid = false` cuja `date` cai em `[início, próximoInício)` da janela do
+ * ciclo. É uma leitura dedicada — **não** filtra `paymentMethod`, porque "a
+ * pagar" é sobre quitação e inclui gastos no crédito (ver open-expenses.ts).
+ *
+ * Não reutiliza `loadCycleMoney`: aquele recorte é de orçamento e exclui
+ * `CREDIT`, além de limitar o avulso até o dia de `asOf`.
+ */
+export async function loadOpenCycleExpenses(
+  now: Date = new Date(),
+): Promise<OpenExpensesSummary> {
+  const timeZone = resolveTimeZone();
+  const { cycleStartDay } = await getSettings();
+  const window = cycleWindow(now, cycleStartDay, timeZone);
+
+  const expenses = await prisma.variableExpense.findMany({
+    where: {
+      paid: false,
+      date: { gte: window.start, lt: window.nextStart },
+    },
+    select: { id: true, amountCents: true, date: true, paid: true },
+  });
+
+  return sumOpenExpenses(
+    expenses.map((item) => ({
+      id: item.id,
+      amountCents: item.amountCents,
+      date: item.date.toISOString(),
+      paid: item.paid,
+    })),
+    {
+      from: window.start.toISOString(),
+      to: window.nextStart.toISOString(),
+    },
+  );
 }

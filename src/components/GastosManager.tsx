@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -10,6 +11,16 @@ import {
 } from "react";
 import type { PaymentMethod } from "@/lib/variable-expenses";
 import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
+import {
+  filterByStatus,
+  MARK_PAID_ERROR_MESSAGE,
+  MARK_PAID_NOT_FOUND_MESSAGE,
+  MARK_PAID_SUCCESS_MESSAGE,
+  openExpensesEmptyText,
+  openMonthSummaryText,
+  setExpensePaid,
+  type OpenExpensesSummary,
+} from "@/lib/open-expenses";
 import MaskedInput from "@/components/MaskedInput";
 import TermHelpLink from "@/components/TermHelpLink";
 import CategoryDatalist, {
@@ -42,6 +53,7 @@ interface GastosManagerProps {
   currentMes: string;
   monthOptions: MonthOption[];
   initialExpenses: ExpenseDTO[];
+  initialStatus?: string | null;
   categorySuggestions: string[];
 }
 
@@ -132,6 +144,7 @@ export default function GastosManager({
   currentMes,
   monthOptions,
   initialExpenses,
+  initialStatus,
   categorySuggestions,
 }: GastosManagerProps) {
   const router = useRouter();
@@ -143,6 +156,7 @@ export default function GastosManager({
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [markingId, setMarkingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (feedback?.type !== "success") return;
@@ -154,6 +168,23 @@ export default function GastosManager({
     () => expenses.reduce((sum, expense) => sum + expense.amountCents, 0),
     [expenses],
   );
+
+  const openSummary = useMemo<OpenExpensesSummary>(() => {
+    const open = filterByStatus(expenses, "open");
+    return {
+      totalCents: open.reduce((sum, expense) => sum + expense.amountCents, 0),
+      count: open.length,
+    };
+  }, [expenses]);
+
+  const filteringOpen = initialStatus === "open";
+  const visibleExpenses = useMemo(
+    () => filterByStatus(expenses, initialStatus),
+    [expenses, initialStatus],
+  );
+  const monthName =
+    monthOptions.find((option) => option.value === mes)?.label ?? mes;
+  const allExpensesHref = `/gastos?mes=${encodeURIComponent(mes)}`;
 
   function handleMonthChange(value: string) {
     if (value === mes) return;
@@ -337,6 +368,41 @@ export default function GastosManager({
     }
   }
 
+  async function handleMarkPaid(expense: ExpenseDTO) {
+    if (markingId !== null || expense.paid) return;
+
+    setFeedback(null);
+    setMarkingId(expense.id);
+    setExpenses((prev) => setExpensePaid(prev, expense.id, true));
+
+    try {
+      const response = await fetch(`/api/variable-expenses/${expense.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paid: true }),
+      });
+
+      if (response.status === 404) {
+        setExpenses((prev) => setExpensePaid(prev, expense.id, false));
+        setFeedback({ type: "error", message: MARK_PAID_NOT_FOUND_MESSAGE });
+        return;
+      }
+
+      if (!response.ok) {
+        setExpenses((prev) => setExpensePaid(prev, expense.id, false));
+        setFeedback({ type: "error", message: MARK_PAID_ERROR_MESSAGE });
+        return;
+      }
+
+      setFeedback({ type: "success", message: MARK_PAID_SUCCESS_MESSAGE });
+    } catch {
+      setExpenses((prev) => setExpensePaid(prev, expense.id, false));
+      setFeedback({ type: "error", message: MARK_PAID_ERROR_MESSAGE });
+    } finally {
+      setMarkingId(null);
+    }
+  }
+
   const editing = editingId !== null;
 
   return (
@@ -347,6 +413,10 @@ export default function GastosManager({
           Lance um gasto em poucos segundos e veja o total do mês.
         </p>
       </header>
+
+      <p className="rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm font-medium text-foreground">
+        {openMonthSummaryText(openSummary)}
+      </p>
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
@@ -374,6 +444,20 @@ export default function GastosManager({
           {isPending ? "Carregando…" : ""}
         </span>
       </div>
+
+      {filteringOpen ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">
+            Mostrando somente gastos em aberto
+          </p>
+          <Link
+            href={allExpensesHref}
+            className="font-medium text-emerald-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+          >
+            Ver todos os gastos
+          </Link>
+        </div>
+      ) : null}
 
       <div aria-live="assertive" role="alert" className="min-h-5">
         {feedback?.type === "error" ? (
@@ -533,15 +617,29 @@ export default function GastosManager({
           </p>
         </div>
 
-        {expenses.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-center text-foreground-muted">
-            {`Nenhum gasto em ${monthOptions.find((option) => option.value === mes)?.label ?? mes}. Lance o primeiro.`}
-          </p>
+        {visibleExpenses.length === 0 ? (
+          filteringOpen ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-foreground-muted">
+              <p>{openExpensesEmptyText(monthName)}</p>
+              <Link
+                href={allExpensesHref}
+                className="font-medium text-emerald-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              >
+                Ver todos os gastos
+              </Link>
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-center text-foreground-muted">
+              {`Nenhum gasto em ${monthName}. Lance o primeiro.`}
+            </p>
+          )
         ) : (
           <ul className="divide-y divide-border">
-            {expenses.map((expense) => {
+            {visibleExpenses.map((expense) => {
               const onCredit = expense.paymentMethod === "CREDIT";
-              const busy = deletingId === expense.id;
+              const deleting = deletingId === expense.id;
+              const marking = markingId === expense.id;
+              const busy = deleting || marking;
               return (
                 <li
                   key={expense.id}
@@ -567,6 +665,17 @@ export default function GastosManager({
                     <span className="tabular-nums font-semibold text-foreground">
                       {formatBRL(expense.amountCents)}
                     </span>
+                    {!expense.paid ? (
+                      <button
+                        type="button"
+                        onClick={() => handleMarkPaid(expense)}
+                        disabled={busy || submitting || markingId !== null}
+                        aria-busy={marking}
+                        className="rounded-lg border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
+                      >
+                        {marking ? "Marcando..." : "Marcar como pago"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => handleEdit(expense)}
@@ -579,10 +688,10 @@ export default function GastosManager({
                       type="button"
                       onClick={() => handleDelete(expense)}
                       disabled={busy || submitting}
-                      aria-busy={busy}
+                      aria-busy={deleting}
                       className="rounded-lg border border-red-800 px-3 py-1.5 text-sm font-medium text-red-300 transition hover:bg-red-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 disabled:opacity-60"
                     >
-                      {busy ? "Excluindo..." : "Excluir"}
+                      {deleting ? "Excluindo..." : "Excluir"}
                     </button>
                   </div>
                 </li>
