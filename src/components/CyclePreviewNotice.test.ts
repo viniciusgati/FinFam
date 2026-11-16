@@ -13,4 +13,11 @@ describe("CyclePreviewNotice", () => {
     );
     expect(html).toContain('role="status"');
   });
+
+  it("leva ao glossário do ciclo", () => {
+    const html = renderToStaticMarkup(createElement(CyclePreviewNotice));
+
+    expect(html).toContain('href="/ajuda#ciclo"');
+    expect(html).toContain('aria-label="Saiba mais sobre Ciclo financeiro"');
+  });
 });

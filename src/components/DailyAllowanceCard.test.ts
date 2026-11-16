@@ -109,4 +109,14 @@ describe("DailyAllowanceCard (renderização)", () => {
 
     expect(html).toContain("Sem dados do ciclo");
   });
+
+  it("leva ao glossário da diária sem mudar o aria-label do card", () => {
+    const html = render(makeAllowance({ window: cycleWindow(NOW, 20) }));
+
+    expect(html).toContain('href="/ajuda#diaria"');
+    expect(html).toContain('aria-label="Saiba mais sobre Diária"');
+    expect(html).toContain(
+      'aria-label="Pode gastar por dia: R$ 0,00. Orçamento do ciclo esgotado. Ciclo financeiro · início dia 20"',
+    );
+  });
 });

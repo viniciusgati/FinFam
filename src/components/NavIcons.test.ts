@@ -19,6 +19,14 @@ describe("NAV_ICONS", () => {
     }
   });
 
+  it("inclui o ícone de ajuda (círculo com interrogação) entre os 8 itens", () => {
+    expect(NAV_ITEMS).toHaveLength(8);
+    const html = renderToStaticMarkup(NAV_ICONS.ajuda);
+    expect(html).toContain('viewBox="0 0 24 24"');
+    expect(html).toContain('stroke="currentColor"');
+    expect(html).toContain("<circle");
+  });
+
   it("ícone do botão Fixar segue o mesmo padrão dos ícones do menu", () => {
     const html = renderToStaticMarkup(createElement(PinIcon));
 

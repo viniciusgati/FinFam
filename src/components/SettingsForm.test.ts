@@ -38,4 +38,11 @@ describe("SettingsForm", () => {
     expect(source).toContain("Não foi possível salvar. Tente novamente.");
     expect(source).toContain("disabled={saving}");
   });
+
+  it("linka a explicação do ciclo ao glossário", () => {
+    const source = readSource("./SettingsForm.tsx");
+
+    expect(source).toContain("TermHelpLink");
+    expect(source).toContain('termId="ciclo"');
+  });
 });

@@ -11,6 +11,7 @@ import {
 import type { PaymentMethod } from "@/lib/variable-expenses";
 import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
 import MaskedInput from "@/components/MaskedInput";
+import TermHelpLink from "@/components/TermHelpLink";
 import CategoryDatalist, {
   CATEGORY_DATALIST_ID,
 } from "@/components/CategoryDatalist";
@@ -518,7 +519,12 @@ export default function GastosManager({
 
       <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-foreground">Gastos do mês</h2>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold text-foreground">
+              Gastos do mês
+            </h2>
+            <TermHelpLink termId="em-aberto" />
+          </div>
           <p className="text-sm text-foreground-muted">
             Total do mês:{" "}
             <strong className="text-base font-bold tabular-nums text-foreground">

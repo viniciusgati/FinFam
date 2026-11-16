@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import TermHelpLink from "./TermHelpLink";
 
 export interface SettingsFormProps {
   initialCycleStartDay: number;
@@ -108,7 +109,9 @@ export default function SettingsForm({
           </span>
         </label>
 
-        <p className="text-xs text-subtle">{CYCLE_START_HELP}</p>
+        <p className="text-xs text-subtle">
+          {CYCLE_START_HELP} <TermHelpLink termId="ciclo" />
+        </p>
 
         <button
           type="submit"

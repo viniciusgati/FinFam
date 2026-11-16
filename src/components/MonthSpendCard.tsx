@@ -6,6 +6,7 @@ import {
   type FinanceLevel,
 } from "@/lib/finance";
 import { buildMonthSpendStats } from "@/lib/month-spend";
+import TermHelpLink from "./TermHelpLink";
 
 export interface MonthSpendCardProps {
   backgroundColor: string;
@@ -82,14 +83,22 @@ export default function MonthSpendCard({
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center lg:gap-10">
           <div className="flex flex-col gap-3 text-center lg:text-left">
-            <p className="text-xs font-medium uppercase tracking-widest opacity-80">
-              Ciclo financeiro
-            </p>
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 lg:justify-start">
+              <p className="text-xs font-medium uppercase tracking-widest opacity-80">
+                Ciclo financeiro
+              </p>
+              <TermHelpLink termId="ciclo" />
+            </div>
 
             <p className="text-5xl font-black tabular-nums sm:text-7xl">
               {percent}
               <span className="align-top text-2xl sm:text-4xl">%</span>
             </p>
+
+            <TermHelpLink
+              termId="percentual-consumido"
+              className="self-center lg:self-start"
+            />
 
             <div
               role="progressbar"
