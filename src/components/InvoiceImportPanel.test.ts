@@ -446,6 +446,61 @@ describe("runInvoiceImport — gate de confirmação", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("sem cartão ou sem arquivo não pergunta e não faz requisição", async () => {
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("window", { confirm });
+    const fetchImpl = vi.fn();
+
+    for (const params of [
+      { cardId: "", file: fileOf(CSV) },
+      { cardId: "card-1", file: null },
+    ]) {
+      const outcome = await runInvoiceImport({
+        mode: "confirm",
+        ...params,
+        preview,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+
+      expect(outcome).toBeNull();
+    }
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("modo preview não pede confirmação e envia dryRun", async () => {
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("window", { confirm });
+    const fetchImpl = makeFetch(async () =>
+      jsonResponse({
+        monthKey: "2026-09",
+        toImport: 9,
+        toRemove: 2,
+        toMatch: 1,
+        ignored: 4,
+        totalCents: 325170,
+      }),
+    );
+
+    const outcome = await runInvoiceImport({
+      mode: "preview",
+      cardId: "card-1",
+      file: fileOf(CSV),
+      preview,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(outcome?.preview?.monthKey).toBe("2026-09");
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      cardId: "card-1",
+      csv: CSV,
+      dryRun: true,
+    });
+  });
+
   it("window.confirm falso: nenhuma requisição e nenhum estado é iniciado", async () => {
     const confirm = vi.fn(() => false);
     vi.stubGlobal("window", { confirm });
