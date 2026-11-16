@@ -32,10 +32,19 @@ describe("filtro rápido de gastos em aberto", () => {
     expect(source).toContain("filterByStatus(expenses, \"open\")");
     expect(source).toContain("openMonthSummaryText(openSummary)");
     expect(source).toContain(
-      "filterByStatus(expenses, initialStatus)",
+      "filterByStatus(withMarkingOpen(expenses, markingId), initialStatus)",
     );
     expect(source).toContain("Mostrando somente gastos em aberto");
     expect(source).toContain("openExpensesEmptyText(monthName)");
     expect(source).toContain("Ver todos os gastos");
+  });
+
+  it("mantém a linha visível como Em aberto/Marcando... durante o PATCH", () => {
+    const source = readSource("./GastosManager.tsx");
+
+    expect(source).toContain("withMarkingOpen(expenses, markingId)");
+    expect(source).toContain("!expense.paid || marking");
+    expect(source).toContain('{marking ? "Marcando..." : "Marcar como pago"}');
+    expect(source).toContain("aria-busy={marking}");
   });
 });

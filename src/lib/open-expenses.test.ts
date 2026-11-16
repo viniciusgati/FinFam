@@ -8,6 +8,7 @@ import {
   openMonthSummaryText,
   setExpensePaid,
   sumOpenExpenses,
+  withMarkingOpen,
   type OpenExpenseItem,
 } from "./open-expenses";
 
@@ -147,6 +148,25 @@ describe("setExpensePaid", () => {
 
     const reverted = setExpensePaid(optimistic, "a", false);
     expect(sumOpenExpenses(reverted, WINDOW)).toEqual(before);
+  });
+});
+
+describe("withMarkingOpen", () => {
+  const items = [
+    item("a", 100, "2026-11-01T12:00:00.000Z", false),
+    item("b", 200, "2026-11-02T12:00:00.000Z", false),
+  ];
+
+  it("mantém a linha em marcação como em aberto até o PATCH responder", () => {
+    const optimistic = setExpensePaid(items, "a", true);
+    const visible = withMarkingOpen(optimistic, "a");
+
+    expect(visible.find((i) => i.id === "a")?.paid).toBe(false);
+    expect(filterByStatus(visible, "open").map((i) => i.id)).toEqual(["a", "b"]);
+  });
+
+  it("não altera a lista quando não há marcação em andamento", () => {
+    expect(withMarkingOpen(items, null)).toBe(items);
   });
 });
 
