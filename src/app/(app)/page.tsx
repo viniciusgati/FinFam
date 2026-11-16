@@ -76,8 +76,16 @@ import type {
   UpcomingBill,
   UpcomingEndingSoon,
 } from "@/lib/upcoming";
+import { resolveTimeZone, zonedDateParts } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
+
+function isoDateInTimeZone(date: Date, timeZone: string): string {
+  const { year, month, day } = zonedDateParts(date, timeZone);
+  const mm = String(month).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `${year}-${mm}-${dd}`;
+}
 
 /**
  * O dashboard usa o **ciclo financeiro** como moldura: `?mes=YYYY-MM` é o mês
@@ -399,6 +407,23 @@ export default async function DashboardPage({
                           {isCurrentCycle && (
                             <QuickExpenseCard
                               categorySuggestions={categorySuggestions}
+                              referenceMonthKey={referenceMonthKey}
+                              windowStart={
+                                referenceWindow
+                                  ? isoDateInTimeZone(
+                                      referenceWindow.start,
+                                      resolveTimeZone(),
+                                    )
+                                  : undefined
+                              }
+                              windowNextStart={
+                                referenceWindow
+                                  ? isoDateInTimeZone(
+                                      referenceWindow.nextStart,
+                                      resolveTimeZone(),
+                                    )
+                                  : undefined
+                              }
                             />
                           )}
                           {allowance !== null && (
