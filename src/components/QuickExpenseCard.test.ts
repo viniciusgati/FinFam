@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -14,9 +16,106 @@ function render(): string {
   );
 }
 
+function readSource(relativePath: string): string {
+  return readFileSync(
+    fileURLToPath(new URL(relativePath, import.meta.url)),
+    "utf8",
+  );
+}
+
+function functionBody(source: string, signature: string): string {
+  const start = source.indexOf(signature);
+  expect(start).toBeGreaterThanOrEqual(0);
+  return source.slice(start, source.indexOf("\n  }\n", start));
+}
+
 describe("QuickExpenseCard (renderização)", () => {
   it("informa que o lançamento rápido já nasce marcado como pago", () => {
     const html = render();
     expect(html).toContain("Este lançamento já nasce marcado como pago.");
+  });
+
+  it("oferece Despesa e Entrada com despesa selecionada por padrão", () => {
+    const html = render();
+
+    expect(html).toContain(">Despesa<");
+    expect(html).toContain(">Entrada<");
+    expect(html).toMatch(
+      /<button[^>]*type="button"[^>]*aria-pressed="true"[^>]*>Despesa<\/button>/,
+    );
+    expect(html).toMatch(
+      /<button[^>]*type="button"[^>]*aria-pressed="false"[^>]*>Entrada<\/button>/,
+    );
+  });
+
+  it("mantém subtítulo de gasto e categoria no modo despesa", () => {
+    const html = render();
+
+    expect(html).toContain(
+      "Registre um gasto em segundos, sem sair do dashboard.",
+    );
+    expect(html).toContain("Categoria");
+    expect(html).toContain("Este lançamento já nasce marcado como pago.");
+  });
+});
+
+describe("QuickExpenseCard (modo entrada e wiring)", () => {
+  const source = readSource("./QuickExpenseCard.tsx");
+
+  it("esconde categoria e nota de pago no modo entrada", () => {
+    expect(source).toContain(
+      "Registre uma entrada em segundos, sem sair do dashboard.",
+    );
+    expect(source).toContain("!isIncome ? (");
+    expect(source).toContain("bg-sky-600");
+    expect(source).toContain("bg-emerald-600");
+  });
+
+  it("roteia o POST para a API do tipo selecionado", () => {
+    expect(source).toContain('"/api/variable-incomes"');
+    expect(source).toContain('"/api/variable-expenses"');
+    expect(source).toContain("buildQuickIncomePayload");
+    expect(source).toContain("buildQuickExpensePayload");
+  });
+
+  it("limpa o status ao alternar o tipo", () => {
+    const body = functionBody(source, "function selectEntryType(");
+
+    expect(body).toContain("setEntryType(type)");
+    expect(body).toContain("setFeedback(null)");
+  });
+
+  it("valida a entrada antes de chamar fetch", () => {
+    const body = source.slice(
+      source.indexOf("async function handleSubmit("),
+      source.indexOf("return ("),
+    );
+
+    expect(body.indexOf("validateQuickIncome")).toBeLessThan(
+      body.indexOf("buildQuickIncomePayload"),
+    );
+    expect(body.indexOf("if (Object.keys(validation).length > 0) return;")).toBeLessThan(
+      body.indexOf("submitPayload("),
+    );
+  });
+
+  it("mantém carregamento, erro de rede e aviso de outro mês", () => {
+    expect(source).toContain("disabled={submitting}");
+    expect(source).toContain("aria-busy={submitting}");
+    expect(source).toContain('{submitting ? "Salvando..." : "Salvar"}');
+    expect(source).toContain("NETWORK_ERROR_MESSAGE");
+    expect(source).toContain("cycleSavedElsewhereMessage");
+    expect(source).toContain('"Entrada criada"');
+    expect(source).toContain('"Gasto criado"');
+  });
+});
+
+describe("dashboard passa a janela do ciclo ao card", () => {
+  it("fornece mês de referência e limites ISO do ciclo exibido", () => {
+    const page = readSource("../app/(app)/page.tsx");
+
+    expect(page).toContain("referenceMonthKey={referenceMonthKey}");
+    expect(page).toContain("windowStart={");
+    expect(page).toContain("windowNextStart={");
   });
 });
