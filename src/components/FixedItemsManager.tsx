@@ -36,6 +36,8 @@ export interface FixedItemsManagerProps {
   initialItems: FixedItem[];
   initialError?: string | null;
   categorySuggestions?: string[];
+  /** Avisos de término por `id` do item (ex.: `Termina em janeiro de 2027`). */
+  endingSoonLabels?: Record<string, string>;
 }
 
 const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -68,6 +70,7 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
     initialItems,
     initialError,
     categorySuggestions = [],
+    endingSoonLabels = {},
   } = props;
 
   const [items, setItems] = useState<FixedItem[]>(initialItems);
@@ -315,6 +318,11 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                     <p className="text-xs text-subtle">
                       Vigência: {item.startMonth ?? "início"} →{" "}
                       {item.endMonth ?? "sem fim"}
+                    </p>
+                  )}
+                  {endingSoonLabels[item.id] && (
+                    <p className="text-xs font-medium text-amber-300">
+                      {endingSoonLabels[item.id]}
                     </p>
                   )}
                 </div>
