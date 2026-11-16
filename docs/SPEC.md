@@ -232,6 +232,44 @@ A cor final é interpolada continuamente (matiz de 120° → 0°) em função do
 coeficiente, produzindo o degradê verde→vermelho. A implementação de referência
 está em `src/lib/finance.ts`.
 
+**Projeção de fechamento da série diária.** A série diária (`buildDailySeries`
+para o mês calendário e `buildCycleDailySeries` para o ciclo — §4.1) separa cada
+dia em duas parcelas: `obligationDailyCents` (saídas fixas da janela e, no mês
+calendário, parcelas de cartão de compras anteriores) e `variableDailyCents`
+(avulsos e cartão pela data da compra). A projeção de fechamento trata as
+obrigações como valores mensais conhecidos — somadas **uma única vez** no total
+da janela, sem virar taxa diária — e extrapola **apenas o gasto variável** no
+ritmo dos dias decorridos:
+
+```
+obrigacoes_total      = soma(obligationDailyCents)
+variavel_decorrido    = soma(variableDailyCents[0..dias_decorridos-1])
+projecao              = round(obrigacoes_total
+                        + (variavel_decorrido / max(dias_decorridos, 1)) * dias_da_janela)
+```
+
+Os centavos são inteiros e o arredondamento acontece só no resultado final.
+Uma fixa que vence no início da janela não infla a projeção, e fixas com
+vencimento futuro (ainda não decorrido) entram integralmente em
+`obrigacoes_total` — não são omitidas. A distribuição da série no eixo do
+gráfico não muda: a obrigação continua no dia do vencimento; a soma inteira vale
+apenas para a projeção.
+
+Casos-limite:
+
+- **`dias_decorridos = 0`**: não há extrapolação. `projecao = obrigacoes_total +
+  variavel_total` (o variável já registrado na janela), refletindo apenas as
+  entradas conhecidas.
+- **Janela fechada (`dias_decorridos = dias_da_janela`)**: a projeção é
+  exatamente o total de gastos da série (`obrigacoes_total + variavel_total`),
+  preservando `sum(série) === consumido`.
+
+Esse valor é o `projectedMonthEndCents` consumido pelo texto de revisão do mês
+("No ritmo atual, a projeção de fechamento é R$ …"), pela IA de revisão e pelo
+snapshot. A projeção do card principal (§§4.1/4.2, `FinanceStatus.projectedCents`
+em `src/lib/finance.ts`) já segue a mesma separação entre obrigações e ritmo
+variável.
+
 ### 4.3 Feedback comparativo
 
 - Guarda-se, por mês, o percentual consumido (pode ser derivado das transações).
