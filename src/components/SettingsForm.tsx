@@ -5,6 +5,7 @@ import {
   savingsGoalInputToCents,
   savingsGoalPreview,
 } from "@/lib/savings-goal";
+import RetryButton from "./RetryButton";
 import TermHelpLink from "./TermHelpLink";
 
 export interface SettingsFormProps {
@@ -12,7 +13,12 @@ export interface SettingsFormProps {
   initialSavingsGoalCents: number | null;
   /** Dias da janela do ciclo corrente, usados na prévia da meta. */
   cycleWindowDays: number;
-  initialError?: string | null;
+  /**
+   * Falha ao carregar a configuração. Quando presente, o formulário fica
+   * somente leitura para não gravar os defaults como se fossem os valores
+   * persistidos. É separado do erro de salvamento.
+   */
+  loadError?: string | null;
 }
 
 const FALLBACK_ERROR = "Não foi possível salvar. Tente novamente.";
@@ -34,8 +40,9 @@ export default function SettingsForm({
   initialCycleStartDay,
   initialSavingsGoalCents,
   cycleWindowDays,
-  initialError,
+  loadError,
 }: SettingsFormProps) {
+  const readOnly = loadError != null;
   const [cycleStartDay, setCycleStartDay] = useState(
     String(initialCycleStartDay),
   );
@@ -44,7 +51,7 @@ export default function SettingsForm({
   );
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(initialError ?? null);
+  const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -67,6 +74,7 @@ export default function SettingsForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (readOnly) return;
 
     const trimmed = savingsGoal.trim();
     const parsedGoal = savingsGoalInputToCents(savingsGoal);
@@ -117,6 +125,15 @@ export default function SettingsForm({
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+      {loadError && (
+        <div className="mb-4 rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-200">
+          <p role="alert" className="mb-3">
+            {loadError}
+          </p>
+          <RetryButton />
+        </div>
+      )}
+
       {success && (
         <div
           role="status"
@@ -146,7 +163,7 @@ export default function SettingsForm({
             max={28}
             value={cycleStartDay}
             onChange={(event) => setCycleStartDay(event.target.value)}
-            disabled={saving}
+            disabled={saving || readOnly}
             className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong sm:max-w-[10rem]"
           />
           <span className="block text-xs text-subtle">
@@ -169,22 +186,24 @@ export default function SettingsForm({
             placeholder="0,00"
             value={savingsGoal}
             onChange={(event) => setSavingsGoal(event.target.value)}
-            disabled={saving}
+            disabled={saving || readOnly}
             className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 disabled:bg-surface-strong sm:max-w-[10rem]"
           />
           <span className="block text-xs text-subtle">
-            {SAVINGS_GOAL_HELP} A janela do ciclo atual tem {cycleWindowDays}{" "}
-            dias.
+            {SAVINGS_GOAL_HELP}
+            {!readOnly && (
+              <> A janela do ciclo atual tem {cycleWindowDays} dias.</>
+            )}
           </span>
         </label>
 
-        {goalPreview && (
+        {!readOnly && goalPreview && (
           <p className="text-sm text-foreground-muted">{goalPreview}</p>
         )}
 
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || readOnly}
           className="rounded-lg bg-emerald-600 px-5 py-2 font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
         >
           {saving ? "Salvando…" : "Salvar"}

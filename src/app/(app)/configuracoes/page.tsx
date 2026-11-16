@@ -38,7 +38,7 @@ export default async function ConfiguracoesPage() {
         initialCycleStartDay={settings.cycleStartDay}
         initialSavingsGoalCents={settings.savingsGoalCents}
         cycleWindowDays={cycleWindowDays}
-        initialError={loadError}
+        loadError={loadError}
       />
     </div>
   );
