@@ -3,7 +3,7 @@ import { NAV_ICONS } from "@/components/NavIcons";
 import { isActivePath, NAV_ITEMS } from "./navigation";
 
 describe("NAV_ITEMS", () => {
-  it("lista exatamente as 7 rotas na ordem esperada", () => {
+  it("lista exatamente as 8 rotas na ordem esperada", () => {
     expect(NAV_ITEMS.map((item) => item.href)).toEqual([
       "/",
       "/entradas",
@@ -12,6 +12,7 @@ describe("NAV_ITEMS", () => {
       "/cartoes",
       "/historico",
       "/configuracoes",
+      "/ajuda",
     ]);
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
       "Dashboard",
@@ -21,6 +22,7 @@ describe("NAV_ITEMS", () => {
       "Cartões",
       "Histórico",
       "Configurações",
+      "Ajuda",
     ]);
   });
 
@@ -34,6 +36,7 @@ describe("NAV_ITEMS", () => {
       "cartoes",
       "historico",
       "configuracoes",
+      "ajuda",
     ]);
     expect(new Set(icons).size).toBe(NAV_ITEMS.length);
   });
@@ -47,8 +50,17 @@ describe("NAV_ITEMS", () => {
     expect(isActivePath("/configuracoes", "/configuracoes")).toBe(true);
   });
 
+  it("inclui a Ajuda como último item", () => {
+    expect(NAV_ITEMS.at(-1)).toEqual({
+      href: "/ajuda",
+      label: "Ajuda",
+      icon: "ajuda",
+    });
+    expect(isActivePath("/ajuda", "/ajuda")).toBe(true);
+  });
+
   it("todos os icones de NAV_ITEMS existem no mapa de SVGs", () => {
-    expect(NAV_ITEMS).toHaveLength(7);
+    expect(NAV_ITEMS).toHaveLength(8);
     for (const item of NAV_ITEMS) {
       expect(Object.keys(NAV_ICONS)).toContain(item.icon);
       expect(NAV_ICONS[item.icon]).toBeDefined();

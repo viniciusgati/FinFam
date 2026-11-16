@@ -83,6 +83,13 @@ export const NAV_ICONS: Record<NavIconName, ReactElement> = {
       <path d="M17 16h6" />
     </Icon>
   ),
+  ajuda: (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5" />
+      <path d="M12 17h.01" />
+    </Icon>
+  ),
 };
 
 /** Ícone do botão "Fixar menu" (pushpin), mesmo padrão dos ícones do menu. */

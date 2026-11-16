@@ -35,7 +35,7 @@ describe("AppNav (markup estático)", () => {
     expect(html).not.toContain('aria-pressed="true"');
   });
 
-  it("menu expandido (padrão): md:w-64, ícone + rótulo visíveis nos 7 itens", () => {
+  it("menu expandido (padrão): md:w-64, ícone + rótulo visíveis nos 8 itens", () => {
     const html = render();
 
     expect(html).toContain("md:w-64");
@@ -47,7 +47,7 @@ describe("AppNav (markup estático)", () => {
       expect(link).toContain(`>${item.label}</span>`);
       expect(link).not.toContain("md:sr-only");
     }
-    expect((html.match(/<svg/g) ?? []).length).toBe(8); // 7 itens + fixar
+    expect((html.match(/<svg/g) ?? []).length).toBe(9); // 8 itens + fixar
   });
 
   it("menu colapsado: md:w-16, rótulos só em md:sr-only com title, ícone visível", () => {
@@ -61,7 +61,7 @@ describe("AppNav (markup estático)", () => {
       expect(link).toContain(`md:sr-only">${item.label}</span>`);
       expect(link).toContain("<svg");
     }
-    expect((html.match(/<svg/g) ?? []).length).toBe(8); // 7 itens + fixar
+    expect((html.match(/<svg/g) ?? []).length).toBe(9); // 8 itens + fixar
   });
 
   it("rota ativa mantém borda esmeralda, fundo e aria-current também colapsada", () => {
