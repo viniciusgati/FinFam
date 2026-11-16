@@ -13,7 +13,6 @@ import {
   dailyAllowanceCents,
   daysUntilCycleStart,
   remainingCycleDays,
-  usualDailySpendCents,
   type CycleWindow,
   type DailyAllowance,
 } from "@/lib/cycle";
@@ -28,6 +27,11 @@ import {
   type FinanceLevel,
 } from "@/lib/finance";
 import { cycleInvoicePaymentLabel } from "@/lib/invoices";
+import { invoiceMonthKeyForCycle } from "@/lib/card-adjustment";
+import {
+  loadCardAdjustmentData,
+  type CardAdjustmentData,
+} from "@/lib/card-adjustment-data";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import {
   buildDashboardLayout,
@@ -56,7 +60,7 @@ import MonthNavigation from "@/components/MonthNavigation";
 import DailyConsumptionChart from "@/components/DailyConsumptionChart";
 import IncomeAllocationCard from "@/components/IncomeAllocationCard";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
-import PurchaseSimulator from "@/components/PurchaseSimulator";
+import QuickCardAdjustmentCard from "@/components/QuickCardAdjustmentCard";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
 import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
@@ -111,6 +115,7 @@ export default async function DashboardPage({
   let allowance: DailyAllowance | null = null;
   let spendAdvice: SpendAdvice | null = null;
   let categoryBreakdown: CategoryBreakdown | null = null;
+  let cardAdjustmentData: CardAdjustmentData | null = null;
   let futureCommitments: FutureCommitmentMonth[] = [];
   let upcomingBills: UpcomingBill[] = [];
   let endingSoon: UpcomingEndingSoon[] = [];
@@ -228,6 +233,16 @@ export default async function DashboardPage({
       familyInsights = buildFamilyInsights(familyInput);
       familyHelpFallback = localFamilyHelp(buildFamilyHelpData(familyInput));
     }
+
+    // O bloco de ajuste só existe no ciclo corrente: carrega os cartões e o
+    // total de competência do mês de fatura exibido (mesmo deslocamento do
+    // seletor de mês). Ajustes em ciclos fechado/futuro ficam fora de escopo.
+    if (isCurrentCycle) {
+      cardAdjustmentData = await loadCardAdjustmentData(
+        invoiceMonthKeyForCycle(referenceMonthKey, cycleStartDay),
+        now,
+      );
+    }
   } catch {
     view = dashboardView({
       dbError: true,
@@ -245,17 +260,6 @@ export default async function DashboardPage({
   const categorySuggestions = isCurrentCycle
     ? await loadCategorySuggestions()
     : [];
-
-  // Ritmo recente de consumo do ciclo — base do simulador "posso comprar?":
-  // avulsos + compras do cartão do ciclo, ÷ dias decorridos.
-  const usualDailySpend =
-    allowance !== null
-      ? usualDailySpendCents({
-          variableSpentCents: allowance.variableSpentCents,
-          cardExpensesCents: 0,
-          elapsedDays: allowance.elapsedDays,
-        })
-      : null;
 
   // Guardado estimado do ciclo = orçamento variável que sobrou até agora
   // (`allowance.freeBudgetCents`, nunca negativo). Sem diária calculada não há
@@ -278,8 +282,8 @@ export default async function DashboardPage({
     { id: "quick-expense", state: isCurrentCycle ? "ok" : "error" },
     { id: "daily-allowance", state: allowance !== null ? "ok" : "error" },
     {
-      id: "purchase-simulator",
-      state: allowance !== null && isCurrentCycle ? "ok" : "error",
+      id: "card-adjustment",
+      state: cardAdjustmentData !== null ? "ok" : "error",
     },
     { id: "income-allocation", state: "ok" },
     { id: "daily-consumption", state: "ok" },
@@ -405,13 +409,12 @@ export default async function DashboardPage({
                         </div>
                       )}
 
-                      {allowance !== null && isCurrentCycle && (
-                        <PurchaseSimulator
+                      {cardAdjustmentData !== null && (
+                        <QuickCardAdjustmentCard
                           key={referenceMonthKey}
-                          freeBudgetCents={allowance.freeBudgetCents}
-                          dailyCents={allowance.dailyCents}
-                          remainingDays={allowance.remainingDays}
-                          usualDailySpendCents={usualDailySpend}
+                          cards={cardAdjustmentData.cards}
+                          totalsByCard={cardAdjustmentData.totalsByCard}
+                          monthKey={cardAdjustmentData.monthKey}
                         />
                       )}
                     </>

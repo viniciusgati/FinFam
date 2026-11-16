@@ -116,6 +116,27 @@ export function monthLabel(monthKey: string): string {
   return `${MONTH_LABELS[month - 1]} de ${year}`;
 }
 
+export interface MonthOption {
+  value: string;
+  label: string;
+}
+
+/** Opções de mês (`YYYY-MM`) para o seletor, ordenadas cronologicamente. */
+export function buildMonthOptions(
+  currentMes: string,
+  selected: string,
+  radius = 12,
+): MonthOption[] {
+  const values = new Set<string>();
+  for (let offset = -radius; offset <= radius; offset += 1) {
+    values.add(shiftMonthKey(currentMes, offset));
+  }
+  values.add(selected);
+  return [...values]
+    .sort()
+    .map((value) => ({ value, label: monthLabel(value) }));
+}
+
 /**
  * Indica se `mes` (YYYY-MM) é posterior a `currentMes` (YYYY-MM).
  * Pré-condição: ambos já passaram por `isValidMonthParam`/`currentMonthParam` —

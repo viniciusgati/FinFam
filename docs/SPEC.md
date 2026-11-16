@@ -113,6 +113,16 @@ gastos avulsos, §4). CRUD em `/entradas` e `/api/variable-incomes`.
   classificação das descrições usa o histórico local primeiro e, para o que
   restar, uma única chamada em lote à DeepSeek (exceção documentada à §7).
   Um modo de pré-visualização (`dryRun`) devolve o plano sem escrever nada.
+- **Ajuste rápido do cartão no dashboard** (história #374): bloco restrito ao
+  **ciclo corrente** que mostra os cartões `active = true` (por nome), o
+  **valor atual** e um campo para o **novo total**. "Valor atual" é o total de
+  **competência** já lançado na fatura do mês de fatura exibido no dashboard:
+  `shiftMonthKey(mês do ciclo, cycleStartDay === 1 ? 0 : 1)` — o mesmo
+  deslocamento do seletor de mês. Salvar reaproveita a rota
+  `POST /api/card-invoices/set-total` (cria o `CardPurchase` de ajuste com a
+  diferença; valor igual é no-op; valor menor é recusado com `400`) e depois
+  chama `router.refresh()`. O bloco **só aumenta** o total; reduzir a fatura
+  continua exigindo editar/excluir lançamentos em `/cartoes`.
 
 > Regra central: o mesmo gasto nunca é contado duas vezes. Gasto pago no
 > cartão substitui o gasto avulso correspondente — por isso um gasto avulso
@@ -184,7 +194,7 @@ Na **pré-visualização de ciclo futuro**, o dashboard também mostra o card
 início da janela (`reference.asOf = window.start`), de modo que todos os dias
 do ciclo contam como restantes. O cartão é consumo (compras/parcelas pela
 data), não obrigação. O conjunto de dados é o mesmo já carregado pela prévia —
-nenhuma consulta adicional é feita; lançamento rápido e simulador de compra
+nenhuma consulta adicional é feita; lançamento rápido e ajuste rápido do cartão
 continuam exclusivos do ciclo corrente.
 
 ### 4.2 Regra de situação (cor)
@@ -332,14 +342,12 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
   **numéricos** são enviados; o veredito e o fallback são locais. Cache em
   `MonthlyReview` (PostgreSQL) pelo mês de início do ciclo. Sem chave →
   `503 { "error": "ai_unavailable" }` + fallback local.
-- **Simulador "posso comprar?"**: veredito local determinístico
-  (`ok`/`cuidado`/`nao`) pelo impacto no **poder de compra por dia** do ciclo:
-  a compra ÷ dias restantes reduz a diária; compara-se a diária resultante com o
-  **ritmo recente** de consumo (avulsos + compras do cartão do ciclo ÷ dias
-  decorridos). Não cabe no orçamento do ciclo ou cai abaixo de metade do ritmo
-  → `nao`; fica abaixo do ritmo → `cuidado`; mantém o ritmo → `ok`. A IA apenas
-  redige a justificativa; a rota sempre responde `200` com fallback local. O
-  card só aparece no ciclo corrente (depende do ciclo).
+- **Ajuste rápido do cartão** (história #374, substitui o simulador de compra na
+  zona "Ações"): o usuário escolhe um cartão ativo, vê o valor atual da fatura
+  do **mês de fatura exibido** e informa o novo total, que é lançado como ajuste
+  pela mesma semântica de `/cartoes` — só aumento (§3.4). O bloco só aparece no
+  ciclo corrente. O simulador de compra (`PurchaseSimulator`, lib e rota de IA)
+  não é mais renderizado no dashboard, mas seu código permanece.
 - O seletor de mês do dashboard navega para `/?mes=YYYY-MM` (prop `basePath`),
   onde `YYYY-MM` é o **mês de início do ciclo** — exibido, no dashboard, pelo
   **mês da fatura** (`início + 1`: `?mes=2026-10` aparece como "novembro de

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { NAV_ITEMS } from "@/lib/navigation";
-import { NAV_ICONS, PinIcon } from "./NavIcons";
+import { CollapseIcon, NAV_ICONS } from "./NavIcons";
 
 describe("NAV_ICONS", () => {
   it("cobre exatamente os ícones usados pela navegação", () => {
@@ -27,8 +27,8 @@ describe("NAV_ICONS", () => {
     expect(html).toContain("<circle");
   });
 
-  it("ícone do botão Fixar segue o mesmo padrão dos ícones do menu", () => {
-    const html = renderToStaticMarkup(createElement(PinIcon));
+  it("ícone do controle de recolher/expandir segue o mesmo padrão dos ícones do menu", () => {
+    const html = renderToStaticMarkup(createElement(CollapseIcon));
 
     expect(html).toContain('viewBox="0 0 24 24"');
     expect(html).toContain('stroke="currentColor"');

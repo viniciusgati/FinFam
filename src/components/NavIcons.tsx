@@ -92,13 +92,13 @@ export const NAV_ICONS: Record<NavIconName, ReactElement> = {
   ),
 };
 
-/** Ícone do botão "Fixar menu" (pushpin), mesmo padrão dos ícones do menu. */
-export function PinIcon(props: Omit<SVGProps<SVGSVGElement>, "width" | "height" | "viewBox">) {
+/** Ícone do controle de recolher/expandir o menu (chevron), mesmo padrão. */
+export function CollapseIcon(
+  props: Omit<SVGProps<SVGSVGElement>, "width" | "height" | "viewBox">,
+) {
   return (
     <Icon {...props}>
-      <path d="M7 4h10" />
-      <path d="M9 4v6l-1.5 4h9L15 10V4" />
-      <path d="M12 14v7" />
+      <path d="m15 6-6 6 6 6" />
     </Icon>
   );
 }

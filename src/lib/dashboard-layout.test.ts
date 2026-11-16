@@ -301,7 +301,7 @@ const ALL_DASHBOARD_BLOCKS: DashboardBlock[] = [
   { id: "spend-advice", state: "ok" },
   { id: "quick-expense", state: "ok" },
   { id: "daily-allowance", state: "ok" },
-  { id: "purchase-simulator", state: "ok" },
+  { id: "card-adjustment", state: "ok" },
   { id: "income-allocation", state: "ok" },
   { id: "daily-consumption", state: "ok" },
   { id: "category-breakdown", state: "ok" },
@@ -338,7 +338,7 @@ describe("zonas de decisão do dashboard", () => {
     expect(zones[1].blocks).toEqual([
       { id: "quick-expense", state: "ok" },
       { id: "daily-allowance", state: "ok" },
-      { id: "purchase-simulator", state: "ok" },
+      { id: "card-adjustment", state: "ok" },
     ]);
     expect(zones[2].blocks).toEqual([
       { id: "income-allocation", state: "ok" },
@@ -433,7 +433,7 @@ describe("zonas de decisão do dashboard", () => {
       { id: "daily-consumption", state: "ok" },
       { id: "spend-advice", state: "ok" },
       { id: "daily-allowance", state: "ok" },
-      { id: "purchase-simulator", state: "ok" },
+      { id: "card-adjustment", state: "ok" },
       { id: "income-allocation", state: "ok" },
       { id: "future-commitments", state: "ok" },
       { id: "open-expenses", state: "ok" },
@@ -458,7 +458,7 @@ describe("zonas de decisão do dashboard", () => {
     expect(zones[1].blocks.map((block) => block.id)).toEqual([
       "quick-expense",
       "daily-allowance",
-      "purchase-simulator",
+      "card-adjustment",
     ]);
     expect(zones[2].blocks.map((block) => block.id)).toEqual([
       "income-allocation",
@@ -572,7 +572,7 @@ describe("página do dashboard em zonas de decisão", () => {
     "SpendAdviceCard",
     "QuickExpenseCard",
     "DailyAllowanceCard",
-    "PurchaseSimulator",
+    "QuickCardAdjustmentCard",
     "IncomeAllocationCard",
     "DailyConsumptionChart",
     "CategoryBreakdownCard",
@@ -642,5 +642,26 @@ describe("página do dashboard em zonas de decisão", () => {
       expect(index).toBeGreaterThan(previous);
       previous = index;
     }
+  });
+});
+
+describe("ajuste rápido do cartão no dashboard", () => {
+  it("substitui o simulador Posso comprar? pelo bloco de ajuste", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    expect(page).toContain("<QuickCardAdjustmentCard");
+    expect(page).not.toContain("PurchaseSimulator");
+    expect(page).not.toContain("Posso comprar?");
+    expect(page).toContain('id: "card-adjustment"');
+    expect(page).not.toContain('id: "purchase-simulator"');
+  });
+
+  it("carrega os cartões só no ciclo corrente", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    expect(page).toMatch(
+      /if \(isCurrentCycle\) \{\s*cardAdjustmentData = await loadCardAdjustmentData\(/,
+    );
+    expect(page).toContain("invoiceMonthKeyForCycle(referenceMonthKey, cycleStartDay)");
   });
 });
