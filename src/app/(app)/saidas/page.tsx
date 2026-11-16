@@ -4,6 +4,12 @@ import FixedItemsManager, {
 } from "@/components/FixedItemsManager";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
 import { prisma } from "@/lib/db";
+import { monthKey } from "@/lib/finance";
+import { resolveReferenceDate } from "@/lib/invoices";
+import {
+  buildEndingSoonWarnings,
+  endingSoonLabel,
+} from "@/lib/upcoming";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +26,25 @@ export default async function SaidasPage() {
   } catch {
     loadError = "Não foi possível carregar as saídas. Tente novamente.";
   }
+
+  const now = new Date();
+  const referenceMonthKey = monthKey(resolveReferenceDate(undefined, now));
+  const endingSoonLabels = Object.fromEntries(
+    buildEndingSoonWarnings(
+      items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        amountCents: item.amountCents,
+        dueDay: item.dueDay ?? 1,
+        active: item.active,
+        startMonth: item.startMonth,
+        endMonth: item.endMonth,
+      })),
+      referenceMonthKey,
+    ).flatMap((warning) =>
+      warning.id ? [[warning.id, endingSoonLabel(warning)] as const] : [],
+    ),
+  );
 
   const categorySuggestions = await loadCategorySuggestions();
 
@@ -40,6 +65,7 @@ export default async function SaidasPage() {
       initialItems={items}
       initialError={loadError}
       categorySuggestions={categorySuggestions}
+      endingSoonLabels={endingSoonLabels}
     />
   );
 }

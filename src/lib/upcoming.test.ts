@@ -3,6 +3,7 @@ import { cycleWindowForKey } from "./cycle";
 import type { CardPurchaseRecord } from "./invoices";
 import {
   billLineLabel,
+  buildEndingSoonWarnings,
   buildUpcomingCommitments,
   endingSoonLabel,
   UPCOMING_WARNING_MONTHS,
@@ -17,8 +18,8 @@ function normalize(value: string): string {
 }
 
 const expense = (
-  overrides: Partial<UpcomingFixedExpense> = {},
-): UpcomingFixedExpense => ({
+  overrides: Partial<UpcomingFixedExpense> & { id?: string } = {},
+): UpcomingFixedExpense & { id?: string } => ({
   name: "Aluguel",
   amountCents: 150000,
   dueDay: 10,
@@ -142,6 +143,36 @@ describe("buildUpcomingCommitments", () => {
       { name: "Internet", endMonth: "2026-12" },
       { name: "Celular", endMonth: "2027-01" },
     ]);
+  });
+});
+
+describe("buildEndingSoonWarnings", () => {
+  it("preserva o id do item e ordena por endMonth e nome", () => {
+    const warnings = buildEndingSoonWarnings(
+      [
+        expense({ id: "i1", name: "Internet", endMonth: "2026-12" }),
+        expense({ id: "i2", name: "Academia", endMonth: "2026-12" }),
+        expense({ id: "i3", name: "Celular", endMonth: "2027-01" }),
+        expense({ id: "i4", name: "Sem fim", endMonth: null }),
+        expense({ id: "i5", name: "Fora da janela", endMonth: "2027-02" }),
+      ],
+      "2026-11",
+    );
+
+    expect(warnings).toEqual([
+      { id: "i2", name: "Academia", endMonth: "2026-12" },
+      { id: "i1", name: "Internet", endMonth: "2026-12" },
+      { id: "i3", name: "Celular", endMonth: "2027-01" },
+    ]);
+  });
+
+  it("não sinaliza item inativo", () => {
+    expect(
+      buildEndingSoonWarnings(
+        [expense({ name: "Inativa", endMonth: "2026-12", active: false })],
+        "2026-11",
+      ),
+    ).toEqual([]);
   });
 });
 

@@ -59,6 +59,11 @@ export interface UpcomingEndingSoon {
   endMonth: string;
 }
 
+/** Aviso de término com o `id` do item fixo, quando disponível. */
+export interface UpcomingEndingSoonWithId extends UpcomingEndingSoon {
+  id?: string;
+}
+
 export interface UpcomingCommitments {
   bills: UpcomingBill[];
   endingSoon: UpcomingEndingSoon[];
@@ -83,6 +88,37 @@ function isoDate(date: Date, timeZone: string): string {
 
 function compareNames(a: string, b: string): number {
   return a.localeCompare(b, "pt-BR");
+}
+
+/**
+ * Itens fixos ativos cujo `endMonth` (inclusivo) cai nos próximos
+ * `UPCOMING_WARNING_MONTHS` meses do mês-base. Preserva o `id` do item quando
+ * ele vier no input (usado por telas que sinalizam a linha do item) e ordena
+ * por `endMonth` e depois por nome.
+ */
+export function buildEndingSoonWarnings(
+  fixedExpenses: Array<UpcomingFixedExpense & { id?: string }>,
+  referenceMonthKey: string,
+): UpcomingEndingSoonWithId[] {
+  const warningMonths = new Set(
+    Array.from({ length: UPCOMING_WARNING_MONTHS }, (_, index) =>
+      shiftMonthKey(referenceMonthKey, index + 1),
+    ),
+  );
+
+  return fixedExpenses
+    .flatMap((expense) => {
+      const endMonth = expense.endMonth;
+      if (!endMonth || !warningMonths.has(endMonth)) return [];
+      if (!isActiveInMonth(expense, endMonth)) return [];
+      const warning: UpcomingEndingSoonWithId = { name: expense.name, endMonth };
+      if (expense.id !== undefined) warning.id = expense.id;
+      return [warning];
+    })
+    .sort(
+      (a, b) =>
+        a.endMonth.localeCompare(b.endMonth) || compareNames(a.name, b.name),
+    );
 }
 
 /**
@@ -160,22 +196,10 @@ export function buildUpcomingCommitments(
     (a, b) => a.dueDate.localeCompare(b.dueDate) || compareNames(a.name, b.name),
   );
 
-  const warningMonths = new Set(
-    Array.from({ length: UPCOMING_WARNING_MONTHS }, (_, index) =>
-      shiftMonthKey(referenceMonthKey, index + 1),
-    ),
-  );
-
-  const endingSoon = input.fixedExpenses
-    .flatMap((expense) => {
-      const endMonth = expense.endMonth;
-      if (!endMonth || !warningMonths.has(endMonth)) return [];
-      if (!isActiveInMonth(expense, endMonth)) return [];
-      return [{ name: expense.name, endMonth }];
-    })
-    .sort(
-      (a, b) => a.endMonth.localeCompare(b.endMonth) || compareNames(a.name, b.name),
-    );
+  const endingSoon = buildEndingSoonWarnings(
+    input.fixedExpenses,
+    referenceMonthKey,
+  ).map(({ name, endMonth }) => ({ name, endMonth }));
 
   return { bills, endingSoon };
 }
