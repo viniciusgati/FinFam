@@ -4,15 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { isActivePath, NAV_ITEMS } from "@/lib/navigation";
-import {
-  NAV_AUTO_COLLAPSE_MS,
-  navExpanded,
-  readNavPinned,
-  touchNav,
-  writeNavPinned,
-  type NavCollapseState,
-} from "@/lib/nav-collapse";
-import { NAV_ICONS, PinIcon } from "@/components/NavIcons";
+import { readNavExpanded, writeNavExpanded } from "@/lib/nav-collapse";
+import { CollapseIcon, NAV_ICONS } from "@/components/NavIcons";
 
 interface AppNavProps {
   footer?: ReactNode;
@@ -20,59 +13,30 @@ interface AppNavProps {
   railFooter?: ReactNode;
   /** Estado inicial do trilho (≥768px). Padrão de produção: expandido. */
   initialExpanded?: boolean;
-  /** Estado inicial do "fixar". Padrão de produção: não fixado. */
-  initialPinned?: boolean;
 }
 
 export default function AppNav({
   footer,
   railFooter,
   initialExpanded = true,
-  initialPinned = false,
 }: AppNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(initialExpanded);
-  const [navState, setNavState] = useState<NavCollapseState>({
-    pinned: initialPinned,
-    lastInteractionAt: 0,
-  });
-  const { pinned } = navState;
 
   // Preferência persistida é aplicada só após a hidratação: o primeiro paint
   // é idêntico entre servidor e cliente (sem mismatch).
   useEffect(() => {
-    const stored = readNavPinned();
-    setNavState((state) => ({ ...state, pinned: stored }));
-    if (stored) setExpanded(true);
+    setExpanded(readNavExpanded());
   }, []);
 
-  // Auto-colapso: 5000ms sem interação e sem fixar ⇒ encolhe. O efeito
-  // visual é exclusivo de ≥768px (todas as classes de estado são `md:`).
-  useEffect(() => {
-    if (navState.pinned) return;
-    const timer = setTimeout(() => {
-      if (navExpanded(navState, Date.now())) return;
-      setExpanded(false);
-    }, NAV_AUTO_COLLAPSE_MS);
-    return () => clearTimeout(timer);
-  }, [navState]);
-
-  function touch() {
-    setNavState((state) => touchNav(state, Date.now()));
-    setExpanded(true);
+  function toggleExpanded() {
+    const next = !expanded;
+    setExpanded(next);
+    writeNavExpanded(next);
   }
 
-  function togglePinned() {
-    setNavState((state) =>
-      touchNav({ ...state, pinned: !state.pinned }, Date.now()),
-    );
-    writeNavPinned(!pinned);
-    // Fixar com o menu colapsado reexpande imediatamente.
-    setExpanded(true);
-  }
-
-  const pinLabel = pinned ? "Desfixar menu" : "Fixar menu";
+  const collapseLabel = expanded ? "Recolher menu" : "Expandir menu";
 
   return (
     <>
@@ -93,9 +57,6 @@ export default function AppNav({
       <nav
         id="app-menu"
         aria-label="Navegação principal"
-        onMouseEnter={touch}
-        onFocus={touch}
-        onPointerDown={touch}
         className={`${open ? "flex" : "hidden"} flex-col border-b border-border bg-surface p-2 transition-[width] duration-200 md:sticky md:top-0 md:flex md:h-screen md:shrink-0 md:overflow-y-auto md:border-b-0 md:border-r ${
           expanded ? "md:w-64 md:p-4" : "md:w-16"
         }`}
@@ -110,19 +71,20 @@ export default function AppNav({
 
         <button
           type="button"
-          onClick={togglePinned}
-          aria-pressed={pinned}
-          title={pinLabel}
-          className={`mb-2 hidden items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 md:flex ${
+          onClick={toggleExpanded}
+          aria-expanded={expanded}
+          aria-controls="app-menu"
+          title={collapseLabel}
+          className={`mb-2 hidden items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 md:flex ${
             expanded ? "" : "md:justify-center md:px-0"
-          } ${
-            pinned
-              ? "border-emerald-500 bg-emerald-600 text-white"
-              : "border-border-strong text-foreground-muted hover:bg-surface-raised"
           }`}
         >
-          <PinIcon className="h-5 w-5 shrink-0" />
-          <span className="sr-only">{pinLabel}</span>
+          <CollapseIcon
+            className={`h-5 w-5 shrink-0 transition-transform ${
+              expanded ? "" : "rotate-180"
+            }`}
+          />
+          <span className="sr-only">{collapseLabel}</span>
         </button>
 
         <ul className="flex-1 space-y-1">
