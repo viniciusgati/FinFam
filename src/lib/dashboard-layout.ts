@@ -20,7 +20,7 @@ export type DashboardBlockId =
   | "spend-advice"
   | "quick-expense"
   | "daily-allowance"
-  | "purchase-simulator"
+  | "card-adjustment"
   | "income-allocation"
   | "daily-consumption"
   | "category-breakdown"
@@ -68,7 +68,7 @@ const ZONE_DEFINITIONS: readonly ZoneDefinition[] = [
     id: "actions",
     title: "Ações",
     priority: 2,
-    blocks: ["quick-expense", "daily-allowance", "purchase-simulator"],
+    blocks: ["quick-expense", "daily-allowance", "card-adjustment"],
   },
   {
     id: "commitments",

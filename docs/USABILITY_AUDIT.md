@@ -973,8 +973,10 @@ Leituras-chave desta rodada: `src/components/GastosManager.tsx:69,250-259,292,52
 - **Dashboard (`/`)** — no ciclo corrente empilha **10 blocos** nesta ordem:
   card principal de `%` (`MonthSpendCard`), alerta único (`SpendAdviceCard`),
   lançamento rápido + diária (grade de 2), alocação da renda + consumo diário,
-  categorias, ajuda à família, avaliação do mês e simulador "Posso comprar?"
-  (`src/app/(app)/page.tsx:285-361`). Erro e vazio têm tela própria com CTA;
+  categorias, ajuda à família, avaliação do mês e ajuste rápido do cartão
+  (`QuickCardAdjustmentCard`, que substituiu o simulador de compra na tela —
+  história #374) (`src/app/(app)/page.tsx:285-361`). Erro e vazio têm tela
+  própria com CTA;
   ciclo futuro tem `CyclePreviewNotice`; navegação de mês mostra o intervalo do
   ciclo (`page.tsx:240-281`, `MonthSelector.tsx:78-96`).
 - **Lançamento rápido (dashboard)** — quatro campos (data, descrição, valor,
