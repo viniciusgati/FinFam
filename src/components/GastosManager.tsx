@@ -13,8 +13,12 @@ import type { PaymentMethod } from "@/lib/variable-expenses";
 import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
 import {
   filterByStatus,
+  MARK_PAID_ERROR_MESSAGE,
+  MARK_PAID_NOT_FOUND_MESSAGE,
+  MARK_PAID_SUCCESS_MESSAGE,
   openExpensesEmptyText,
   openMonthSummaryText,
+  setExpensePaid,
   type OpenExpensesSummary,
 } from "@/lib/open-expenses";
 import MaskedInput from "@/components/MaskedInput";
@@ -151,6 +155,7 @@ export default function GastosManager({
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [markingId, setMarkingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (feedback?.type !== "success") return;
@@ -359,6 +364,41 @@ export default function GastosManager({
       });
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleMarkPaid(expense: ExpenseDTO) {
+    if (markingId !== null || expense.paid) return;
+
+    setFeedback(null);
+    setMarkingId(expense.id);
+    setExpenses((prev) => setExpensePaid(prev, expense.id, true));
+
+    try {
+      const response = await fetch(`/api/variable-expenses/${expense.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paid: true }),
+      });
+
+      if (response.status === 404) {
+        setExpenses((prev) => setExpensePaid(prev, expense.id, false));
+        setFeedback({ type: "error", message: MARK_PAID_NOT_FOUND_MESSAGE });
+        return;
+      }
+
+      if (!response.ok) {
+        setExpenses((prev) => setExpensePaid(prev, expense.id, false));
+        setFeedback({ type: "error", message: MARK_PAID_ERROR_MESSAGE });
+        return;
+      }
+
+      setFeedback({ type: "success", message: MARK_PAID_SUCCESS_MESSAGE });
+    } catch {
+      setExpenses((prev) => setExpensePaid(prev, expense.id, false));
+      setFeedback({ type: "error", message: MARK_PAID_ERROR_MESSAGE });
+    } finally {
+      setMarkingId(null);
     }
   }
 
@@ -591,7 +631,9 @@ export default function GastosManager({
           <ul className="divide-y divide-border">
             {visibleExpenses.map((expense) => {
               const onCredit = expense.paymentMethod === "CREDIT";
-              const busy = deletingId === expense.id;
+              const deleting = deletingId === expense.id;
+              const marking = markingId === expense.id;
+              const busy = deleting || marking;
               return (
                 <li
                   key={expense.id}
@@ -617,6 +659,17 @@ export default function GastosManager({
                     <span className="tabular-nums font-semibold text-foreground">
                       {formatBRL(expense.amountCents)}
                     </span>
+                    {!expense.paid ? (
+                      <button
+                        type="button"
+                        onClick={() => handleMarkPaid(expense)}
+                        disabled={busy || submitting || markingId !== null}
+                        aria-busy={marking}
+                        className="rounded-lg border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
+                      >
+                        {marking ? "Marcando..." : "Marcar como pago"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => handleEdit(expense)}
@@ -629,10 +682,10 @@ export default function GastosManager({
                       type="button"
                       onClick={() => handleDelete(expense)}
                       disabled={busy || submitting}
-                      aria-busy={busy}
+                      aria-busy={deleting}
                       className="rounded-lg border border-red-800 px-3 py-1.5 text-sm font-medium text-red-300 transition hover:bg-red-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 disabled:opacity-60"
                     >
-                      {busy ? "Excluindo..." : "Excluir"}
+                      {deleting ? "Excluindo..." : "Excluir"}
                     </button>
                   </div>
                 </li>
