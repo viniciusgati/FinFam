@@ -14,7 +14,7 @@
  *   dias restantes mostra o restante integral.
  */
 
-import { formatCents } from "./money";
+import { formatCents, parseAmountToCents } from "./money";
 
 export interface SavingsGoalProgressInput {
   /** Meta do ciclo em centavos; `null`/`0` desligam o acompanhamento. */
@@ -45,6 +45,22 @@ export function savingsGoalPreview(goalCents: number, windowDays: number): strin
   const days = windowDays > 0 ? windowDays : 1;
   const dailyCents = Math.round(goalCents / days);
   return `Sua meta equivale a ${formatCents(dailyCents)} por dia.`;
+}
+
+/**
+ * Converte o texto digitado no campo de meta (reais) para centavos inteiros.
+ *
+ * - Vazio (ou só espaços) ⇒ `null` ("sem meta").
+ * - `0`, `0,00` etc. ⇒ `0` (também "sem meta", aceito pela API).
+ * - Valor positivo em pt-BR (`1.234,56`) ⇒ centavos arredondados.
+ * - Texto inválido/negativo ⇒ `null`; o formulário distingue "vazio" de
+ *   "inválido" olhando o texto original.
+ */
+export function savingsGoalInputToCents(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^0+([.,]0{1,2})?$/.test(trimmed)) return 0;
+  return parseAmountToCents(trimmed);
 }
 
 /**

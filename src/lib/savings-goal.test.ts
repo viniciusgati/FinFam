@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { savingsGoalPreview, savingsGoalProgress } from "./savings-goal";
+import {
+  savingsGoalInputToCents,
+  savingsGoalPreview,
+  savingsGoalProgress,
+} from "./savings-goal";
 
 const normalize = (value: string) => value.replace(/\u00a0/g, " ");
 
@@ -26,6 +30,31 @@ describe("savingsGoalPreview", () => {
     expect(normalize(savingsGoalPreview(30000, 0))).toBe(
       "Sua meta equivale a R$ 300,00 por dia.",
     );
+  });
+});
+
+describe("savingsGoalInputToCents", () => {
+  it("trata campo vazio como sem meta", () => {
+    expect(savingsGoalInputToCents("")).toBeNull();
+    expect(savingsGoalInputToCents("   ")).toBeNull();
+  });
+
+  it("converte valor em reais para centavos inteiros", () => {
+    expect(savingsGoalInputToCents("1000")).toBe(100000);
+    expect(savingsGoalInputToCents("1.000,00")).toBe(100000);
+    expect(savingsGoalInputToCents("1.234,56")).toBe(123456);
+    expect(savingsGoalInputToCents("10,50")).toBe(1050);
+  });
+
+  it("aceita zero como ausência de meta", () => {
+    expect(savingsGoalInputToCents("0")).toBe(0);
+    expect(savingsGoalInputToCents("0,00")).toBe(0);
+  });
+
+  it("rejeita valores inválidos ou negativos", () => {
+    expect(savingsGoalInputToCents("abc")).toBeNull();
+    expect(savingsGoalInputToCents("-10")).toBeNull();
+    expect(savingsGoalInputToCents("10,999")).toBeNull();
   });
 });
 
