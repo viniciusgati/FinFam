@@ -9,6 +9,7 @@ import {
 import GastosManager, { type ExpenseDTO } from "@/components/GastosManager";
 import FutureMonthNotice from "@/components/FutureMonthNotice";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
+import { parseExpenseFilters } from "@/lib/expense-filters";
 import { isFutureMonth } from "@/lib/finance";
 import RetryButton from "@/components/RetryButton";
 import { todayISO } from "@/lib/quick-expense";
@@ -46,6 +47,9 @@ export default async function GastosPage({
 }: {
   searchParams: Promise<{
     mes?: string | string[];
+    q?: string | string[];
+    categoria?: string | string[];
+    pagamento?: string | string[];
     status?: string | string[];
   }>;
 }) {
@@ -53,10 +57,7 @@ export default async function GastosPage({
   const rawMes = Array.isArray(params.mes) ? params.mes[0] : params.mes;
   const mes = isValidMonthParam(rawMes) ? rawMes : currentMonthParam();
   const currentMes = currentMonthParam();
-  const rawStatus = Array.isArray(params.status)
-    ? params.status[0]
-    : params.status;
-  const status = rawStatus === "open" ? "open" : undefined;
+  const initialFilters = parseExpenseFilters(params);
 
   if (isFutureMonth(mes, currentMes)) {
     return <FutureMonthNotice />;
@@ -119,7 +120,7 @@ export default async function GastosPage({
       currentMes={currentMes}
       monthOptions={monthOptions}
       initialExpenses={expenses}
-      initialStatus={status}
+      initialFilters={initialFilters}
       categorySuggestions={categorySuggestions}
     />
   );
