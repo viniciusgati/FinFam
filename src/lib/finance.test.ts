@@ -57,6 +57,20 @@ describe("computeFinanceStatus", () => {
     expect(status.projectedPercent).toBeCloseTo(122);
   });
 
+  it("não infla a fixa do dia 1 na projeção do card principal (regressão)", () => {
+    const status = computeFinanceStatus({
+      monthlyIncomeCents: 100000,
+      fixedExpensesCents: 30000,
+      variableExpensesCents: 0,
+      cardExpensesCents: 0,
+      referenceDate: new Date(Date.UTC(2026, 9, 1, 12)), // 01/10/2026
+    });
+
+    expect(status.daysElapsed).toBe(1);
+    expect(status.projectedCents).toBe(30000);
+    expect(status.projectedPercent).toBe(30);
+  });
+
   it("não fica vermelho no início do mês só por causa dos fixos", () => {
     const status = computeFinanceStatus({
       monthlyIncomeCents: 100000,
