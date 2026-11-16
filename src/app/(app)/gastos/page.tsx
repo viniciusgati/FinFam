@@ -3,43 +3,18 @@ import { prisma } from "@/lib/db";
 import {
   currentMonthParam,
   isValidMonthParam,
-  monthLabel,
   monthRange,
 } from "@/lib/variable-expenses";
 import GastosManager, { type ExpenseDTO } from "@/components/GastosManager";
 import FutureMonthNotice from "@/components/FutureMonthNotice";
 import { loadCategorySuggestions } from "@/lib/category-suggestions";
-import { isFutureMonth } from "@/lib/finance";
+import { buildMonthOptions, isFutureMonth } from "@/lib/finance";
 import RetryButton from "@/components/RetryButton";
 import { todayISO } from "@/lib/quick-expense";
 
 export const metadata: Metadata = { title: "Gastos — FinFam" };
 
 export const dynamic = "force-dynamic";
-
-interface MonthOption {
-  value: string;
-  label: string;
-}
-
-function addMonths(mes: string, offset: number): string {
-  const [year, month] = mes.split("-").map(Number);
-  const total = year * 12 + (month - 1) + offset;
-  const nextYear = Math.floor(total / 12);
-  const nextMonth = (total % 12) + 1;
-  return `${nextYear}-${String(nextMonth).padStart(2, "0")}`;
-}
-
-function buildMonthOptions(currentMes: string, selected: string): MonthOption[] {
-  const values = new Set<string>();
-  for (let offset = -12; offset <= 12; offset += 1) {
-    values.add(addMonths(currentMes, offset));
-  }
-  values.add(selected);
-  return [...values]
-    .sort()
-    .map((value) => ({ value, label: monthLabel(value) }));
-}
 
 export default async function GastosPage({
   searchParams,
