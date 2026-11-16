@@ -1,3 +1,5 @@
+import TermHelpLink from "./TermHelpLink";
+
 /**
  * Aviso do dashboard quando o ciclo selecionado ainda não começou. O card
  * principal e os demais mostram uma **previsão** com o que já está lançado
@@ -14,6 +16,9 @@ export default function CyclePreviewNotice() {
       <p className="mt-1 text-sm text-foreground-muted">
         Este ciclo ainda não começou. Os números abaixo são uma previsão com o
         que já está lançado: rendas, contas fixas e faturas.
+      </p>
+      <p className="mt-2">
+        <TermHelpLink termId="ciclo" />
       </p>
     </section>
   );

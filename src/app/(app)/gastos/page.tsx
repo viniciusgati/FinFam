@@ -44,12 +44,19 @@ function buildMonthOptions(currentMes: string, selected: string): MonthOption[] 
 export default async function GastosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string | string[] }>;
+  searchParams: Promise<{
+    mes?: string | string[];
+    status?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
   const rawMes = Array.isArray(params.mes) ? params.mes[0] : params.mes;
   const mes = isValidMonthParam(rawMes) ? rawMes : currentMonthParam();
   const currentMes = currentMonthParam();
+  const rawStatus = Array.isArray(params.status)
+    ? params.status[0]
+    : params.status;
+  const status = rawStatus === "open" ? "open" : undefined;
 
   if (isFutureMonth(mes, currentMes)) {
     return <FutureMonthNotice />;
@@ -112,6 +119,7 @@ export default async function GastosPage({
       currentMes={currentMes}
       monthOptions={monthOptions}
       initialExpenses={expenses}
+      initialStatus={status}
       categorySuggestions={categorySuggestions}
     />
   );

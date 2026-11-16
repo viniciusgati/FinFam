@@ -1,8 +1,10 @@
 import Link from "next/link";
 import {
   loadCycleDashboardData,
+  loadOpenCycleExpenses,
   resolveCycleReference,
 } from "@/lib/dashboard";
+import type { OpenExpensesSummary } from "@/lib/open-expenses";
 import {
   cycleEndCountdownLabel,
   cycleRangeLabel,
@@ -60,6 +62,7 @@ import DailyAllowanceCard from "@/components/DailyAllowanceCard";
 import SpendAdviceCard from "@/components/SpendAdviceCard";
 import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
 import FutureCommitmentsCard from "@/components/FutureCommitmentsCard";
+import OpenExpensesCard from "@/components/OpenExpensesCard";
 import FamilyHelpCard from "@/components/FamilyHelpCard";
 import type { CategoryBreakdown } from "@/lib/category-breakdown";
 import type { FutureCommitmentMonth } from "@/lib/future-commitments";
@@ -110,6 +113,7 @@ export default async function DashboardPage({
   let upcomingBills: UpcomingBill[] = [];
   let endingSoon: UpcomingEndingSoon[] = [];
   let hasFutureCommitments = false;
+  let openExpenses: OpenExpensesSummary = { totalCents: 0, count: 0 };
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
   let cycleStartDay = defaultSettings().cycleStartDay;
@@ -131,6 +135,7 @@ export default async function DashboardPage({
     isNextDisabled = reference.isFuture;
 
     const data = await loadCycleDashboardData(reference, now);
+    openExpenses = await loadOpenCycleExpenses(now);
     const status = computeFinanceStatus(data);
     backgroundColor = status.color;
     // O contador do card principal segue o estado do ciclo: no corrente, dias
@@ -268,6 +273,7 @@ export default async function DashboardPage({
       id: "future-commitments",
       state: hasFutureCommitments ? "ok" : "empty",
     },
+    { id: "open-expenses", state: "ok" },
     { id: "family-help", state: "ok" },
     { id: "month-review", state: "ok" },
   ];
@@ -423,6 +429,8 @@ export default async function DashboardPage({
                         bills={upcomingBills}
                         endingSoon={endingSoon}
                       />
+
+                      <OpenExpensesCard summary={openExpenses} />
                     </>
                   );
                 case "explore":

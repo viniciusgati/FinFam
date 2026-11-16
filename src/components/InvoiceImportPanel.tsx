@@ -4,6 +4,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { IMPORT_FAILURE_MESSAGE } from "@/lib/invoice-import";
 import { formatCents } from "@/lib/money";
+import TermHelpLink from "./TermHelpLink";
 
 /** Modo da requisição em voo: pré-visualização (dryRun) ou confirmação. */
 export type InvoiceImportMode = "preview" | "confirm";
@@ -198,6 +199,9 @@ export function InvoiceImportBody({
       <p className="mt-1 text-sm text-foreground-muted">
         Substitui os lançamentos à vista da competência detectada pelo CSV.
         Compras parceladas permanecem intactas.
+      </p>
+      <p className="mt-1">
+        <TermHelpLink termId="competencia" />
       </p>
 
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">

@@ -1,4 +1,5 @@
 import type { DailyAllowanceCard as DailyAllowanceCardView } from "@/lib/cycle";
+import TermHelpLink from "./TermHelpLink";
 
 export interface DailyAllowanceCardProps {
   card: DailyAllowanceCardView;
@@ -30,6 +31,7 @@ export default function DailyAllowanceCard({ card }: DailyAllowanceCardProps) {
           {card.freeBudgetLabel}
         </p>
       )}
+      <TermHelpLink termId="diaria" className="mt-1" />
     </section>
   );
 }

@@ -89,6 +89,9 @@ export default function QuickExpenseCard({
       <p className="mt-1 text-sm text-foreground-muted">
         Registre um gasto em segundos, sem sair do dashboard.
       </p>
+      <p className="mt-1 text-xs text-foreground-muted">
+        Este lançamento já nasce marcado como pago.
+      </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
         <div className="grid gap-4 lg:grid-cols-4">

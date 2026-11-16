@@ -25,6 +25,7 @@ export type DashboardBlockId =
   | "daily-consumption"
   | "category-breakdown"
   | "future-commitments"
+  | "open-expenses"
   | "family-help"
   | "month-review";
 
@@ -78,6 +79,7 @@ const ZONE_DEFINITIONS: readonly ZoneDefinition[] = [
       "daily-consumption",
       "category-breakdown",
       "future-commitments",
+      "open-expenses",
     ],
   },
   {

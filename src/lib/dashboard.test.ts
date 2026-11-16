@@ -22,6 +22,7 @@ import {
   loadCycleAllowance,
   loadCycleDashboardData,
   loadDashboardData,
+  loadOpenCycleExpenses,
   resolveCycleReference,
 } from "./dashboard";
 import { computeFinanceStatus, dashboardView } from "./finance";
@@ -1266,5 +1267,56 @@ describe("cardPurchase — limite inferior de lookback (task #359)", () => {
     expect(args.where.purchaseDate.lt.toISOString()).toBe(
       "2026-11-15T03:00:00.000Z",
     );
+  });
+});
+
+describe("loadOpenCycleExpenses — a pagar do ciclo (task #364)", () => {
+  const now = new Date("2026-10-16T15:00:00.000Z");
+
+  beforeEach(() => {
+    prismaMock.appSettings.findUnique.mockResolvedValue({
+      id: "singleton",
+      cycleStartDay: 15,
+    });
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+  });
+
+  it("consulta só os não pagos na janela [início, próximoInício) do ciclo, sem filtro de método", async () => {
+    await loadOpenCycleExpenses(now);
+
+    const [args] = prismaMock.variableExpense.findMany.mock.calls[0];
+    expect(args.where.paid).toBe(false);
+    expect(args.where.date.gte.toISOString()).toBe("2026-10-15T03:00:00.000Z");
+    expect(args.where.date.lt.toISOString()).toBe("2026-11-15T03:00:00.000Z");
+    expect(args.where).not.toHaveProperty("paymentMethod");
+  });
+
+  it("soma e conta todos os retornos, inclusive no crédito", async () => {
+    prismaMock.variableExpense.findMany.mockResolvedValue([
+      {
+        id: "pix",
+        amountCents: 5000,
+        date: new Date("2026-10-20T12:00:00.000Z"),
+        paid: false,
+        paymentMethod: "PIX",
+      },
+      {
+        id: "credito",
+        amountCents: 3000,
+        date: new Date("2026-11-10T12:00:00.000Z"),
+        paid: false,
+        paymentMethod: "CREDIT",
+      },
+    ]);
+
+    const summary = await loadOpenCycleExpenses(now);
+
+    expect(summary).toEqual({ totalCents: 8000, count: 2 });
+  });
+
+  it("lista vazia devolve zero", async () => {
+    const summary = await loadOpenCycleExpenses(now);
+
+    expect(summary).toEqual({ totalCents: 0, count: 0 });
   });
 });
