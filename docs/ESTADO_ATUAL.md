@@ -57,7 +57,7 @@ APIs (`src/app/api`): autenticação (`login`, `logout`), CRUDs de
 
 - `src/lib/*` — lógica de domínio **pura** (testável sem banco/rede), incluindo
   `finance`, `cycle`, `dashboard`, `dashboard-series`, `dashboard-charts`,
-  `invoices`, `category-breakdown`, `family-insights`, `spend-advice`,
+  `invoices`, `card-adjustment`, `category-breakdown`, `family-insights`, `spend-advice`,
   `history`, `snapshots`, `settings`, `time`, `money`, `validation`, `ai/*`.
 - `src/components/*` — apresentação e formulários client; vários têm teste com
   `renderToStaticMarkup`.
@@ -110,8 +110,16 @@ interface:
   acima da média, variação diária) + resumo opcional por IA com fallback local.
 - **Avaliação de mês fechado:** resumo local e, opcionalmente, IA com cache em
   `MonthlyReview`.
-- **Simulador "Posso comprar?"** (somente ciclo corrente e compra à vista):
-  veredito local `ok`/`cuidado`/`nao` + justificativa opcional por IA.
+- **Ajuste rápido do cartão** (somente ciclo corrente): bloco na zona "Ações" do
+  dashboard com `select` dos cartões ativos (por nome), "Valor atual" (total de
+  competência já lançado na fatura do **mês de fatura exibido**) e campo "Novo
+  total (R$)" em pt-BR (`parseAmountToCents`). Reaproveita
+  `POST /api/card-invoices/set-total` — a mesma semântica do ajuste de
+  `/cartoes`: lança a diferença como compra de ajuste, valor igual é no-op e
+  valor menor é recusado — e `router.refresh()` atualiza os números da tela. Só
+  aumenta o total; reduzir continua exigindo editar/excluir lançamentos em
+  `/cartoes`. O simulador de compra saiu da tela do dashboard, mas seu
+  componente, lib e rota de IA permanecem no código.
 - **Entradas:** CRUD de entradas fixas (vigência, ativar/desativar) e de entradas
   avulsas por data/mês; aviso de mês futuro.
 - **Saídas fixas:** CRUD com categoria, dia de vencimento, vigência e
@@ -164,8 +172,9 @@ subutilizados ou fricções verificáveis):
    calculados, porém não há aviso de conta perto do fim/renovação.
 5. **Configurações minimalistas:** só existe `cycleStartDay`; não há meta de
    economia, orçamento por categoria, limites de alerta ou preferências.
-6. **Simulador limitado:** a compra simulada é à vista e isolada; não há
-   simulação parcelada nem comparação com uma meta de economia.
+6. **Simulador limitado (fora da tela):** o código do simulador de compra
+   continua no projeto, mas não é mais renderizado no dashboard; a compra
+   simulada é à vista e isolada, sem simulação parcelada nem meta de economia.
 7. **Sem entrada rápida de receita:** o dashboard só permite lançar despesa.
 8. **Sem busca/filtro em `/gastos`:** apenas navegação por mês; não há filtro por
    categoria, forma de pagamento ou status.
