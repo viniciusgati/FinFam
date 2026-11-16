@@ -535,3 +535,24 @@ describe("página do dashboard em zonas de decisão", () => {
     }
   });
 });
+
+describe("ajuste rápido do cartão no dashboard", () => {
+  it("substitui o simulador Posso comprar? pelo bloco de ajuste", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    expect(page).toContain("<QuickCardAdjustmentCard");
+    expect(page).not.toContain("PurchaseSimulator");
+    expect(page).not.toContain("Posso comprar?");
+    expect(page).toContain('id: "card-adjustment"');
+    expect(page).not.toContain('id: "purchase-simulator"');
+  });
+
+  it("carrega os cartões só no ciclo corrente", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    expect(page).toMatch(
+      /if \(isCurrentCycle\) \{\s*cardAdjustmentData = await loadCardAdjustmentData\(/,
+    );
+    expect(page).toContain("invoiceMonthKeyForCycle(referenceMonthKey, cycleStartDay)");
+  });
+});
