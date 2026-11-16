@@ -3,11 +3,15 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
+  buildQuickCardPurchasePayload,
   buildQuickExpensePayload,
   mapQuickExpenseFieldErrors,
+  quickExpenseApiError,
+  quickExpenseSuccessMessage,
   todayISO,
   validateQuickExpense,
   type QuickExpenseErrors,
+  type QuickExpenseTarget,
 } from "@/lib/quick-expense";
 import CategoryDatalist, {
   CATEGORY_DATALIST_ID,
@@ -16,7 +20,12 @@ import CategoryDatalist, {
 const NETWORK_ERROR_MESSAGE =
   "Não foi possível salvar. Verifique sua conexão e tente novamente.";
 
-type Feedback = "success" | "error" | null;
+type Feedback =
+  | { kind: "success"; message: string }
+  | { kind: "error"; message: string }
+  | null;
+
+const PIX_OPTION = "pix";
 
 const FIELD_CLASSES =
   "rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2";
@@ -28,12 +37,14 @@ interface QuickExpenseCardProps {
 
 export default function QuickExpenseCard({
   categorySuggestions = [],
+  cards = [],
 }: QuickExpenseCardProps) {
   const router = useRouter();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(() => todayISO());
   const [category, setCategory] = useState("");
+  const [payment, setPayment] = useState(PIX_OPTION);
   const [errors, setErrors] = useState<QuickExpenseErrors>({});
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -42,17 +53,26 @@ export default function QuickExpenseCard({
     event.preventDefault();
     setFeedback(null);
 
-    const input = { description, amount, date, category };
+    const target: QuickExpenseTarget =
+      payment === PIX_OPTION ? "pix" : "card";
+    const cardId = payment === PIX_OPTION ? undefined : payment;
+    const input = { description, amount, date, category, target, cardId };
     const validation = validateQuickExpense(input);
     setErrors(validation);
     if (Object.keys(validation).length > 0) return;
 
-    const payload = buildQuickExpensePayload(input);
+    const payload =
+      target === "card"
+        ? buildQuickCardPurchasePayload(input)
+        : buildQuickExpensePayload(input);
     if (!payload) return;
+
+    const endpoint =
+      target === "card" ? "/api/card-purchases" : "/api/variable-expenses";
 
     setSubmitting(true);
     try {
-      const response = await fetch("/api/variable-expenses", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -60,12 +80,19 @@ export default function QuickExpenseCard({
 
       if (response.status === 400) {
         const body = await response.json().catch(() => null);
+        if (target === "card") {
+          const message = quickExpenseApiError(body);
+          if (message) {
+            setFeedback({ kind: "error", message });
+            return;
+          }
+        }
         setErrors(mapQuickExpenseFieldErrors(body?.fieldErrors));
         return;
       }
 
       if (response.status !== 201) {
-        setFeedback("error");
+        setFeedback({ kind: "error", message: NETWORK_ERROR_MESSAGE });
         return;
       }
 
@@ -73,10 +100,14 @@ export default function QuickExpenseCard({
       setAmount("");
       setDate(todayISO());
       setCategory("");
-      setFeedback("success");
+      setPayment(PIX_OPTION);
+      setFeedback({
+        kind: "success",
+        message: quickExpenseSuccessMessage(target),
+      });
       router.refresh();
     } catch {
-      setFeedback("error");
+      setFeedback({ kind: "error", message: NETWORK_ERROR_MESSAGE });
     } finally {
       setSubmitting(false);
     }
@@ -90,12 +121,37 @@ export default function QuickExpenseCard({
       <p className="mt-1 text-sm text-foreground-muted">
         Registre um gasto em segundos, sem sair do dashboard.
       </p>
-      <p className="mt-1 text-xs text-foreground-muted">
-        Este lançamento já nasce marcado como pago.
-      </p>
+      {payment === PIX_OPTION ? (
+        <p className="mt-1 text-xs text-foreground-muted">
+          Este lançamento já nasce marcado como pago.
+        </p>
+      ) : null}
 
       <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
         <div className="grid gap-4 lg:grid-cols-4">
+          <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
+            Forma de pagamento
+            <select
+              value={payment}
+              onChange={(event) => setPayment(event.target.value)}
+              aria-invalid={Boolean(errors.cardId)}
+              aria-describedby={errors.cardId ? "erro-quick-card" : undefined}
+              className={FIELD_CLASSES}
+            >
+              <option value={PIX_OPTION}>Dinheiro/PIX (já pago)</option>
+              {cards.map((card) => (
+                <option key={card.id} value={card.id}>
+                  {card.name}
+                </option>
+              ))}
+            </select>
+            {errors.cardId ? (
+              <span id="erro-quick-card" className="text-sm text-red-400">
+                {errors.cardId}
+              </span>
+            ) : null}
+          </label>
+
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
             <input
@@ -184,11 +240,10 @@ export default function QuickExpenseCard({
             role="status"
             aria-live="polite"
             className={`min-h-5 text-sm ${
-              feedback === "error" ? "text-red-400" : "text-emerald-300"
+              feedback?.kind === "error" ? "text-red-400" : "text-emerald-300"
             }`}
           >
-            {feedback === "success" ? "Gasto criado" : null}
-            {feedback === "error" ? NETWORK_ERROR_MESSAGE : null}
+            {feedback?.message ?? null}
           </div>
         </div>
       </form>
