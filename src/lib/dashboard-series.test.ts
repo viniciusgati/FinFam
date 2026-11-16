@@ -168,6 +168,32 @@ describe("buildDailySeries — calendário", () => {
   });
 });
 
+describe("buildDailySeries — projeção de fechamento", () => {
+  it("fixa do dia 1 entra uma única vez (não infla a projeção)", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: new Date(Date.UTC(2026, 9, 1, 12)), // 01/10/2026
+      incomeCents: 100000,
+      fixedExpenses: [{ amountCents: 30000, dueDay: 1 }],
+    });
+
+    expect(series.elapsedDay).toBe(1);
+    expect(series.projectedMonthEndCents).toBe(30000);
+  });
+
+  it("inclui fixa com vencimento futuro ainda não decorrido", () => {
+    const series = buildDailySeries({
+      referenceDate: OCTOBER,
+      now: new Date(Date.UTC(2026, 9, 1, 12)), // 01/10/2026
+      fixedExpenses: [{ amountCents: 30000, dueDay: 20 }],
+    });
+
+    expect(series.elapsedDay).toBe(1);
+    expect(series.cumulativeExpensesCents).toEqual([0]);
+    expect(series.projectedMonthEndCents).toBe(30000);
+  });
+});
+
 describe("projectMonthEndCents", () => {
   const zeros = (length: number): number[] => new Array<number>(length).fill(0);
 
@@ -367,7 +393,21 @@ describe("buildCycleDailySeries — eixo do ciclo", () => {
     );
     expect(series.cumulativeExpensesCents).toEqual([0, 5000]);
     expect(series.dailyBudgetCents).toBe(Math.round(500000 / 31));
-    expect(series.projectedMonthEndCents).toBe(Math.round((5000 / 2) * 31));
+    // Obrigação inteira (120000) + apenas o variável decorrido extrapolado.
+    expect(series.projectedMonthEndCents).toBe(197500);
+  });
+
+  it("fixa no primeiro dia do ciclo não infla a projeção", () => {
+    const series = buildCycleDailySeries({
+      cycle,
+      now: at("2026-10-15T15:00:00.000Z"),
+      fixedExpenses: [
+        { amountCents: 30000, dueDate: at("2026-10-15T03:00:00.000Z") },
+      ],
+    });
+
+    expect(series.elapsedDay).toBe(1);
+    expect(series.projectedMonthEndCents).toBe(30000);
   });
 
   it("compra de cartão fora da janela não entra na série", () => {

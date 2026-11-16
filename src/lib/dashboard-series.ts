@@ -206,10 +206,12 @@ export function buildDailySeries(input: BuildDailySeriesInput): DailySeries {
   const entriesCents = Math.max(input.incomeCents ?? 0, 0);
   const dailyBudgetCents =
     totalDays > 0 ? Math.round(entriesCents / totalDays) : 0;
-  const projectedMonthEndCents =
-    elapsedDay > 0
-      ? Math.round((running / elapsedDay) * totalDays)
-      : 0;
+  const projectedMonthEndCents = projectMonthEndCents({
+    obligationDailyCents: obligations,
+    variableDailyCents: variable,
+    elapsedDay,
+    totalDays,
+  });
 
   return {
     daysInMonth: totalDays,
@@ -316,10 +318,12 @@ export function buildCycleDailySeries(
   const entriesCents = Math.max(input.incomeCents ?? 0, 0);
   const dailyBudgetCents =
     totalDays > 0 ? Math.round(entriesCents / totalDays) : 0;
-  const projectedMonthEndCents =
-    elapsedDay > 0
-      ? Math.round((running / elapsedDay) * totalDays)
-      : 0;
+  const projectedMonthEndCents = projectMonthEndCents({
+    obligationDailyCents: obligations,
+    variableDailyCents: variable,
+    elapsedDay,
+    totalDays,
+  });
 
   return {
     daysInMonth: totalDays,
