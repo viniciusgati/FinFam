@@ -2,8 +2,8 @@
  * Motor puro do alerta de ritmo do dashboard (história #295).
  *
  * Compara o **consumo variável** do ciclo (avulsos + compras do cartão pela
- * data) com o **orçamento variável** (`renda − contas fixas`, nunca negativo) e
- * devolve um único texto acionável. Nenhuma função aqui acessa banco, rede ou
+ * data) com o **orçamento variável** (`renda − contas fixas − meta de
+ * economia`, nunca negativo) e devolve um único texto acionável. Nenhuma função aqui acessa banco, rede ou
  * `Date.now()` — as datas vêm do chamador (ver spend-advice.test.ts).
  *
  * Fórmulas (SPEC §4.7):
@@ -42,6 +42,8 @@ export interface SpendAdviceInput {
   incomeCents: number;
   /** Contas fixas que vencem na janela, em centavos. */
   fixedExpensesCents: number;
+  /** Meta de economia do ciclo em centavos; `0`/omitido = sem meta. */
+  savingsGoalCents?: number;
   /** Consumo variável do ciclo (avulsos + compras do cartão pela data). */
   variableConsumedCents: number;
   /** Só o ciclo corrente tem "hoje" e um ritmo a comparar. */
@@ -72,8 +74,9 @@ export function buildSpendAdvice(
   if (!input.isCurrentCycle) return null;
   if (input.elapsedDays <= 0 || input.windowDays <= 0) return null;
 
+  const savingsGoalCents = Math.max(input.savingsGoalCents ?? 0, 0);
   const variableBudgetCents = Math.max(
-    input.incomeCents - input.fixedExpensesCents,
+    input.incomeCents - input.fixedExpensesCents - savingsGoalCents,
     0,
   );
   const dailyCents = Math.round(variableBudgetCents / input.windowDays);
