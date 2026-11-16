@@ -192,8 +192,14 @@ export const invoiceImportSchema = z.object(
 );
 
 const CYCLE_START_DAY_MESSAGE = "Dia do ciclo deve ser entre 1 e 28";
+const SAVINGS_GOAL_MIN_MESSAGE = "Meta de economia deve ser maior ou igual a zero";
+const SAVINGS_GOAL_INT_MESSAGE =
+  "Meta de economia deve ser um número inteiro em centavos";
 
-/** Configuração global: dia do mês em que começa o ciclo financeiro (1–28). */
+/**
+ * Configuração global: dia do mês em que começa o ciclo financeiro (1–28) e
+ * meta de economia por ciclo em centavos (`null`/omitido = sem meta).
+ */
 export const settingsUpdateSchema = z.object({
   cycleStartDay: z
     .number({
@@ -203,6 +209,15 @@ export const settingsUpdateSchema = z.object({
     .int(CYCLE_START_DAY_MESSAGE)
     .min(1, CYCLE_START_DAY_MESSAGE)
     .max(28, CYCLE_START_DAY_MESSAGE),
+  savingsGoalCents: z
+    .number({
+      invalid_type_error: SAVINGS_GOAL_INT_MESSAGE,
+      required_error: SAVINGS_GOAL_INT_MESSAGE,
+    })
+    .int(SAVINGS_GOAL_INT_MESSAGE)
+    .min(0, SAVINGS_GOAL_MIN_MESSAGE)
+    .nullable()
+    .optional(),
 });
 
 export type IncomeCreateInput = z.infer<typeof incomeCreateSchema>;
