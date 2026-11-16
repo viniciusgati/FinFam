@@ -301,7 +301,7 @@ const ALL_DASHBOARD_BLOCKS: DashboardBlock[] = [
   { id: "spend-advice", state: "ok" },
   { id: "quick-expense", state: "ok" },
   { id: "daily-allowance", state: "ok" },
-  { id: "purchase-simulator", state: "ok" },
+  { id: "card-adjustment", state: "ok" },
   { id: "income-allocation", state: "ok" },
   { id: "daily-consumption", state: "ok" },
   { id: "category-breakdown", state: "ok" },
@@ -335,7 +335,7 @@ describe("zonas de decisão do dashboard", () => {
     expect(zones[1].blocks).toEqual([
       { id: "quick-expense", state: "ok" },
       { id: "daily-allowance", state: "ok" },
-      { id: "purchase-simulator", state: "ok" },
+      { id: "card-adjustment", state: "ok" },
     ]);
     expect(zones[2].blocks).toEqual([
       { id: "income-allocation", state: "ok" },
@@ -423,7 +423,7 @@ describe("zonas de decisão do dashboard", () => {
       { id: "daily-consumption", state: "ok" },
       { id: "spend-advice", state: "ok" },
       { id: "daily-allowance", state: "ok" },
-      { id: "purchase-simulator", state: "ok" },
+      { id: "card-adjustment", state: "ok" },
       { id: "income-allocation", state: "ok" },
       { id: "family-help", state: "ok" },
       { id: "month-spend", state: "error" },
@@ -446,7 +446,7 @@ describe("zonas de decisão do dashboard", () => {
     expect(zones[1].blocks.map((block) => block.id)).toEqual([
       "quick-expense",
       "daily-allowance",
-      "purchase-simulator",
+      "card-adjustment",
     ]);
     expect(zones[2].blocks.map((block) => block.id)).toEqual([
       "income-allocation",
@@ -489,7 +489,7 @@ describe("página do dashboard em zonas de decisão", () => {
     "SpendAdviceCard",
     "QuickExpenseCard",
     "DailyAllowanceCard",
-    "PurchaseSimulator",
+    "QuickCardAdjustmentCard",
     "IncomeAllocationCard",
     "DailyConsumptionChart",
     "CategoryBreakdownCard",
