@@ -407,6 +407,7 @@ export default async function DashboardPage({
                           {isCurrentCycle && (
                             <QuickExpenseCard
                               categorySuggestions={categorySuggestions}
+                              cards={cardAdjustmentData?.cards ?? []}
                               referenceMonthKey={referenceMonthKey}
                               windowStart={
                                 referenceWindow
