@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   actionableBudgetMessage,
+  buildMonthOptions,
   classifyLevel,
   compareWithHistory,
   computeFinanceStatus,
@@ -831,6 +832,43 @@ describe("monthLabel", () => {
   it("formata os meses de virada de ano", () => {
     expect(monthLabel("2025-12")).toBe("dezembro de 2025");
     expect(monthLabel("2027-01")).toBe("janeiro de 2027");
+  });
+});
+
+describe("buildMonthOptions", () => {
+  it("cobre ±12 meses a partir do mês corrente, ordenado", () => {
+    const options = buildMonthOptions("2026-06", "2026-06");
+    expect(options[0].value).toBe("2025-06");
+    expect(options[options.length - 1].value).toBe("2027-06");
+    expect(options).toHaveLength(25);
+    const values = options.map((option) => option.value);
+    expect(values).toEqual([...values].sort());
+  });
+
+  it("cruza a virada de ano preservando zero à esquerda", () => {
+    const values = buildMonthOptions("2026-01", "2026-01").map(
+      (option) => option.value,
+    );
+    expect(values[0]).toBe("2025-01");
+    expect(values).toContain("2025-12");
+    expect(values).toContain("2026-09");
+    expect(values).toContain("2027-01");
+  });
+
+  it("inclui o mês selecionado mesmo fora do intervalo, sem duplicar", () => {
+    const options = buildMonthOptions("2026-06", "2024-01");
+    const values = options.map((option) => option.value);
+    expect(values).toContain("2024-01");
+    expect(values.filter((value) => value === "2024-01")).toHaveLength(1);
+    expect(values.filter((value) => value === "2026-06")).toHaveLength(1);
+  });
+
+  it("rotula cada opção via monthLabel", () => {
+    const options = buildMonthOptions("2026-01", "2026-01");
+    const december = options.find((option) => option.value === "2025-12");
+    expect(december?.label).toBe("dezembro de 2025");
+    const january = options.find((option) => option.value === "2026-01");
+    expect(january?.label).toBe("janeiro de 2026");
   });
 });
 
