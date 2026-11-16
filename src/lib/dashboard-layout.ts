@@ -24,6 +24,7 @@ export type DashboardBlockId =
   | "income-allocation"
   | "daily-consumption"
   | "category-breakdown"
+  | "future-commitments"
   | "family-help"
   | "month-review";
 
@@ -72,7 +73,12 @@ const ZONE_DEFINITIONS: readonly ZoneDefinition[] = [
     id: "commitments",
     title: "Compromissos",
     priority: 3,
-    blocks: ["income-allocation", "daily-consumption", "category-breakdown"],
+    blocks: [
+      "income-allocation",
+      "daily-consumption",
+      "category-breakdown",
+      "future-commitments",
+    ],
   },
   {
     id: "explore",

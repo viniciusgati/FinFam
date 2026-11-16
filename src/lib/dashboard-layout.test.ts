@@ -305,12 +305,13 @@ const ALL_DASHBOARD_BLOCKS: DashboardBlock[] = [
   { id: "income-allocation", state: "ok" },
   { id: "daily-consumption", state: "ok" },
   { id: "category-breakdown", state: "ok" },
+  { id: "future-commitments", state: "ok" },
   { id: "family-help", state: "ok" },
   { id: "month-review", state: "ok" },
 ];
 
 describe("zonas de decisão do dashboard", () => {
-  it("organiza os 10 blocos ok nas quatro zonas na ordem canônica", () => {
+  it("organiza os 11 blocos ok nas quatro zonas na ordem canônica", () => {
     const { zones, failed } = buildDashboardLayout(ALL_DASHBOARD_BLOCKS);
 
     expect(failed).toEqual([]);
@@ -341,6 +342,7 @@ describe("zonas de decisão do dashboard", () => {
       { id: "income-allocation", state: "ok" },
       { id: "daily-consumption", state: "ok" },
       { id: "category-breakdown", state: "ok" },
+      { id: "future-commitments", state: "ok" },
     ]);
     expect(zones[3].blocks).toEqual([
       { id: "family-help", state: "ok" },
@@ -367,6 +369,7 @@ describe("zonas de decisão do dashboard", () => {
     expect(zones[2].blocks.map((block) => block.id)).toEqual([
       "income-allocation",
       "category-breakdown",
+      "future-commitments",
     ]);
     expect(zones[3].blocks.map((block) => block.id)).toEqual(["month-review"]);
   });
@@ -480,6 +483,41 @@ describe("zonas de decisão do dashboard", () => {
 
     expect(zones).toEqual([]);
     expect(failed).toEqual([]);
+  });
+
+  it("inclui future-commitments na zona commitments após category-breakdown", () => {
+    const { zones, failed } = buildDashboardLayout([
+      { id: "future-commitments", state: "ok" },
+    ]);
+
+    expect(failed).toEqual([]);
+    expect(zones).toHaveLength(1);
+    expect(zones[0].id).toBe("commitments");
+    expect(zones[0].blocks.map((block) => block.id)).toEqual([
+      "future-commitments",
+    ]);
+
+    const withCategory = buildDashboardLayout([
+      { id: "category-breakdown", state: "ok" },
+      { id: "future-commitments", state: "ok" },
+    ]);
+    expect(withCategory.zones[0].blocks.map((block) => block.id)).toEqual([
+      "category-breakdown",
+      "future-commitments",
+    ]);
+  });
+
+  it("move future-commitments para failed quando o estado é error", () => {
+    const { zones, failed } = buildDashboardLayout([
+      { id: "income-allocation", state: "ok" },
+      { id: "future-commitments", state: "error" },
+    ]);
+
+    expect(failed).toEqual(["future-commitments"]);
+    expect(zones).toHaveLength(1);
+    expect(zones[0].blocks.map((block) => block.id)).toEqual([
+      "income-allocation",
+    ]);
   });
 });
 
