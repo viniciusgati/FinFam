@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -10,6 +11,12 @@ import {
 } from "react";
 import type { PaymentMethod } from "@/lib/variable-expenses";
 import { categoryLabel, normalizeCategoryLabel } from "@/lib/categories";
+import {
+  filterByStatus,
+  openExpensesEmptyText,
+  openMonthSummaryText,
+  type OpenExpensesSummary,
+} from "@/lib/open-expenses";
 import MaskedInput from "@/components/MaskedInput";
 import CategoryDatalist, {
   CATEGORY_DATALIST_ID,
@@ -41,6 +48,7 @@ interface GastosManagerProps {
   currentMes: string;
   monthOptions: MonthOption[];
   initialExpenses: ExpenseDTO[];
+  initialStatus?: string | null;
   categorySuggestions: string[];
 }
 
@@ -131,6 +139,7 @@ export default function GastosManager({
   currentMes,
   monthOptions,
   initialExpenses,
+  initialStatus,
   categorySuggestions,
 }: GastosManagerProps) {
   const router = useRouter();
@@ -153,6 +162,23 @@ export default function GastosManager({
     () => expenses.reduce((sum, expense) => sum + expense.amountCents, 0),
     [expenses],
   );
+
+  const openSummary = useMemo<OpenExpensesSummary>(() => {
+    const open = filterByStatus(expenses, "open");
+    return {
+      totalCents: open.reduce((sum, expense) => sum + expense.amountCents, 0),
+      count: open.length,
+    };
+  }, [expenses]);
+
+  const filteringOpen = initialStatus === "open";
+  const visibleExpenses = useMemo(
+    () => filterByStatus(expenses, initialStatus),
+    [expenses, initialStatus],
+  );
+  const monthName =
+    monthOptions.find((option) => option.value === mes)?.label ?? mes;
+  const allExpensesHref = `/gastos?mes=${encodeURIComponent(mes)}`;
 
   function handleMonthChange(value: string) {
     if (value === mes) return;
@@ -347,6 +373,10 @@ export default function GastosManager({
         </p>
       </header>
 
+      <p className="rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm font-medium text-foreground">
+        {openMonthSummaryText(openSummary)}
+      </p>
+
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
           Mês
@@ -373,6 +403,20 @@ export default function GastosManager({
           {isPending ? "Carregando…" : ""}
         </span>
       </div>
+
+      {filteringOpen ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">
+            Mostrando somente gastos em aberto
+          </p>
+          <Link
+            href={allExpensesHref}
+            className="font-medium text-emerald-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+          >
+            Ver todos os gastos
+          </Link>
+        </div>
+      ) : null}
 
       <div aria-live="assertive" role="alert" className="min-h-5">
         {feedback?.type === "error" ? (
@@ -527,13 +571,25 @@ export default function GastosManager({
           </p>
         </div>
 
-        {expenses.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-center text-foreground-muted">
-            {`Nenhum gasto em ${monthOptions.find((option) => option.value === mes)?.label ?? mes}. Lance o primeiro.`}
-          </p>
+        {visibleExpenses.length === 0 ? (
+          filteringOpen ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-foreground-muted">
+              <p>{openExpensesEmptyText(monthName)}</p>
+              <Link
+                href={allExpensesHref}
+                className="font-medium text-emerald-400 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+              >
+                Ver todos os gastos
+              </Link>
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-border-strong bg-surface-raised px-4 py-6 text-center text-foreground-muted">
+              {`Nenhum gasto em ${monthName}. Lance o primeiro.`}
+            </p>
+          )
         ) : (
           <ul className="divide-y divide-border">
-            {expenses.map((expense) => {
+            {visibleExpenses.map((expense) => {
               const onCredit = expense.paymentMethod === "CREDIT";
               const busy = deletingId === expense.id;
               return (
