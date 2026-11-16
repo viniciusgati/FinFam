@@ -157,6 +157,23 @@ describe("buildSpendAdvice — meta de economia", () => {
     expect(advice?.state).toBe("on-pace");
   });
 
+  it("usa diária de 6667 centavos: 1 centavo acima do esperado já fica adiantado", () => {
+    // Com diária 10000 (sem descontar a meta) o esperado seria 100000 e este
+    // consumo cairia em "atrasado"; com a meta, o esperado é 66670.
+    const advice = buildSpendAdvice(
+      input({
+        windowDays: 30,
+        elapsedDays: 10,
+        incomeCents: 500000,
+        fixedExpensesCents: 200000,
+        savingsGoalCents: 100000,
+        variableConsumedCents: 66671,
+      }),
+    );
+
+    expect(advice?.state).toBe("ahead");
+  });
+
   it("meta maior ou igual à renda menos as fixas zera o orçamento e não gera alerta", () => {
     expect(
       buildSpendAdvice(
