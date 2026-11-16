@@ -14,16 +14,22 @@ import { resolveTimeZone, zonedDateParts } from "./time";
 export const DESCRIPTION_ERROR = "Informe uma descrição.";
 export const AMOUNT_ERROR = "Informe um valor válido (ex.: 12,34).";
 export const DATE_ERROR = "Informe uma data válida.";
+export const CARD_ERROR = "Selecione um cartão.";
+
+/** Meio de pagamento do lançamento rápido: PIX/dinheiro ou cartão. */
+export type QuickExpenseTarget = "pix" | "card";
 
 export interface QuickExpenseInput {
   description: string;
   amount: string;
   date: string;
   category?: string;
+  target?: QuickExpenseTarget;
+  cardId?: string;
 }
 
 export type QuickExpenseErrors = Partial<
-  Record<"description" | "amount" | "date", string>
+  Record<"description" | "amount" | "date" | "cardId", string>
 >;
 
 export interface QuickExpensePayload {
@@ -33,6 +39,16 @@ export interface QuickExpensePayload {
   category: string | null;
   paymentMethod: "PIX";
   paid: true;
+}
+
+export interface QuickCardPurchasePayload {
+  cardId: string;
+  description: string;
+  amountCents: number;
+  purchaseDate: string;
+  category: string | null;
+  installmentNumber: 1;
+  installmentsTotal: 1;
 }
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -70,6 +86,9 @@ export function validateQuickExpense(input: QuickExpenseInput): QuickExpenseErro
   if (!input.description.trim()) errors.description = DESCRIPTION_ERROR;
   if (parseAmountToCents(input.amount) === null) errors.amount = AMOUNT_ERROR;
   if (!isValidDateISO(input.date)) errors.date = DATE_ERROR;
+  if (input.target === "card" && !input.cardId?.trim()) {
+    errors.cardId = CARD_ERROR;
+  }
   return errors;
 }
 
@@ -94,6 +113,53 @@ export function buildQuickExpensePayload(
     paymentMethod: "PIX",
     paid: true,
   };
+}
+
+/**
+ * Monta o payload do `POST /api/card-purchases` a partir de uma entrada já
+ * validada. O lançamento rápido não oferece parcelamento: sempre 1 de 1.
+ * Devolve `null` quando a entrada é inválida.
+ */
+export function buildQuickCardPurchasePayload(
+  input: QuickExpenseInput,
+): QuickCardPurchasePayload | null {
+  const description = input.description.trim();
+  const amountCents = parseAmountToCents(input.amount);
+  const cardId = input.cardId?.trim() ?? "";
+  if (
+    !description ||
+    amountCents === null ||
+    !isValidDateISO(input.date) ||
+    !cardId
+  ) {
+    return null;
+  }
+
+  return {
+    cardId,
+    description,
+    amountCents,
+    purchaseDate: `${input.date}T00:00:00`,
+    category: normalizeCategoryLabel(input.category),
+    installmentNumber: 1,
+    installmentsTotal: 1,
+  };
+}
+
+/** Mensagem de sucesso exibida após o lançamento, por meio de pagamento. */
+export function quickExpenseSuccessMessage(target: QuickExpenseTarget): string {
+  return target === "card"
+    ? "Compra lançada na fatura do cartão"
+    : "Gasto criado";
+}
+
+/**
+ * Extrai a mensagem em pt-BR das respostas `{ error }` (ex.: 400 do fluxo de
+ * cartão). Devolve `null` quando não há `error` textual.
+ */
+export function quickExpenseApiError(raw: unknown): string | null {
+  const error = (raw as { error?: unknown } | null | undefined)?.error;
+  return typeof error === "string" && error.trim() ? error : null;
 }
 
 /** Traduz os `fieldErrors` (zod flatten) do 400 da API para pt-BR por campo. */
