@@ -59,8 +59,14 @@ import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
 import SpendAdviceCard from "@/components/SpendAdviceCard";
 import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
+import FutureCommitmentsCard from "@/components/FutureCommitmentsCard";
 import FamilyHelpCard from "@/components/FamilyHelpCard";
 import type { CategoryBreakdown } from "@/lib/category-breakdown";
+import type { FutureCommitmentMonth } from "@/lib/future-commitments";
+import type {
+  UpcomingBill,
+  UpcomingEndingSoon,
+} from "@/lib/upcoming";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +106,10 @@ export default async function DashboardPage({
   let allowance: DailyAllowance | null = null;
   let spendAdvice: SpendAdvice | null = null;
   let categoryBreakdown: CategoryBreakdown | null = null;
+  let futureCommitments: FutureCommitmentMonth[] = [];
+  let upcomingBills: UpcomingBill[] = [];
+  let endingSoon: UpcomingEndingSoon[] = [];
+  let hasFutureCommitments = false;
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
   let cycleStartDay = defaultSettings().cycleStartDay;
@@ -144,6 +154,13 @@ export default async function DashboardPage({
       data.invoicePaymentCents ?? 0,
     );
     categoryBreakdown = data.categoryBreakdown;
+    futureCommitments = data.futureCommitments ?? [];
+    upcomingBills = data.upcoming?.bills ?? [];
+    endingSoon = data.upcoming?.endingSoon ?? [];
+    hasFutureCommitments =
+      futureCommitments.some((month) => month.totalCents > 0) ||
+      upcomingBills.length > 0 ||
+      endingSoon.length > 0;
     localMonthSummary = localMonthReview(
       buildMonthReviewData(
         monthReviewSnapshotFrom(data),
@@ -246,6 +263,10 @@ export default async function DashboardPage({
     {
       id: "category-breakdown",
       state: categoryBreakdown !== null ? "ok" : "error",
+    },
+    {
+      id: "future-commitments",
+      state: hasFutureCommitments ? "ok" : "empty",
     },
     { id: "family-help", state: "ok" },
     { id: "month-review", state: "ok" },
@@ -396,6 +417,12 @@ export default async function DashboardPage({
                       {categoryBreakdown !== null && (
                         <CategoryBreakdownCard breakdown={categoryBreakdown} />
                       )}
+
+                      <FutureCommitmentsCard
+                        months={futureCommitments}
+                        bills={upcomingBills}
+                        endingSoon={endingSoon}
+                      />
                     </>
                   );
                 case "explore":

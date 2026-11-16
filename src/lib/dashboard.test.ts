@@ -1103,6 +1103,64 @@ describe("loadCycleDashboardData — moldura do ciclo", () => {
     expect(data.invoicePaymentCents).toBe(10000);
   });
 
+  it("expõe compromissos futuros e vencimentos do ciclo a partir do mês-base", async () => {
+    prismaMock.income.findMany.mockResolvedValue([]);
+    prismaMock.fixedExpense.findMany.mockResolvedValue([
+      {
+        id: "aluguel",
+        name: "Aluguel",
+        amountCents: 150000,
+        dueDay: 31,
+        category: "Casa",
+        active: true,
+        startMonth: null,
+        endMonth: "2026-12",
+      },
+    ]);
+    prismaMock.variableExpense.findMany.mockResolvedValue([]);
+    prismaMock.variableIncome.findMany.mockResolvedValue([]);
+    prismaMock.cardPurchase.findMany.mockResolvedValue([
+      {
+        id: "p-antiga",
+        description: "Compra do ciclo passado",
+        amountCents: 10000,
+        purchaseDate: new Date("2026-09-20T12:00:00.000Z"),
+        category: null,
+        installmentsTotal: 1,
+        card: { id: "c", name: "Itau", closingDay: 15, dueDay: 21 },
+      },
+      {
+        id: "p-parcelada",
+        description: "Compra parcelada",
+        amountCents: 40000,
+        purchaseDate: new Date("2026-10-16T12:00:00.000Z"),
+        category: null,
+        installmentsTotal: 3,
+        card: { id: "c", name: "Itau", closingDay: 15, dueDay: 21 },
+      },
+    ]);
+
+    const data = await loadCycleDashboardData(reference, now);
+
+    // Mês-base: fatura de novembro/2026 (ciclo começa no dia 15) → projeta
+    // dezembro/2026, janeiro/2027 e fevereiro/2027.
+    expect(data.futureCommitments?.map((month) => month.monthKey)).toEqual([
+      "2026-12",
+      "2027-01",
+      "2027-02",
+    ]);
+    expect(data.futureCommitments?.map((month) => month.totalCents)).toEqual([
+      13333, 13333, 0,
+    ]);
+    expect(data.upcoming?.bills).toEqual([
+      { name: "Fatura Itau", dueDate: "2026-10-21", amountCents: 10000 },
+      { name: "Aluguel", dueDate: "2026-10-31", amountCents: 150000 },
+    ]);
+    expect(data.upcoming?.endingSoon).toEqual([
+      { name: "Aluguel", endMonth: "2026-12" },
+    ]);
+  });
+
   it("consulta avulsos só na janela do ciclo, limitada a amanhã", async () => {
     prismaMock.income.findMany.mockResolvedValue([]);
     prismaMock.fixedExpense.findMany.mockResolvedValue([]);
