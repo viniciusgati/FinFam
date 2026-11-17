@@ -82,8 +82,8 @@ interface:
   competência; não há projeção de parcelas futuras no dashboard).
 - `FixedExpense.startMonth/endMonth` (vigência usada no cálculo; não há alerta
   de conta terminando/renovando).
-- `AppSettings` tem **apenas** `cycleStartDay` (sem metas, orçamento por
-  categoria, preferências de alerta ou notificação).
+- `AppSettings` tem `cycleStartDay` e `savingsGoalCents` (meta de economia); sem
+  orçamento por categoria, preferências de alerta ou notificação.
 - `MonthlySnapshot`/`MonthlyCategorySnapshot` (histórico imutável já serve de
   base para tendências por categoria).
 
@@ -118,8 +118,13 @@ interface:
   `/cartoes`: lança a diferença como compra de ajuste, valor igual é no-op e
   valor menor é recusado — e `router.refresh()` atualiza os números da tela. Só
   aumenta o total; reduzir continua exigindo editar/excluir lançamentos em
-  `/cartoes`. O simulador de compra saiu da tela do dashboard, mas seu
-  componente, lib e rota de IA permanecem no código.
+  `/cartoes`. A #374 é preservada (o ajuste rápido segue na zona "Ações").
+- **Simulador "Posso comprar?"** (zona "Compromissos", ciclo corrente): abaixo de
+  "Parcelas futuras", o usuário informa o valor e em **quantas parcelas** vai
+  pagar. O impacto usa só a **1ª parcela** (rateio `floor(valor/N)` + resto na
+  1ª); as demais são **compromisso futuro informativo**. Considera a **meta de
+  economia** do ciclo, que **só pode piorar** o veredito, nunca melhorar. Sem IA
+  (ou em falha), exibe o resultado local determinístico.
 - **Entradas:** CRUD de entradas fixas (vigência, ativar/desativar) e de entradas
   avulsas por data/mês; aviso de mês futuro.
 - **Saídas fixas:** CRUD com categoria, dia de vencimento, vigência e
@@ -170,11 +175,12 @@ subutilizados ou fricções verificáveis):
    mostra quanto já está comprometido nos meses seguintes.
 4. **Vigência de contas fixas sem alerta:** `startMonth`/`endMonth` são
    calculados, porém não há aviso de conta perto do fim/renovação.
-5. **Configurações minimalistas:** só existe `cycleStartDay`; não há meta de
-   economia, orçamento por categoria, limites de alerta ou preferências.
-6. **Simulador limitado (fora da tela):** o código do simulador de compra
-   continua no projeto, mas não é mais renderizado no dashboard; a compra
-   simulada é à vista e isolada, sem simulação parcelada nem meta de economia.
+5. **Configurações minimalistas:** só existe `cycleStartDay` e a meta de
+   economia; não há orçamento por categoria, limites de alerta ou preferências.
+6. **Simulador sem veredito futuro:** o "Posso comprar?" agora simula o
+   parcelamento e considera a meta no ciclo corrente, mas as parcelas restantes
+   são apenas compromisso futuro informativo — não há veredito para os meses
+   seguintes.
 7. **Sem entrada rápida de receita:** o dashboard só permite lançar despesa.
 8. **Sem busca/filtro em `/gastos`:** apenas navegação por mês; não há filtro por
    categoria, forma de pagamento ou status.
@@ -196,8 +202,9 @@ real.
 
 ### 6.1 Planejar e economizar
 
-- **Meta de economia/reserva** por ciclo ou mês: valor-alvo, quanto já foi
-  guardado e "quanto guardar por dia" (integrável à diária disponível).
+- **Meta de economia/reserva** por ciclo: valor-alvo e quanto já foi guardado
+  existem (`AppSettings.savingsGoalCents` + `savingsGoalProgress`); falta a
+  sugestão de "quanto guardar por dia" e metas por mês/categoria.
 - **Orçamento por categoria (envelopes):** limite mensal por categoria, consumo
   realizado, restante e alerta preventivo ao passar de X%.
 - **Regra de alocação da renda** (ex.: 50/30/20 ou percentuais livres) mostrando
@@ -224,8 +231,8 @@ real.
   (hoje só há alerta das 2 categorias que passam do limite).
 - **Detecção de recorrência na importação CSV:** identificar cobranças repetidas
   e sugerir transformá-las em saída fixa/assinatura.
-- **Simulador de parcelamento e de corte:** "e se eu parcelar em N vezes?" e
-  "se eu reduzir a categoria X em R$ Y, quanto sobra no ciclo?".
+- **Simulador de corte:** "se eu reduzir a categoria X em R$ Y, quanto sobra no
+  ciclo?" (o parcelamento em N vezes já existe no "Posso comprar?").
 - **Custo por dia/semana por categoria:** leitura mais acionável que o total do
   mês para gastos do dia a dia.
 

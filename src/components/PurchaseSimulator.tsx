@@ -18,6 +18,10 @@ interface PurchaseSimulatorProps {
   remainingDays: number;
   /** Ritmo recente de gastos avulsos por dia; `null` sem base para medir. */
   usualDailySpendCents: number | null;
+  /** Meta de economia do ciclo em centavos; `null`/`0` = sem meta. */
+  savingsGoalCents?: number | null;
+  /** Guardado estimado do ciclo; default `0`. */
+  savingsGoalSavedCents?: number;
 }
 
 type Status = "idle" | "loading" | "done";
@@ -26,6 +30,8 @@ interface SimulationResult {
   verdict: PurchaseVerdict;
   summary: string;
   impactLabel: string;
+  installmentLabel: string;
+  goalLabel: string;
   source: "ai" | "local";
 }
 
@@ -41,13 +47,27 @@ const VERDICT_CLASSES: Record<PurchaseVerdict, string> = {
   nao: "border-red-700 bg-red-950 text-red-200",
 };
 
+const INVALID_INSTALLMENTS_MESSAGE =
+  "Informe um número de parcelas maior ou igual a 1";
+
+/** Aceita apenas inteiro ≥ 1; vazio, `0`, negativo ou decimal são inválidos. */
+function parseInstallments(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : null;
+}
+
 export default function PurchaseSimulator({
   freeBudgetCents,
   dailyCents,
   remainingDays,
   usualDailySpendCents,
+  savingsGoalCents = null,
+  savingsGoalSavedCents = 0,
 }: PurchaseSimulatorProps) {
   const [value, setValue] = useState("");
+  const [installments, setInstallments] = useState("1");
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [failed, setFailed] = useState(false);
@@ -58,6 +78,11 @@ export default function PurchaseSimulator({
   // (vazio) o botão fica desabilitado, sem borda vermelha nem mensagem.
   const showValidation = value.trim().length > 0 && invalid;
 
+  const installmentsTotal = parseInstallments(installments);
+  const installmentsInvalid = installmentsTotal === null;
+  // O campo já nasce válido ("1"); qualquer valor inválido digitado é acusado.
+  const showInstallmentsValidation = installmentsInvalid;
+
   function buildInput(purchaseCents: number): SimulatePurchaseInput {
     return {
       freeBudgetCents,
@@ -65,6 +90,9 @@ export default function PurchaseSimulator({
       remainingDays,
       usualDailySpendCents,
       purchaseCents,
+      installmentsTotal: installmentsTotal ?? 1,
+      savingsGoalCents,
+      savingsGoalSavedCents,
     };
   }
 
@@ -74,13 +102,15 @@ export default function PurchaseSimulator({
       verdict: simulation.verdict,
       summary: simulation.summary,
       impactLabel: simulation.impactLabel,
+      installmentLabel: simulation.installmentLabel,
+      goalLabel: simulation.goalLabel,
       source: "local",
     };
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (cents === null) return;
+    if (cents === null || installmentsTotal === null) return;
 
     setStatus("loading");
     setResult(null);
@@ -104,6 +134,8 @@ export default function PurchaseSimulator({
           verdict: data.verdict,
           summary: data.summary ?? local.summary,
           impactLabel: local.impactLabel,
+          installmentLabel: local.installmentLabel,
+          goalLabel: local.goalLabel,
           source: data.source === "ai" && data.summary ? "ai" : "local",
         });
       }
@@ -146,9 +178,26 @@ export default function PurchaseSimulator({
           />
         </label>
 
+        <label className="w-32 space-y-1">
+          <span className="text-sm font-medium text-foreground-muted">
+            Número de parcelas
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={installments}
+            onChange={(event) => setInstallments(event.target.value)}
+            aria-label="Número de parcelas"
+            aria-invalid={showInstallmentsValidation}
+            className={`w-full rounded-lg border bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 ${
+              showInstallmentsValidation ? "border-red-500" : "border-border-strong"
+            }`}
+          />
+        </label>
+
         <button
           type="submit"
-          disabled={invalid || status === "loading"}
+          disabled={invalid || installmentsInvalid || status === "loading"}
           className="rounded-lg bg-emerald-600 px-5 py-2 font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {status === "loading" ? "Consultando…" : "Simular"}
@@ -157,6 +206,10 @@ export default function PurchaseSimulator({
 
       {showValidation && (
         <p className="text-sm text-red-400">Informe um valor maior que zero</p>
+      )}
+
+      {showInstallmentsValidation && (
+        <p className="text-sm text-red-400">{INVALID_INSTALLMENTS_MESSAGE}</p>
       )}
 
       {status === "loading" && (
@@ -186,6 +239,8 @@ export default function PurchaseSimulator({
             {VERDICT_LABELS[result.verdict]}
           </p>
           <p className="text-sm font-medium">{result.impactLabel}</p>
+          <p className="text-sm font-medium">{result.installmentLabel}</p>
+          <p className="text-sm font-medium">{result.goalLabel}</p>
           <p className="text-sm">{result.summary}</p>
           {result.source === "local" && (
             <p role="status" aria-live="polite" className="text-xs font-medium">

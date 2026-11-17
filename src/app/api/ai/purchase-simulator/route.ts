@@ -15,6 +15,9 @@ const simulateSchema = z.object({
   remainingDays: z.number().int().positive(),
   usualDailySpendCents: z.number().int().nonnegative().nullable().optional(),
   purchaseCents: z.number().int().positive(),
+  installmentsTotal: z.number().int().positive().optional(),
+  savingsGoalCents: z.number().int().nonnegative().nullable().optional(),
+  savingsGoalSavedCents: z.number().int().nonnegative().nullable().optional(),
 });
 
 /**

@@ -346,8 +346,24 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
   zona "Ações"): o usuário escolhe um cartão ativo, vê o valor atual da fatura
   do **mês de fatura exibido** e informa o novo total, que é lançado como ajuste
   pela mesma semântica de `/cartoes` — só aumento (§3.4). O bloco só aparece no
-  ciclo corrente. O simulador de compra (`PurchaseSimulator`, lib e rota de IA)
-  não é mais renderizado no dashboard, mas seu código permanece.
+  ciclo corrente; a #374 é preservada e o ajuste rápido continua na zona
+  **"Ações"**.
+- **Simulador "Posso comprar?"** (história #367, zona **"Compromissos"**, abaixo
+  de "Parcelas futuras"): renderizado na seção de compromissos do dashboard
+  **apenas no ciclo corrente** e quando a diária existe. O usuário informa o
+  valor da compra e **em quantas parcelas** vai pagá-la, e vê o veredito local
+  (`PurchaseSimulator`, lib e rota de IA). O impacto orçamentário usa **somente
+  a 1ª parcela**; as demais formam um **compromisso futuro apenas informativo**,
+  sem veredito para ciclos futuros. O rateio é o mesmo de
+  `allocateInstallments` (§3.4): `base = floor(valor/N)` e o resto vai na **1ª
+  parcela** (ex.: `R$ 1.000,00` em `3×` → `333,34 / 333,33 / 333,33`, com
+  `R$ 666,66` de compromisso futuro). A **meta de economia** do ciclo
+  (`savingsGoalCents`, #366) **só pode piorar** o veredito, nunca melhorar: com
+  restante > 0, se a 1ª parcela ≥ restante o veredito é `nao`; se a 1ª parcela ×
+  2 ≥ restante, no mínimo `cuidado`; sem meta (`null`/`0`) ou com meta atingida
+  (restante `0`) o veredito é idêntico ao cenário sem meta. A IA (opcional)
+  recebe apenas agregados **numéricos** da simulação (incluindo parcelas e
+  meta); sem chave ou em falha, o resultado local é exibido.
 - O seletor de mês do dashboard navega para `/?mes=YYYY-MM` (prop `basePath`),
   onde `YYYY-MM` é o **mês de início do ciclo** — exibido, no dashboard, pelo
   **mês da fatura** (`início + 1`: `?mes=2026-10` aparece como "novembro de
@@ -476,7 +492,13 @@ o mês calendário. Com `cycleStartDay = 1` as duas coisas coincidem.
    da compra + `k−1` meses), com as faturas pagas na janela aparecendo só como
    linha informativa.
 5. **Compra parcelada**: valor total dividido pelo número de parcelas; cada
-   parcela em sua fatura.
+   parcela em sua fatura. No rateio, `base = floor(valor/N)` e o resto vai na
+   **1ª parcela**. No simulador "Posso comprar?" (§4.4), apenas a **1ª parcela**
+   pesa no orçamento do ciclo; as demais são **compromisso futuro informativo**
+   (sem veredito para ciclos futuros). Parcelas ausentes/inválidas normalizam
+   para `1` no núcleo; a rota de IA rejeita com `400` parcelas ≤ 0, não inteiras
+   ou enviadas como texto. A meta de economia do ciclo **só pode piorar** o
+   veredito, nunca melhorá-lo.
 6. Se `renda_mensal == 0`, o percentual é indefinido: exibir estado neutro e
    orientar o cadastro de entradas.
 7. Não contam para o orçamento: transferências internas, receitas avulsas
@@ -546,7 +568,9 @@ arquivo apenas com o cabeçalho, e a tela avisa isso.
   família recebe o **agregado numérico completo do ciclo** (renda fixa/variável,
   saídas, consumo, percentuais, projeção, dias/janela, orçamento livre, diária,
   snapshots e desvios anônimos); a avaliação de mês fechado mantém os 10 campos
-  numéricos + histórico; o simulador envia apenas os números da simulação.
+  numéricos + histórico; o simulador envia apenas os números da simulação
+  (incluindo `installmentsTotal`, `installmentCents`, o compromisso futuro e a
+  meta), nunca descrições ou texto do usuário.
   **Exceção documentada à importação de fatura CSV (história #269):** na
   classificação de títulos da importação trafegam **apenas títulos de lançamento
    e rótulos de categoria** já usados pela família para a DeepSeek, e somente
