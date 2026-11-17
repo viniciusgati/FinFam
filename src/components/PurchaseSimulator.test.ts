@@ -91,6 +91,7 @@ describe("PurchaseSimulator (fonte do veredito e feedbacks)", () => {
     const source = readSource("./PurchaseSimulator.tsx");
 
     expect(source).toContain("Consultando…");
+    expect(source).toContain("Analisando sua compra…");
     expect(source).toContain("Simular");
     expect(source).toContain("Informe um valor maior que zero");
     expect(source).toContain("Não foi possível simular agora. Tente novamente.");
