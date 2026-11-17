@@ -496,9 +496,42 @@ o mês calendário. Com `cycleStartDay = 1` as duas coisas coincidem.
 | `/gastos` | Lançamento e listagem de gastos avulsos. |
 | `/cartoes` | Cartões e compras/faturas. |
 | `/historico` | Histórico mensal e comparações. |
+| `/configuracoes` | Configurações do app e bloco "Baixar meus dados". |
 
 O MVP desta fase entrega o **dashboard** funcional com dados; as telas de CRUD
 são entregas seguintes.
+
+### 6.1 Baixar meus dados (exportação e backup)
+
+Em `/configuracoes`, o bloco **"Baixar meus dados"** permite à família baixar
+uma cópia completa dos dados: o botão principal **"Baixar tudo (JSON)"** e a
+lista **"CSV por tabela"** com um link para cada uma das 10 tabelas do domínio
+(`incomes`, `variable_incomes`, `fixed_expenses`, `credit_cards`,
+`variable_expenses`, `card_purchases`, `monthly_snapshots`,
+`monthly_category_snapshots`, `app_settings`, `monthly_reviews`), rotuladas em
+pt-BR a partir de `EXPORT_TABLES`.
+
+Contrato de `GET /api/export` (autenticado; sem sessão responde 401):
+
+- **JSON completo** (`/api/export` ou `?formato=json`): corpo
+  `{ versao: 1, geradoEm, fuso, tabelas: { <tabela>: [...] } }` com as 10
+  chaves; valores monetários em centavos inteiros; data de negócio `date`/
+  `purchaseDate` como `YYYY-MM-DD` no fuso da família; `createdAt`/`updatedAt`
+  em ISO 8601 UTC. Arquivo `finfam-dados-YYYY-MM-DD.json`.
+- **CSV por tabela** (`?formato=csv&tabela=<nome>`): cabeçalho exatamente na
+  ordem de colunas de `EXPORT_TABLES`, valores monetários via `formatCents`
+  (`R$ 1.234,56`), vírgula como separador, aspas RFC 4180, BOM UTF-8 e
+  neutralização de fórmula. Arquivo `finfam-<tabela>-YYYY-MM-DD.csv`.
+- Parâmetros inválidos retornam 400; falha ao consultar os dados retorna 500
+  com mensagem de erro, sem corpo parcial.
+
+Estados visuais do bloco: **inicial** (links habilitados), **carregando**
+(link acionado desabilitado exibindo "Preparando…"), **sucesso**
+("Download iniciado: <nome-do-arquivo>", lido de `Content-Disposition`),
+**erro 401** ("Sua sessão expirou. Entre novamente para baixar seus dados." com
+link para `/login`) e **erro 500/rede** ("Não foi possível gerar a exportação.
+Tente novamente.", com o link reabilitado). Tabelas sem registros geram um
+arquivo apenas com o cabeçalho, e a tela avisa isso.
 
 ## 7. Requisitos não funcionais
 
@@ -516,8 +549,13 @@ são entregas seguintes.
   numéricos + histórico; o simulador envia apenas os números da simulação.
   **Exceção documentada à importação de fatura CSV (história #269):** na
   classificação de títulos da importação trafegam **apenas títulos de lançamento
-  e rótulos de categoria** já usados pela família para a DeepSeek, e somente
-  nesta função — nenhum outro dado pessoal ou agregado sai do sistema.
+   e rótulos de categoria** já usados pela família para a DeepSeek, e somente
+   nesta função — nenhum outro dado pessoal ou agregado sai do sistema.
+- **Exportação local e portabilidade**: "Baixar meus dados" em `/configuracoes`
+  gera e baixa os arquivos **localmente**, sem enviar dados a terceiros. O JSON
+  completo e os CSVs por tabela (via `/api/export`) incluem todas as tabelas
+  persistidas do domínio e nunca expõem segredos de ambiente (`FINFAM_USER`,
+  `FINFAM_PASS`, `FINFAM_SESSION_SECRET`).
 - **Acessibilidade**: contraste adequado mesmo com fundo colorido; gráficos e
   estados usam `role`/`aria-label`/`aria-live` e rótulos textuais.
 
