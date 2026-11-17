@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cycleWindowForKey, remainingCycleDays } from "./cycle";
 import {
   allocateInstallments,
+  availableCardLimitCents,
   cardPurchaseLookbackMonthKey,
   cardPurchaseLookbackStart,
   cycleInvoicePaymentLabel,
@@ -520,5 +521,21 @@ describe("cycleInvoicePaymentLabel", () => {
     ).toBe("Faturas a pagar no ciclo: R$ 6.072,15");
     expect(cycleInvoicePaymentLabel(0)).toBeNull();
     expect(cycleInvoicePaymentLabel(-10)).toBeNull();
+  });
+});
+
+describe("availableCardLimitCents", () => {
+  it("desconta o total da fatura do limite em centavos", () => {
+    expect(availableCardLimitCents(200000, 60000)).toBe(140000);
+    expect(availableCardLimitCents(200000, 0)).toBe(200000);
+    expect(availableCardLimitCents(60000, 60000)).toBe(0);
+  });
+
+  it("pode ficar negativo quando a fatura passa do limite", () => {
+    expect(availableCardLimitCents(50000, 60000)).toBe(-10000);
+  });
+
+  it("sem limite cadastrado não há limite disponível", () => {
+    expect(availableCardLimitCents(null, 60000)).toBeNull();
   });
 });

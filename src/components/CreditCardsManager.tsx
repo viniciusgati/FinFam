@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  availableCardLimitCents,
   invoiceLinesForMonth,
   type CardPurchaseRecord,
 } from "@/lib/invoices";
@@ -222,6 +223,18 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
   const currentTotalCents = adjustmentCardId
     ? (cardInvoiceTotals.get(adjustmentCardId) ?? 0)
     : 0;
+
+  /**
+   * Linha de limite do cartão: mostra o limite cadastrado e o disponível na
+   * competência exibida (limite − parcelas do mês). Cartão sem limite continua
+   * "Sem limite" (não há o que descontar).
+   */
+  function cardLimitLabel(card: CreditCardData): string {
+    const invoiceCents = cardInvoiceTotals.get(card.id) ?? 0;
+    const available = availableCardLimitCents(card.limitCents, invoiceCents);
+    if (available === null || card.limitCents === null) return " · Sem limite";
+    return ` · Limite ${formatCents(card.limitCents)} · Limite disponível ${formatCents(available)}`;
+  }
 
   function showSuccess(message: string) {
     setSuccess(message);
@@ -907,9 +920,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                   <p className="text-sm text-subtle">
                     Fechamento dia {card.closingDay} · Vencimento dia{" "}
                     {card.dueDay}
-                    {card.limitCents !== null
-                      ? ` · Limite ${formatCents(card.limitCents)}`
-                      : " · Sem limite"}
+                    {cardLimitLabel(card)}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
