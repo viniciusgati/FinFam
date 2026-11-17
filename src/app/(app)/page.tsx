@@ -13,6 +13,7 @@ import {
   dailyAllowanceCents,
   daysUntilCycleStart,
   remainingCycleDays,
+  usualDailySpendCents,
   type CycleWindow,
   type DailyAllowance,
 } from "@/lib/cycle";
@@ -61,6 +62,7 @@ import DailyConsumptionChart from "@/components/DailyConsumptionChart";
 import IncomeAllocationCard from "@/components/IncomeAllocationCard";
 import MonthReviewPanel from "@/components/MonthReviewPanel";
 import QuickCardAdjustmentCard from "@/components/QuickCardAdjustmentCard";
+import PurchaseSimulator from "@/components/PurchaseSimulator";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
 import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
@@ -273,6 +275,17 @@ export default async function DashboardPage({
         })
       : null;
 
+  // Ritmo recente de consumo do ciclo — base do simulador "Posso comprar?":
+  // avulsos + compras do cartão do ciclo, ÷ dias decorridos.
+  const usualDailySpend =
+    allowance !== null && series !== null
+      ? usualDailySpendCents({
+          variableSpentCents: variableExpensesCents + cardExpensesCents,
+          cardExpensesCents: 0,
+          elapsedDays: series.elapsedDay,
+        })
+      : null;
+
   // Os blocos disponíveis viram zonas de decisão (Resumo → Ações →
   // Compromissos → Explorar). Cada condicional de exibição vira o estado do
   // bloco: o que não pode ser exibido entra como `error` e fica fora das zonas.
@@ -295,6 +308,10 @@ export default async function DashboardPage({
     {
       id: "future-commitments",
       state: hasFutureCommitments ? "ok" : "empty",
+    },
+    {
+      id: "purchase-simulator",
+      state: isCurrentCycle && allowance !== null ? "ok" : "error",
     },
     { id: "open-expenses", state: "ok" },
     { id: "family-help", state: "ok" },
@@ -455,6 +472,22 @@ export default async function DashboardPage({
                         bills={upcomingBills}
                         endingSoon={endingSoon}
                       />
+
+                      {isCurrentCycle &&
+                        allowance !== null &&
+                        series !== null && (
+                          <PurchaseSimulator
+                            key={referenceMonthKey}
+                            freeBudgetCents={allowance.freeBudgetCents}
+                            dailyCents={allowance.dailyCents}
+                            remainingDays={allowance.remainingDays}
+                            usualDailySpendCents={usualDailySpend}
+                            savingsGoalCents={savingsGoalCents}
+                            savingsGoalSavedCents={
+                              savingsGoal?.savedCents ?? 0
+                            }
+                          />
+                        )}
 
                       <OpenExpensesCard summary={openExpenses} />
                     </>
