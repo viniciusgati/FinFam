@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ExportDataCard from "@/components/ExportDataCard";
 import SettingsForm from "@/components/SettingsForm";
 import { cycleLengthDays, cycleWindow } from "@/lib/cycle";
 import { defaultSettings, getSettings } from "@/lib/settings";
@@ -40,6 +41,8 @@ export default async function ConfiguracoesPage() {
         cycleWindowDays={cycleWindowDays}
         loadError={loadError}
       />
+
+      <ExportDataCard />
     </div>
   );
 }
