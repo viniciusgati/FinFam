@@ -1,11 +1,14 @@
 import Link from "next/link";
 import {
   openCycleSummaryText,
+  openExpensesEmptyText,
   type OpenExpensesSummary,
 } from "@/lib/open-expenses";
 
 export interface OpenExpensesCardProps {
   summary: OpenExpensesSummary;
+  /** Mês exibido (ex.: `novembro de 2026`), usado só no vazio sem pendências. */
+  emptyLabel?: string;
   href?: string;
   className?: string;
 }
@@ -18,6 +21,7 @@ export interface OpenExpensesCardProps {
  */
 export default function OpenExpensesCard({
   summary,
+  emptyLabel,
   href = "/gastos?status=open",
   className = "",
 }: OpenExpensesCardProps) {
@@ -33,6 +37,12 @@ export default function OpenExpensesCard({
       <p className="mt-2 text-lg font-semibold text-foreground">
         {openCycleSummaryText(summary)}
       </p>
+
+      {summary.count === 0 && emptyLabel ? (
+        <p className="mt-1 text-sm text-foreground-muted">
+          {openExpensesEmptyText(emptyLabel)}
+        </p>
+      ) : null}
 
       <Link
         href={href}

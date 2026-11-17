@@ -24,6 +24,7 @@ import {
   dashboardView,
   emptyStateCopy,
   monthKey,
+  monthLabel,
   type DashboardView,
   type FinanceLevel,
 } from "@/lib/finance";
@@ -515,7 +516,10 @@ export default async function DashboardPage({
                           />
                         )}
 
-                      <OpenExpensesCard summary={openExpenses} />
+                      <OpenExpensesCard
+                        summary={openExpenses}
+                        emptyLabel={monthLabel(referenceMonthKey)}
+                      />
                     </>
                   );
                 case "explore":

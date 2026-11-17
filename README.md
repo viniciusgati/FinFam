@@ -128,6 +128,8 @@ deploy`), sem o passo interativo do `db:migrate`; com tudo já aplicado imprime
 | `npm run db:seed -- --reset` | **apaga tudo** e recria os dados de exemplo |
 | `npm run db:snapshots` | captura os snapshots dos meses fechados (cria ausentes; `--force` recalcula um mês) |
 | `npm run db:studio` | Prisma Studio |
+| `npm run acceptance:prepare` | aplica migrations + seed no PostgreSQL de aceite (`TEST_DATABASE_URL` com fallback `DATABASE_URL`) |
+| `npm run acceptance:serve` | build + `next start` numa porta livre, validando `/login` (200) e o redirect da rota protegida |
 
 ### Testes de integração
 
@@ -145,6 +147,40 @@ explícita** (não pula em silêncio); `npm test` simplesmente ignora os arquivo
 `*.integration.test.ts`. O helper `src/test/integration.ts` conecta via Prisma e
 expõe `resetDatabase()`/`truncateAllTables()` para limpar as tabelas entre os
 casos.
+
+### Ambiente de aceite ponta a ponta
+
+O aceite no browser real usa o **mesmo PostgreSQL de teste** (nunca mocks) e as
+credenciais da família. Os comandos abaixo orquestram migrations, seed, build e
+`next start` sem novas dependências:
+
+```bash
+export TEST_DATABASE_URL="postgresql://user:pass@host:5432/finfam_test?schema=public"
+export FINFAM_USER="familia"
+export FINFAM_PASS="senha-de-teste"
+export FINFAM_SESSION_SECRET="segredo-de-teste"
+
+npm run acceptance:prepare        # migrations + seed (falha se não houver URL)
+npm run acceptance:serve          # build + start numa porta livre + validação
+# ou, para reaproveitar um build já feito:
+npx tsx scripts/acceptance-env.ts serve --no-build
+```
+
+Saídas esperadas do `serve`:
+
+```text
+Banco de aceite (TEST_DATABASE_URL): postgresql://user:***@host:5432/finfam_test?schema=public
+Autenticação: FINFAM_USER=definida, FINFAM_PASS=definida, FINFAM_SESSION_SECRET=definida
+PASS GET /login -> 200
+PASS GET /gastos (sem sessão) -> 302 /login
+App pronto para o roteiro: http://127.0.0.1:<porta>
+```
+
+O script nunca imprime senha/segredo: a URL sai mascarada e as variáveis
+`FINFAM_*` aparecem apenas como `definida`/`ausente`. Opções úteis: `--port N`
+(porta fixa), `--no-build` (reaproveita `.next`) e `--check-only` (valida e
+encerra). Sem `TEST_DATABASE_URL`, o script cai para `DATABASE_URL`; sem nenhuma
+das duas, falha com uma mensagem explícita.
 
 ## Variáveis de ambiente
 

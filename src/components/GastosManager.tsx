@@ -516,6 +516,8 @@ export default function GastosManager({
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
           Mês
           <select
+            id="gastos-month"
+            name="month"
             value={mes}
             onChange={(event) => handleMonthChange(event.target.value)}
             disabled={isPending}
@@ -543,6 +545,8 @@ export default function GastosManager({
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted sm:col-span-2">
           Buscar por descrição
           <input
+            id="gastos-filter-search"
+            name="search"
             type="search"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
@@ -554,6 +558,8 @@ export default function GastosManager({
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
           Categoria
           <select
+            id="gastos-filter-category"
+            name="category"
             value={filters.category ?? ""}
             onChange={(event) =>
               setFilters((prev) => ({
@@ -575,6 +581,8 @@ export default function GastosManager({
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
           Forma de pagamento
           <select
+            id="gastos-filter-payment"
+            name="payment"
             value={filters.payment ?? ""}
             onChange={(event) =>
               setFilters((prev) => ({
@@ -596,6 +604,8 @@ export default function GastosManager({
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
           Status
           <select
+            id="gastos-filter-status"
+            name="status"
             value={filters.status ?? ""}
             onChange={(event) =>
               setFilters((prev) => ({
@@ -666,6 +676,8 @@ export default function GastosManager({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted sm:col-span-2">
             Descrição
             <input
+              id="gasto-description"
+              name="description"
               type="text"
               value={form.description}
               onChange={(event) => updateField("description", event.target.value)}
@@ -684,6 +696,8 @@ export default function GastosManager({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Valor (R$)
             <input
+              id="gasto-amount"
+              name="amount"
               type="text"
               inputMode="decimal"
               value={form.amount}
@@ -703,6 +717,8 @@ export default function GastosManager({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
             <MaskedInput
+              id="gasto-date"
+              name="date"
               mask="date"
               value={form.date}
               onChange={(value) => updateField("date", value)}
@@ -720,6 +736,8 @@ export default function GastosManager({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Categoria (opcional)
             <input
+              id="gasto-category"
+              name="category"
               type="text"
               value={form.category}
               list={CATEGORY_DATALIST_ID}
@@ -732,6 +750,8 @@ export default function GastosManager({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Forma de pagamento
             <select
+              id="gasto-payment"
+              name="paymentMethod"
               value={form.paymentMethod}
               onChange={(event) =>
                 updateField("paymentMethod", event.target.value as PaymentMethod)
@@ -748,6 +768,8 @@ export default function GastosManager({
 
           <label className="flex items-center gap-2 text-sm font-medium text-foreground-muted">
             <input
+              id="gasto-paid"
+              name="paid"
               type="checkbox"
               checked={form.paid}
               onChange={(event) => updateField("paid", event.target.checked)}

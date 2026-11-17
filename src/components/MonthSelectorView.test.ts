@@ -59,6 +59,13 @@ describe("MonthSelectorView (markup estático)", () => {
     const html = render({ monthKey: "2026-09" });
     expect(html).not.toContain("15/09 a 14/10");
   });
+
+  it("dá id e name ao seletor de mês e nome acessível (regressão #373)", () => {
+    const html = render({ monthKey: "2026-09" });
+
+    expect(html).toMatch(/<input[^>]*id="month-selector"[^>]*name="month"/);
+    expect(html).toContain('aria-label="Selecionar mês"');
+  });
 });
 
 describe("MonthSelector do ciclo — mês exibido = mês da fatura", () => {

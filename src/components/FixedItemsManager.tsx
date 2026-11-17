@@ -379,6 +379,8 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
             <span className="text-sm font-medium text-foreground-muted">Nome</span>
             <input
               ref={nameInputRef}
+              id="fixed-item-name"
+              name="name"
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -398,6 +400,8 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 Valor (R$)
               </span>
               <input
+                id="fixed-item-amount"
+                name="amount"
                 type="text"
                 inputMode="decimal"
                 placeholder="1.234,56"
@@ -418,6 +422,8 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 {dayLabel}
               </span>
               <input
+                id="fixed-item-day"
+                name={dayField}
                 type="number"
                 min={1}
                 max={31}
@@ -440,6 +446,8 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 Categoria (opcional)
               </span>
               <input
+                id="fixed-item-category"
+                name="category"
                 type="text"
                 value={category}
                 list={CATEGORY_DATALIST_ID}
@@ -457,6 +465,8 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 Início da vigência (opcional)
               </span>
               <MaskedInput
+                id="fixed-item-start-month"
+                name="startMonth"
                 mask="month"
                 placeholder="AAAA-MM"
                 value={startMonth}
@@ -478,6 +488,8 @@ export default function FixedItemsManager(props: FixedItemsManagerProps) {
                 Fim da vigência (opcional)
               </span>
               <MaskedInput
+                id="fixed-item-end-month"
+                name="endMonth"
                 mask="month"
                 placeholder="AAAA-MM"
                 value={endMonth}

@@ -165,6 +165,8 @@ export default function PurchaseSimulator({
             Valor da compra (R$)
           </span>
           <input
+            id="purchase-simulator-value"
+            name="value"
             type="text"
             inputMode="decimal"
             placeholder="1.234,56"
@@ -183,6 +185,8 @@ export default function PurchaseSimulator({
             Número de parcelas
           </span>
           <input
+            id="purchase-simulator-installments"
+            name="installments"
             type="text"
             inputMode="numeric"
             value={installments}

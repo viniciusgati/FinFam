@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  availableCardLimitCents,
   invoiceLinesForMonth,
   type CardPurchaseRecord,
 } from "@/lib/invoices";
@@ -222,6 +223,18 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
   const currentTotalCents = adjustmentCardId
     ? (cardInvoiceTotals.get(adjustmentCardId) ?? 0)
     : 0;
+
+  /**
+   * Linha de limite do cartão: mostra o limite cadastrado e o disponível na
+   * competência exibida (limite − parcelas do mês). Cartão sem limite continua
+   * "Sem limite" (não há o que descontar).
+   */
+  function cardLimitLabel(card: CreditCardData): string {
+    const invoiceCents = cardInvoiceTotals.get(card.id) ?? 0;
+    const available = availableCardLimitCents(card.limitCents, invoiceCents);
+    if (available === null || card.limitCents === null) return " · Sem limite";
+    return ` · Limite ${formatCents(card.limitCents)} · Limite disponível ${formatCents(available)}`;
+  }
 
   function showSuccess(message: string) {
     setSuccess(message);
@@ -748,6 +761,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             <label className="block space-y-1">
               <span className="text-sm font-medium text-foreground-muted">Cartão</span>
               <select
+                id="card-adjustment-card"
+                name="cardId"
                 value={adjustmentCardId}
                 onChange={(event) => {
                   setAdjustmentCardId(event.target.value);
@@ -781,6 +796,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Total-alvo (R$)
               </span>
               <input
+                id="card-adjustment-target"
+                name="target"
                 type="text"
                 inputMode="decimal"
                 placeholder="750,00"
@@ -907,9 +924,7 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                   <p className="text-sm text-subtle">
                     Fechamento dia {card.closingDay} · Vencimento dia{" "}
                     {card.dueDay}
-                    {card.limitCents !== null
-                      ? ` · Limite ${formatCents(card.limitCents)}`
-                      : " · Sem limite"}
+                    {cardLimitLabel(card)}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
@@ -971,6 +986,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
               <span className="text-sm font-medium text-foreground-muted">Nome</span>
               <input
                 ref={cardNameInputRef}
+                id="card-name"
+                name="name"
                 type="text"
                 value={cardName}
                 onChange={(event) => setCardName(event.target.value)}
@@ -989,6 +1006,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Limite (R$, opcional)
               </span>
               <input
+                id="card-limit"
+                name="limit"
                 type="text"
                 inputMode="decimal"
                 placeholder="1.234,56"
@@ -1011,6 +1030,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Dia de fechamento
               </span>
               <input
+                id="card-closing-day"
+                name="closingDay"
                 type="number"
                 min={1}
                 max={31}
@@ -1033,6 +1054,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Dia de vencimento
               </span>
               <input
+                id="card-due-day"
+                name="dueDay"
                 type="number"
                 min={1}
                 max={31}
@@ -1163,6 +1186,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             <label className="block space-y-1">
               <span className="text-sm font-medium text-foreground-muted">Cartão</span>
               <select
+                id="card-purchase-card"
+                name="cardId"
                 value={purchaseCardId}
                 onChange={(event) => setPurchaseCardId(event.target.value)}
                 disabled={disabled}
@@ -1191,6 +1216,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
               </span>
               <input
                 ref={purchaseDescInputRef}
+                id="card-purchase-description"
+                name="description"
                 type="text"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -1215,6 +1242,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Valor total (R$)
               </span>
               <input
+                id="card-purchase-amount"
+                name="amount"
                 type="text"
                 inputMode="decimal"
                 placeholder="1.234,56"
@@ -1235,6 +1264,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             <label className="block space-y-1">
               <span className="text-sm font-medium text-foreground-muted">Data</span>
               <MaskedInput
+                id="card-purchase-date"
+                name="purchaseDate"
                 mask="date"
                 value={purchaseDate}
                 onChange={setPurchaseDate}
@@ -1259,6 +1290,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Parcela (nº)
               </span>
               <input
+                id="card-purchase-installment"
+                name="installmentNumber"
                 type="number"
                 min={1}
                 value={installmentNumber}
@@ -1282,6 +1315,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Total de parcelas
               </span>
               <input
+                id="card-purchase-installments"
+                name="installmentsTotal"
                 type="number"
                 min={1}
                 value={installmentsTotal}
@@ -1305,6 +1340,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Categoria (opcional)
               </span>
               <input
+                id="card-purchase-category"
+                name="category"
                 type="text"
                 value={category}
                 list={CATEGORY_DATALIST_ID}

@@ -506,3 +506,16 @@ export function cycleInvoicePaymentLabel(cents: number): string | null {
   if (cents <= 0) return null;
   return `Faturas a pagar no ciclo: ${formatCents(cents)}`;
 }
+
+/**
+ * Limite disponível do cartão no mês da fatura exibida: limite menos o total
+ * das parcelas que caem naquela competência. Sem limite cadastrado não há
+ * valor a exibir (`null`).
+ */
+export function availableCardLimitCents(
+  limitCents: number | null,
+  invoiceCents: number,
+): number | null {
+  if (limitCents === null) return null;
+  return limitCents - invoiceCents;
+}

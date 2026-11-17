@@ -78,6 +78,8 @@ export function MonthSelectorView({
       </div>
 
       <input
+        id="month-selector"
+        name="month"
         type="month"
         value={monthKey}
         disabled={isPending}

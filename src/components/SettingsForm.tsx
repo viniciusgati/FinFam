@@ -158,6 +158,8 @@ export default function SettingsForm({
             Dia de início do ciclo financeiro
           </span>
           <input
+            id="settings-cycle-start-day"
+            name="cycleStartDay"
             type="number"
             min={1}
             max={28}
@@ -181,6 +183,8 @@ export default function SettingsForm({
             Meta de economia por ciclo (opcional)
           </span>
           <input
+            id="settings-savings-goal"
+            name="savingsGoal"
             type="text"
             inputMode="decimal"
             placeholder="0,00"

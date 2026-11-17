@@ -281,6 +281,8 @@ export default function ExtraIncomesManager({
         <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
           Mês
           <select
+            id="extra-income-month"
+            name="month"
             value={mes}
             onChange={(event) => handleMonthChange(event.target.value)}
             disabled={isPending}
@@ -328,6 +330,8 @@ export default function ExtraIncomesManager({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted sm:col-span-2">
             Descrição
             <input
+              id="extra-income-description"
+              name="description"
               type="text"
               value={form.description}
               onChange={(event) =>
@@ -353,6 +357,8 @@ export default function ExtraIncomesManager({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Valor (R$)
             <input
+              id="extra-income-amount"
+              name="amount"
               type="text"
               inputMode="decimal"
               value={form.amount}
@@ -377,6 +383,8 @@ export default function ExtraIncomesManager({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
             <MaskedInput
+              id="extra-income-date"
+              name="date"
               mask="date"
               value={form.date}
               onChange={(value) => updateField("date", value)}

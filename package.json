@@ -22,7 +22,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:snapshots": "tsx prisma/snapshots.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "acceptance:prepare": "tsx scripts/acceptance-env.ts prepare",
+    "acceptance:serve": "tsx scripts/acceptance-env.ts serve"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
