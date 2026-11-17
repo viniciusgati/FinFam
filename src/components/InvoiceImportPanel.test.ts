@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { IMPORT_FAILURE_MESSAGE } from "@/lib/invoice-import";
 import InvoiceImportPanel, {
@@ -12,6 +12,8 @@ import InvoiceImportPanel, {
   countsSummaryText,
   executeInvoiceImport,
   importTotalText,
+  replaceConfirmMessage,
+  runInvoiceImport,
   type InvoiceImportBodyProps,
   type InvoiceImportConfirmation,
   type InvoiceImportPreviewSummary,
@@ -100,9 +102,14 @@ describe("InvoiceImportPanel — estado inicial", () => {
     expect(
       disabledButtonCount(renderBody({ cardId: "card-1", hasFile: false })),
     ).toBe(2);
+  });
+
+  it("com cartão e arquivo, substituir só habilita depois do preview", () => {
     expect(
-      disabledButtonCount(renderBody({ cardId: "card-1", hasFile: true })),
-    ).toBe(0);
+      disabledButtonCount(
+        renderBody({ cardId: "card-1", hasFile: true, preview: null }),
+      ),
+    ).toBe(1);
   });
 
   it("não mostra resumo, status nem alerta antes da primeira ação", () => {
@@ -131,6 +138,14 @@ describe("textos puros do painel", () => {
     ).toBe("9 a importar · 2 a remover · 1 a casar · 4 a ignorar");
     expect(importTotalText(325170).replace(/\u00a0/g, " ")).toBe(
       "Total a importar: R$ 3.251,70",
+    );
+  });
+
+  it("monta a confirmação destrutiva com competência e contagens exatas", () => {
+    expect(
+      replaceConfirmMessage({ monthKey: "2026-09", toImport: 9, toRemove: 2 }),
+    ).toBe(
+      "Substituir a competência de setembro/2026? 9 lançamentos serão importados e 2 serão removidos. Esta ação não pode ser desfeita.",
     );
   });
 });
@@ -387,20 +402,202 @@ describe("executeInvoiceImport — requisição", () => {
   });
 });
 
+describe("runInvoiceImport — gate de confirmação", () => {
+  const CSV = "date,title,amount\n2026-09-01,Padaria,10,00";
+  const preview: InvoiceImportPreviewSummary = {
+    monthKey: "2026-09",
+    toImport: 9,
+    toRemove: 2,
+    toMatch: 1,
+    ignored: 4,
+    totalCents: 325170,
+  };
+
+  function fileOf(csv: string) {
+    return { text: vi.fn(async () => csv) };
+  }
+
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sem preview não confirma, não pergunta e não faz requisição", async () => {
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("window", { confirm });
+    const fetchImpl = vi.fn();
+
+    const outcome = await runInvoiceImport({
+      mode: "confirm",
+      cardId: "card-1",
+      file: fileOf(CSV),
+      preview: null,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(outcome).toBeNull();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("sem cartão ou sem arquivo não pergunta e não faz requisição", async () => {
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("window", { confirm });
+    const fetchImpl = vi.fn();
+
+    for (const params of [
+      { cardId: "", file: fileOf(CSV) },
+      { cardId: "card-1", file: null },
+    ]) {
+      const outcome = await runInvoiceImport({
+        mode: "confirm",
+        ...params,
+        preview,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+
+      expect(outcome).toBeNull();
+    }
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("modo preview não pede confirmação e envia dryRun", async () => {
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("window", { confirm });
+    const fetchImpl = makeFetch(async () =>
+      jsonResponse({
+        monthKey: "2026-09",
+        toImport: 9,
+        toRemove: 2,
+        toMatch: 1,
+        ignored: 4,
+        totalCents: 325170,
+      }),
+    );
+
+    const outcome = await runInvoiceImport({
+      mode: "preview",
+      cardId: "card-1",
+      file: fileOf(CSV),
+      preview,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(outcome?.preview?.monthKey).toBe("2026-09");
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      cardId: "card-1",
+      csv: CSV,
+      dryRun: true,
+    });
+  });
+
+  it("window.confirm falso: nenhuma requisição e nenhum estado é iniciado", async () => {
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("window", { confirm });
+    const fetchImpl = vi.fn();
+    const onStart = vi.fn();
+
+    const outcome = await runInvoiceImport({
+      mode: "confirm",
+      cardId: "card-1",
+      file: fileOf(CSV),
+      preview,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onStart,
+    });
+
+    expect(outcome).toBeNull();
+    expect(confirm).toHaveBeenCalledWith(replaceConfirmMessage(preview));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("window.confirm verdadeiro: envia mode confirm uma única vez", async () => {
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal("window", { confirm });
+    const fetchImpl = makeFetch(async () =>
+      jsonResponse({ imported: 9, removed: 2, matched: 1, ignored: 4 }),
+    );
+    const onStart = vi.fn();
+
+    const outcome = await runInvoiceImport({
+      mode: "confirm",
+      cardId: "card-1",
+      file: fileOf(CSV),
+      preview,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onStart,
+    });
+
+    expect(confirm).toHaveBeenCalledWith(replaceConfirmMessage(preview));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ cardId: "card-1", csv: CSV });
+    expect(outcome?.confirmation).toEqual({
+      imported: 9,
+      removed: 2,
+      matched: 1,
+      ignored: 4,
+    });
+  });
+});
+
 describe("InvoiceImportPanel — fonte (guard e wiring)", () => {
   const source = readSource("./InvoiceImportPanel.tsx");
 
   it("ignora cliques repetidos enquanto há requisição em voo", () => {
     const body = runImportBody(source);
 
-    expect(body).toContain("if (busyRef.current || !cardId || !file) return;");
-    const guard = body.indexOf("busyRef.current || !cardId || !file");
-    const busy = body.indexOf("setBusy(mode)");
-    const call = body.indexOf("executeInvoiceImport(");
+    expect(body).toContain("if (busyRef.current) return;");
+    const guard = body.indexOf("if (busyRef.current) return;");
+    const start = body.indexOf("onStart:");
+    const call = body.indexOf("runInvoiceImport({");
     expect(guard).toBeGreaterThanOrEqual(0);
-    expect(guard).toBeLessThan(busy);
-    expect(busy).toBeLessThan(call);
+    expect(guard).toBeLessThan(call);
+    expect(call).toBeLessThan(start);
+    expect(body).toContain("busyRef.current = true;");
     expect(body).toContain("busyRef.current = false;");
+  });
+
+  it("exige preview e window.confirm antes de executeInvoiceImport", () => {
+    const start = source.indexOf("export async function runInvoiceImport(");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const body = source.slice(start, source.indexOf("\n}\n", start));
+
+    expect(body).toContain("if (!params.cardId || params.file === null) return null;");
+    expect(body).toContain("if (params.preview === null) return null;");
+    expect(body).toContain("window.confirm(message)");
+    expect(body).toContain("if (!confirmImpl(");
+    const confirmIndex = body.indexOf("if (!confirmImpl(");
+    const startIndex = body.indexOf("params.onStart?.()");
+    const callIndex = body.indexOf("executeInvoiceImport(");
+    expect(confirmIndex).toBeGreaterThanOrEqual(0);
+    expect(confirmIndex).toBeLessThan(startIndex);
+    expect(startIndex).toBeLessThan(callIndex);
+  });
+
+  it("descarta o preview ao trocar o cartão ou o arquivo", () => {
+    for (const name of ["resetFeedback", "handleCardChange", "handleFileChange"]) {
+      const start = source.indexOf(`function ${name}(`);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const body = source.slice(start, source.indexOf("\n  }\n", start));
+      if (name === "resetFeedback") {
+        expect(body).toContain("setPreview(null)");
+      } else {
+        expect(body).toContain("resetFeedback();");
+      }
+    }
   });
 
   it("chama router.refresh() após a confirmação persistida", () => {
@@ -413,8 +610,7 @@ describe("InvoiceImportPanel — fonte (guard e wiring)", () => {
     expect(source).toContain('accept=".csv,text/csv"');
     expect(source).toContain("await params.file.text()");
     expect(source).toContain("body: JSON.stringify(payload)");
-    expect(
-      source.split("disabled={actionsDisabled}").length - 1,
-    ).toBe(2);
+    expect(source.split("disabled={actionsDisabled}").length - 1).toBe(1);
+    expect(source.split("disabled={confirmDisabled}").length - 1).toBe(1);
   });
 });
