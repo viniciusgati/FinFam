@@ -192,6 +192,8 @@ export default function QuickCardAdjustmentCard({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Cartão
             <select
+              id="quick-card-adjustment-card"
+              name="cardId"
               value={cardId}
               onChange={(event) => setCardId(event.target.value)}
               aria-invalid={selectionInvalid}
@@ -218,6 +220,8 @@ export default function QuickCardAdjustmentCard({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Novo total (R$)
             <input
+              id="quick-card-adjustment-total"
+              name="total"
               type="text"
               inputMode="decimal"
               placeholder="1.234,56"

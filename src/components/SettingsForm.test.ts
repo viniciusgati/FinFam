@@ -130,4 +130,15 @@ describe("SettingsForm — erro de leitura (somente leitura)", () => {
     expect(guard).toBeGreaterThanOrEqual(0);
     expect(body.indexOf("fetch(")).toBeGreaterThan(guard);
   });
+
+  it("dá id e name aos campos e mantém rótulo associado (regressão #373)", () => {
+    const html = renderForm({ loadError: null });
+
+    expect(html).toMatch(
+      /<label[^>]*>.*Dia de início do ciclo financeiro.*<input[^>]*id="settings-cycle-start-day"[^>]*name="cycleStartDay"/s,
+    );
+    expect(html).toMatch(
+      /<label[^>]*>.*Meta de economia por ciclo.*<input[^>]*id="settings-savings-goal"[^>]*name="savingsGoal"/s,
+    );
+  });
 });

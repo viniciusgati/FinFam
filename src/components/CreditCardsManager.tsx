@@ -761,6 +761,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             <label className="block space-y-1">
               <span className="text-sm font-medium text-foreground-muted">Cartão</span>
               <select
+                id="card-adjustment-card"
+                name="cardId"
                 value={adjustmentCardId}
                 onChange={(event) => {
                   setAdjustmentCardId(event.target.value);
@@ -794,6 +796,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Total-alvo (R$)
               </span>
               <input
+                id="card-adjustment-target"
+                name="target"
                 type="text"
                 inputMode="decimal"
                 placeholder="750,00"
@@ -982,6 +986,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
               <span className="text-sm font-medium text-foreground-muted">Nome</span>
               <input
                 ref={cardNameInputRef}
+                id="card-name"
+                name="name"
                 type="text"
                 value={cardName}
                 onChange={(event) => setCardName(event.target.value)}
@@ -1000,6 +1006,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Limite (R$, opcional)
               </span>
               <input
+                id="card-limit"
+                name="limit"
                 type="text"
                 inputMode="decimal"
                 placeholder="1.234,56"
@@ -1022,6 +1030,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Dia de fechamento
               </span>
               <input
+                id="card-closing-day"
+                name="closingDay"
                 type="number"
                 min={1}
                 max={31}
@@ -1044,6 +1054,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Dia de vencimento
               </span>
               <input
+                id="card-due-day"
+                name="dueDay"
                 type="number"
                 min={1}
                 max={31}
@@ -1174,6 +1186,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             <label className="block space-y-1">
               <span className="text-sm font-medium text-foreground-muted">Cartão</span>
               <select
+                id="card-purchase-card"
+                name="cardId"
                 value={purchaseCardId}
                 onChange={(event) => setPurchaseCardId(event.target.value)}
                 disabled={disabled}
@@ -1202,6 +1216,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
               </span>
               <input
                 ref={purchaseDescInputRef}
+                id="card-purchase-description"
+                name="description"
                 type="text"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -1226,6 +1242,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Valor total (R$)
               </span>
               <input
+                id="card-purchase-amount"
+                name="amount"
                 type="text"
                 inputMode="decimal"
                 placeholder="1.234,56"
@@ -1246,6 +1264,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
             <label className="block space-y-1">
               <span className="text-sm font-medium text-foreground-muted">Data</span>
               <MaskedInput
+                id="card-purchase-date"
+                name="purchaseDate"
                 mask="date"
                 value={purchaseDate}
                 onChange={setPurchaseDate}
@@ -1270,6 +1290,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Parcela (nº)
               </span>
               <input
+                id="card-purchase-installment"
+                name="installmentNumber"
                 type="number"
                 min={1}
                 value={installmentNumber}
@@ -1293,6 +1315,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Total de parcelas
               </span>
               <input
+                id="card-purchase-installments"
+                name="installmentsTotal"
                 type="number"
                 min={1}
                 value={installmentsTotal}
@@ -1316,6 +1340,8 @@ export default function CreditCardsManager(props: CreditCardsManagerProps) {
                 Categoria (opcional)
               </span>
               <input
+                id="card-purchase-category"
+                name="category"
                 type="text"
                 value={category}
                 list={CATEGORY_DATALIST_ID}

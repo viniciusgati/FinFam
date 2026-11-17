@@ -188,3 +188,30 @@ describe("QuickExpenseCard (fluxo de envio)", () => {
     expect(source).toContain('submitting ? "Salvando..." : "Salvar"');
   });
 });
+
+describe("QuickExpenseCard (acessibilidade do formulário)", () => {
+  it("dá id e name a todos os campos do lançamento rápido (regressão #373)", () => {
+    const html = render({ cards: CARDS });
+
+    expect(html).toMatch(/<select[^>]*id="quick-payment"[^>]*name="payment"/);
+    expect(html).toMatch(/<input[^>]*id="quick-date"[^>]*name="date"/);
+    expect(html).toMatch(
+      /<input[^>]*id="quick-description"[^>]*name="description"/,
+    );
+    expect(html).toMatch(/<input[^>]*id="quick-amount"[^>]*name="amount"/);
+    expect(html).toMatch(/<input[^>]*id="quick-category"[^>]*name="category"/);
+  });
+
+  it("associa cada rótulo visível ao respectivo campo", () => {
+    const html = render({ cards: CARDS });
+
+    expect(html).toMatch(/<label[^>]*>Data<input[^>]*id="quick-date"/s);
+    expect(html).toMatch(
+      /<label[^>]*>Descrição<input[^>]*id="quick-description"/s,
+    );
+    expect(html).toMatch(/<label[^>]*>Valor \(R\$\)<input[^>]*id="quick-amount"/s);
+    expect(html).toMatch(
+      /<label[^>]*>Categoria<input[^>]*id="quick-category"/s,
+    );
+  });
+});

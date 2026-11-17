@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -104,5 +105,16 @@ describe("AppNav (markup estático)", () => {
     expect(html).toContain('<span class="sr-only">Expandir menu</span>');
     expect(html).not.toContain("Fixar menu");
     expect(html).not.toContain("Desfixar menu");
+  });
+
+  it("fecha o menu mobile ao pressionar Escape (regressão #373)", () => {
+    const source = readFileSync(
+      new URL("./AppNav.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain('event.key === "Escape"');
+    expect(source).toContain('document.addEventListener("keydown"');
+    expect(source).toContain("setOpen(false)");
   });
 });

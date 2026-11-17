@@ -75,24 +75,28 @@ export default function LoginPage() {
             Usuário
           </span>
           <input
+            id="login-user"
+            name="user"
             type="text"
             value={user}
             onChange={(event) => setUser(event.target.value)}
             autoComplete="username"
             required
-            className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500"
+            className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
           />
         </label>
 
         <label className="block space-y-1">
           <span className="text-sm font-medium text-foreground-muted">Senha</span>
           <input
+            id="login-pass"
+            name="pass"
             type="password"
             value={pass}
             onChange={(event) => setPass(event.target.value)}
             autoComplete="current-password"
             required
-            className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500"
+            className="w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-foreground outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
           />
         </label>
 
@@ -130,7 +134,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
+          className="w-full rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-60"
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>

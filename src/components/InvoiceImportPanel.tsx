@@ -274,6 +274,8 @@ export function InvoiceImportBody({
             Cartão
           </span>
           <select
+            id="invoice-import-card"
+            name="cardId"
             value={cardId}
             onChange={(event) => onCardChange(event.target.value)}
             disabled={busy !== null}
@@ -293,6 +295,8 @@ export function InvoiceImportBody({
             Arquivo CSV da fatura
           </span>
           <input
+            id="invoice-import-file"
+            name="file"
             type="file"
             accept=".csv,text/csv"
             onChange={onFileChange}

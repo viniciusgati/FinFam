@@ -237,6 +237,8 @@ export default function QuickExpenseCard({
             <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
               Forma de pagamento
               <select
+                id="quick-payment"
+                name="payment"
                 value={payment}
                 onChange={(event) => setPayment(event.target.value)}
                 aria-invalid={Boolean(errors.cardId)}
@@ -261,6 +263,8 @@ export default function QuickExpenseCard({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Data
             <input
+              id="quick-date"
+              name="date"
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
@@ -278,6 +282,8 @@ export default function QuickExpenseCard({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Descrição
             <input
+              id="quick-description"
+              name="description"
               type="text"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
@@ -301,6 +307,8 @@ export default function QuickExpenseCard({
           <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
             Valor (R$)
             <input
+              id="quick-amount"
+              name="amount"
               type="text"
               inputMode="decimal"
               value={amount}
@@ -321,6 +329,8 @@ export default function QuickExpenseCard({
             <label className="flex flex-col gap-1 text-sm font-medium text-foreground-muted">
               Categoria
               <input
+                id="quick-category"
+                name="category"
                 type="text"
                 value={category}
                 list={CATEGORY_DATALIST_ID}

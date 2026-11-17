@@ -14,6 +14,8 @@ export interface MaskedInputProps {
   disabled?: boolean;
   className?: string;
   placeholder?: string;
+  id?: string;
+  name?: string;
   "aria-invalid"?: boolean;
   "aria-describedby"?: string;
 }
