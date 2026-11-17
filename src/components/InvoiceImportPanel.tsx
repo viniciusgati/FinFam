@@ -47,10 +47,15 @@ const MONTH_NAMES = [
   "dezembro",
 ];
 
+/** "setembro/2026" — mês por extenso seguido do ano. */
+function monthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  return `${MONTH_NAMES[month - 1]}/${year}`;
+}
+
 /** "Competência: setembro/2026" — mês por extenso no formato da história. */
 export function competenceSummaryText(monthKey: string): string {
-  const [year, month] = monthKey.split("-").map(Number);
-  return `Competência: ${MONTH_NAMES[month - 1]}/${year}`;
+  return `Competência: ${monthLabel(monthKey)}`;
 }
 
 /** "9 a importar · 2 a remover · 1 a casar · 4 a ignorar". */
@@ -79,6 +84,23 @@ export function confirmationStatusText(
     `Fatura substituída: ${summary.imported} importadas, ` +
     `${summary.removed} removidas, ${summary.matched} casadas, ` +
     `${summary.ignored} ignoradas.`
+  );
+}
+
+/**
+ * Pergunta exibida em `window.confirm` antes da substituição destrutiva.
+ * Inclui a competência por extenso e as contagens do preview.
+ */
+export function replaceConfirmMessage(
+  summary: Pick<
+    InvoiceImportPreviewSummary,
+    "monthKey" | "toImport" | "toRemove"
+  >,
+): string {
+  return (
+    `Substituir a competência de ${monthLabel(summary.monthKey)}? ` +
+    `${summary.toImport} lançamentos serão importados e ` +
+    `${summary.toRemove} serão removidos. Esta ação não pode ser desfeita.`
   );
 }
 
@@ -157,6 +179,47 @@ export async function executeInvoiceImport(
   }
 }
 
+export interface RunInvoiceImportParams {
+  mode: InvoiceImportMode;
+  cardId: string;
+  file: { text: () => Promise<string> } | null;
+  preview: InvoiceImportPreviewSummary | null;
+  fetchImpl?: typeof fetch;
+  /** Confirmação injetável nos testes; na UI usa `window.confirm`. */
+  confirmImpl?: (message: string) => boolean;
+  /** Chamado só na confirmação persistida — a página usa `router.refresh()`. */
+  onImported?: () => void;
+  /** Chamado imediatamente antes do fetch, depois de todos os gates. */
+  onStart?: () => void;
+}
+
+/**
+ * Orquestra o clique nos botões do painel. Devolve `null` quando nada deve
+ * ser enviado: sem cartão/arquivo, confirmação sem preview válido ou usuário
+ * cancelando o `window.confirm` (nesse caso nenhum estado muda).
+ */
+export async function runInvoiceImport(
+  params: RunInvoiceImportParams,
+): Promise<InvoiceImportOutcome | null> {
+  if (!params.cardId || params.file === null) return null;
+
+  if (params.mode === "confirm") {
+    if (params.preview === null) return null;
+    const confirmImpl =
+      params.confirmImpl ?? ((message: string) => window.confirm(message));
+    if (!confirmImpl(replaceConfirmMessage(params.preview))) return null;
+  }
+
+  params.onStart?.();
+  return executeInvoiceImport({
+    mode: params.mode,
+    cardId: params.cardId,
+    file: params.file,
+    fetchImpl: params.fetchImpl,
+    onImported: params.onImported,
+  });
+}
+
 export interface InvoiceImportBodyProps {
   cards: InvoiceImportCardOption[];
   cardId: string;
@@ -190,6 +253,7 @@ export function InvoiceImportBody({
   onConfirm,
 }: InvoiceImportBodyProps) {
   const actionsDisabled = !cardId || !hasFile || busy !== null;
+  const confirmDisabled = actionsDisabled || preview === null;
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
@@ -250,7 +314,7 @@ export function InvoiceImportBody({
         <button
           type="button"
           onClick={onConfirm}
-          disabled={actionsDisabled}
+          disabled={confirmDisabled}
           className="rounded-lg border border-border-strong px-5 py-2 font-medium text-foreground transition hover:bg-surface-raised disabled:opacity-60"
         >
           {busy === "confirm" ? "Importando…" : "Substituir competência"}
@@ -343,17 +407,23 @@ export default function InvoiceImportPanel({
   }
 
   async function run(mode: InvoiceImportMode) {
-    if (busyRef.current || !cardId || !file) return;
-    busyRef.current = true;
-    setBusy(mode);
-    setError(null);
+    if (busyRef.current) return;
+    let started = false;
     try {
-      const outcome = await executeInvoiceImport({
+      const outcome = await runInvoiceImport({
         mode,
         cardId,
         file,
+        preview,
+        onStart: () => {
+          started = true;
+          busyRef.current = true;
+          setBusy(mode);
+          setError(null);
+        },
         onImported: () => router.refresh(),
       });
+      if (outcome === null) return;
       if (outcome.error !== null) setError(outcome.error);
       if (outcome.preview !== null) {
         setPreview(outcome.preview);
@@ -364,8 +434,10 @@ export default function InvoiceImportPanel({
         setPreview(null);
       }
     } finally {
-      busyRef.current = false;
-      setBusy(null);
+      if (started) {
+        busyRef.current = false;
+        setBusy(null);
+      }
     }
   }
 

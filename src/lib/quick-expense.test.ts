@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   AMOUNT_ERROR,
+  CARD_ERROR,
   DATE_ERROR,
   DESCRIPTION_ERROR,
+  buildQuickCardPurchasePayload,
   buildQuickExpensePayload,
   isValidDateISO,
   mapQuickExpenseFieldErrors,
+  quickExpenseApiError,
+  quickExpenseSuccessMessage,
   todayISO,
   validateQuickExpense,
 } from "./quick-expense";
+import { cardPurchaseCreateSchema } from "./validation";
 import { createVariableExpenseSchema } from "./variable-expenses";
 
 const validInput = {
@@ -67,6 +72,19 @@ describe("validateQuickExpense", () => {
     expect(validateQuickExpense({ ...validInput, category: "Feira" })).toEqual(
       {},
     );
+  });
+
+  it("exige cartão quando o alvo é cartão, mas não no PIX", () => {
+    expect(validateQuickExpense({ ...validInput, target: "card" })).toEqual({
+      cardId: CARD_ERROR,
+    });
+    expect(
+      validateQuickExpense({ ...validInput, target: "card", cardId: "  " }),
+    ).toEqual({ cardId: CARD_ERROR });
+    expect(
+      validateQuickExpense({ ...validInput, target: "card", cardId: "card-1" }),
+    ).toEqual({});
+    expect(validateQuickExpense({ ...validInput, target: "pix" })).toEqual({});
   });
 });
 
@@ -139,6 +157,73 @@ describe("buildQuickExpensePayload", () => {
         date: "2026-02-30",
       }),
     ).toBeNull();
+  });
+});
+
+describe("buildQuickCardPurchasePayload", () => {
+  const cardInput = {
+    description: "Mercado",
+    amount: "120,00",
+    date: "2026-03-10",
+    category: "Mercado",
+    cardId: "card-1",
+    target: "card" as const,
+  };
+
+  it("monta o payload exato do POST /api/card-purchases", () => {
+    expect(buildQuickCardPurchasePayload(cardInput)).toEqual({
+      cardId: "card-1",
+      description: "Mercado",
+      amountCents: 12000,
+      purchaseDate: "2026-03-10T00:00:00",
+      category: "Mercado",
+      installmentNumber: 1,
+      installmentsTotal: 1,
+    });
+  });
+
+  it("usa null na categoria vazia e passa no schema do endpoint", () => {
+    const payload = buildQuickCardPurchasePayload({
+      ...cardInput,
+      category: "  ",
+    });
+
+    expect(payload).not.toBeNull();
+    if (!payload) return;
+    expect(payload.category).toBeNull();
+    expect(cardPurchaseCreateSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it("devolve null sem cartão ou com entrada inválida", () => {
+    expect(
+      buildQuickCardPurchasePayload({ ...cardInput, cardId: "" }),
+    ).toBeNull();
+    expect(
+      buildQuickCardPurchasePayload({ ...cardInput, amount: "0" }),
+    ).toBeNull();
+    expect(
+      buildQuickCardPurchasePayload({ ...cardInput, date: "2026-02-30" }),
+    ).toBeNull();
+  });
+});
+
+describe("quickExpenseSuccessMessage", () => {
+  it("distingue PIX de cartão", () => {
+    expect(quickExpenseSuccessMessage("pix")).toBe("Gasto criado");
+    expect(quickExpenseSuccessMessage("card")).toBe(
+      "Compra lançada na fatura do cartão",
+    );
+  });
+});
+
+describe("quickExpenseApiError", () => {
+  it("extrai o error textual e ignora respostas sem error", () => {
+    expect(quickExpenseApiError({ error: "Cartão não encontrado" })).toBe(
+      "Cartão não encontrado",
+    );
+    expect(quickExpenseApiError({ fieldErrors: {} })).toBeNull();
+    expect(quickExpenseApiError(null)).toBeNull();
+    expect(quickExpenseApiError({ error: "" })).toBeNull();
   });
 });
 
