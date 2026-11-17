@@ -307,13 +307,14 @@ const ALL_DASHBOARD_BLOCKS: DashboardBlock[] = [
   { id: "category-breakdown", state: "ok" },
   { id: "savings-goal", state: "ok" },
   { id: "future-commitments", state: "ok" },
+  { id: "purchase-simulator", state: "ok" },
   { id: "open-expenses", state: "ok" },
   { id: "family-help", state: "ok" },
   { id: "month-review", state: "ok" },
 ];
 
 describe("zonas de decisão do dashboard", () => {
-  it("organiza os 13 blocos ok nas quatro zonas na ordem canônica", () => {
+  it("organiza os 14 blocos ok nas quatro zonas na ordem canônica", () => {
     const { zones, failed } = buildDashboardLayout(ALL_DASHBOARD_BLOCKS);
 
     expect(failed).toEqual([]);
@@ -346,6 +347,7 @@ describe("zonas de decisão do dashboard", () => {
       { id: "category-breakdown", state: "ok" },
       { id: "savings-goal", state: "ok" },
       { id: "future-commitments", state: "ok" },
+      { id: "purchase-simulator", state: "ok" },
       { id: "open-expenses", state: "ok" },
     ]);
     expect(zones[3].blocks).toEqual([
@@ -375,6 +377,7 @@ describe("zonas de decisão do dashboard", () => {
       "category-breakdown",
       "savings-goal",
       "future-commitments",
+      "purchase-simulator",
       "open-expenses",
     ]);
     expect(zones[3].blocks.map((block) => block.id)).toEqual(["month-review"]);
@@ -436,6 +439,7 @@ describe("zonas de decisão do dashboard", () => {
       { id: "card-adjustment", state: "ok" },
       { id: "income-allocation", state: "ok" },
       { id: "future-commitments", state: "ok" },
+      { id: "purchase-simulator", state: "ok" },
       { id: "open-expenses", state: "ok" },
       { id: "family-help", state: "ok" },
       { id: "month-spend", state: "error" },
@@ -466,6 +470,7 @@ describe("zonas de decisão do dashboard", () => {
       "category-breakdown",
       "savings-goal",
       "future-commitments",
+      "purchase-simulator",
       "open-expenses",
     ]);
     expect(zones[3].blocks.map((block) => block.id)).toEqual([
@@ -578,12 +583,13 @@ describe("página do dashboard em zonas de decisão", () => {
     "CategoryBreakdownCard",
     "SavingsGoalCard",
     "FutureCommitmentsCard",
+    "PurchaseSimulator",
     "OpenExpensesCard",
     "FamilyHelpCard",
     "MonthReviewPanel",
   ];
 
-  it("renderiza cada um dos 13 blocos exatamente uma vez na fonte", () => {
+  it("renderiza cada um dos 14 blocos exatamente uma vez na fonte", () => {
     const page = readSource(DASHBOARD_PAGE);
 
     for (const component of DASHBOARD_COMPONENTS) {
@@ -646,14 +652,72 @@ describe("página do dashboard em zonas de decisão", () => {
 });
 
 describe("ajuste rápido do cartão no dashboard", () => {
-  it("substitui o simulador Posso comprar? pelo bloco de ajuste", () => {
+  it("mantém o bloco de ajuste na zona Ações junto do simulador em Compromissos", () => {
     const page = readSource(DASHBOARD_PAGE);
 
     expect(page).toContain("<QuickCardAdjustmentCard");
-    expect(page).not.toContain("PurchaseSimulator");
-    expect(page).not.toContain("Posso comprar?");
     expect(page).toContain('id: "card-adjustment"');
-    expect(page).not.toContain('id: "purchase-simulator"');
+    expect(page).toContain('id: "purchase-simulator"');
+
+    // #374 preservada: o ajuste rápido fica só em Ações.
+    const actionsIndex = page.indexOf('case "actions":');
+    const commitmentsIndex = page.indexOf('case "commitments":');
+    const adjustmentIndex = page.indexOf("<QuickCardAdjustmentCard");
+    const simulatorIndex = page.indexOf("<PurchaseSimulator");
+    expect(adjustmentIndex).toBeGreaterThan(actionsIndex);
+    expect(adjustmentIndex).toBeLessThan(commitmentsIndex);
+    // O simulador volta à superfície em Compromissos, abaixo de Parcelas futuras.
+    expect(simulatorIndex).toBeGreaterThan(commitmentsIndex);
+    expect(simulatorIndex).toBeGreaterThan(page.indexOf("<FutureCommitmentsCard"));
+    expect(simulatorIndex).toBeLessThan(page.indexOf("<OpenExpensesCard"));
+
+    const { zones } = buildDashboardLayout([
+      { id: "card-adjustment", state: "ok" },
+      { id: "purchase-simulator", state: "ok" },
+    ]);
+    expect(zones).toEqual([
+      {
+        id: "actions",
+        title: "Ações",
+        priority: 2,
+        blocks: [{ id: "card-adjustment", state: "ok" }],
+      },
+      {
+        id: "commitments",
+        title: "Compromissos",
+        priority: 3,
+        blocks: [{ id: "purchase-simulator", state: "ok" }],
+      },
+    ]);
+  });
+
+  it("renderiza o simulador só no ciclo corrente com a diária disponível", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    const commitmentsIndex = page.indexOf('case "commitments":');
+    const simulatorIndex = page.indexOf("<PurchaseSimulator");
+    expect(simulatorIndex).toBeGreaterThan(commitmentsIndex);
+
+    // Condição de exibição: ciclo corrente + diária + série.
+    const start = page.lastIndexOf("{isCurrentCycle", simulatorIndex);
+    const condition = page.slice(start, simulatorIndex);
+    expect(condition).toContain("isCurrentCycle");
+    expect(condition).toContain("allowance !== null");
+    expect(condition).toContain("series !== null");
+
+    // Props ligadas ao orçamento, ritmo recente e meta.
+    const block = page.slice(simulatorIndex, page.indexOf("/>", simulatorIndex));
+    for (const prop of [
+      "freeBudgetCents={allowance.freeBudgetCents}",
+      "dailyCents={allowance.dailyCents}",
+      "remainingDays={allowance.remainingDays}",
+      "usualDailySpendCents={usualDailySpend}",
+      "savingsGoalCents={savingsGoalCents}",
+      "savingsGoalSavedCents={",
+    ]) {
+      expect(block).toContain(prop);
+    }
+    expect(block).toContain("savingsGoal?.savedCents ?? 0");
   });
 
   it("carrega os cartões só no ciclo corrente", () => {

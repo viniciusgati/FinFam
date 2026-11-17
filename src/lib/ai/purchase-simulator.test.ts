@@ -113,6 +113,157 @@ describe("simulatePurchase — limites", () => {
   });
 });
 
+describe("simulatePurchase — compra parcelada", () => {
+  it("sem installmentsTotal é idêntico à compra à vista", () => {
+    const avista = simulatePurchase({ ...base, purchaseCents: 80000 });
+    const semParcelas = simulatePurchase({
+      ...base,
+      purchaseCents: 80000,
+      installmentsTotal: undefined,
+    });
+
+    expect(semParcelas).toEqual(avista);
+    expect(semParcelas.installmentsTotal).toBe(1);
+    expect(semParcelas.installmentLabel).toBe(
+      "Compra à vista: sem parcelas futuras.",
+    );
+  });
+
+  it("100000 em 3x usa a 1ª parcela (33334) e informa 66666 futuros", () => {
+    const result = simulatePurchase({
+      ...base,
+      purchaseCents: 100000,
+      installmentsTotal: 3,
+    });
+
+    expect(result.installmentsTotal).toBe(3);
+    expect(result.installmentCents).toBe(33334);
+    expect(result.futureCommitmentCents).toBe(66666);
+    const data = buildPurchaseData({
+      ...base,
+      purchaseCents: 100000,
+      installmentsTotal: 3,
+    });
+    expect(data.impactPerDayCents).toBe(4167);
+    expect(plain(result.installmentLabel)).toBe(
+      "Parcela de R$ 333,34 em 3 vezes; 2 parcelas restantes somam R$ 666,66 de compromisso futuro.",
+    );
+  });
+
+  it("primeira parcela é floor(valor/N) + resto", () => {
+    const data = buildPurchaseData({
+      ...base,
+      purchaseCents: 100000,
+      installmentsTotal: 3,
+    });
+
+    expect(data.installmentCents).toBe(
+      Math.floor(100000 / 3) + (100000 % 3),
+    );
+    expect(data.futureCommitmentCents).toBe(66666);
+  });
+
+  it.each([0, -2, 2.7, null])(
+    "installmentsTotal %s normaliza para 1 no núcleo",
+    (installmentsTotal) => {
+      const result = simulatePurchase({
+        ...base,
+        purchaseCents: 80000,
+        installmentsTotal,
+      });
+
+      expect(result.installmentsTotal).toBe(1);
+      expect(result.installmentCents).toBe(80000);
+      expect(result.futureCommitmentCents).toBe(0);
+    },
+  );
+});
+
+describe("simulatePurchase — meta de economia", () => {
+  it("sem meta ou meta zerada não altera o veredito", () => {
+    const semMeta = simulatePurchase({ ...base, purchaseCents: 20000 });
+    const metaNula = simulatePurchase({
+      ...base,
+      purchaseCents: 20000,
+      savingsGoalCents: null,
+    });
+    const metaZero = simulatePurchase({
+      ...base,
+      purchaseCents: 20000,
+      savingsGoalCents: 0,
+    });
+
+    expect(semMeta.verdict).toBe("ok");
+    expect(metaNula).toEqual(semMeta);
+    expect(metaZero).toEqual(semMeta);
+    expect(metaZero.goalLabel).toBe("Sem meta de economia definida.");
+  });
+
+  it("meta atingida mantém o veredito e sinaliza atingida", () => {
+    const semMeta = simulatePurchase({ ...base, purchaseCents: 20000 });
+    const atingida = simulatePurchase({
+      ...base,
+      purchaseCents: 20000,
+      savingsGoalCents: 100000,
+      savingsGoalSavedCents: 100000,
+    });
+
+    expect(atingida.verdict).toBe(semMeta.verdict);
+    expect(atingida.goalLabel).toBe("Meta de economia atingida.");
+  });
+
+  it("1ª parcela ≥ restante da meta força nao", () => {
+    const result = simulatePurchase({
+      ...base,
+      purchaseCents: 200000,
+      installmentsTotal: 10,
+      savingsGoalCents: 20000,
+      savingsGoalSavedCents: 0,
+    });
+
+    expect(result.installmentCents).toBe(20000);
+    expect(result.verdict).toBe("nao");
+  });
+
+  it("1ª parcela × 2 ≥ restante força no mínimo cuidado", () => {
+    const result = simulatePurchase({
+      ...base,
+      purchaseCents: 20000,
+      savingsGoalCents: 40000,
+      savingsGoalSavedCents: 0,
+    });
+
+    expect(result.verdict).toBe("cuidado");
+    expect(plain(result.goalLabel)).toBe(
+      "Faltam R$ 400,00 para a meta de R$ 400,00 (0% guardado).",
+    );
+  });
+
+  it("nunca melhora um veredito já negativo", () => {
+    const result = simulatePurchase({
+      ...base,
+      purchaseCents: 160000,
+      savingsGoalCents: 1000000,
+      savingsGoalSavedCents: 0,
+    });
+
+    expect(result.verdict).toBe("nao");
+  });
+
+  it("exibe o restante e o percentual guardado", () => {
+    const result = simulatePurchase({
+      ...base,
+      purchaseCents: 10000,
+      savingsGoalCents: 100000,
+      savingsGoalSavedCents: 25000,
+    });
+
+    expect(plain(result.goalLabel)).toBe(
+      "Faltam R$ 750,00 para a meta de R$ 1.000,00 (25% guardado).",
+    );
+  });
+});
+
 describe("buildPurchaseData", () => {
   it("expõe apenas números do impacto", () => {
     const data = buildPurchaseData({ ...base, purchaseCents: 80000 });
@@ -122,9 +273,46 @@ describe("buildPurchaseData", () => {
     expect(data.remainingDays).toBe(8);
     expect(data.usualDailySpendCents).toBe(20000);
     expect(data.purchaseCents).toBe(80000);
+    expect(data.installmentsTotal).toBe(1);
+    expect(data.installmentCents).toBe(80000);
+    expect(data.futureCommitmentCents).toBe(0);
     expect(data.impactPerDayCents).toBe(10000);
     expect(data.newFreeBudgetCents).toBe(120000);
     expect(data.newDailyCents).toBe(15000);
+  });
+
+  it("explica parcelamento e meta com números", () => {
+    const data = buildPurchaseData({
+      ...base,
+      purchaseCents: 100000,
+      installmentsTotal: 3,
+      savingsGoalCents: 100000,
+      savingsGoalSavedCents: 25000,
+    });
+
+    expect(data.installmentsTotal).toBe(3);
+    expect(data.installmentCents).toBe(33334);
+    expect(data.futureCommitmentCents).toBe(66666);
+    expect(data.savingsGoalCents).toBe(100000);
+    expect(data.savingsGoalSavedCents).toBe(25000);
+    expect(data.goalRemainingCents).toBe(75000);
+  });
+
+  it("zera a meta sem meta ou atingida", () => {
+    const semMeta = buildPurchaseData({ ...base, purchaseCents: 10000 });
+    const atingida = buildPurchaseData({
+      ...base,
+      purchaseCents: 10000,
+      savingsGoalCents: 100000,
+      savingsGoalSavedCents: 100000,
+    });
+
+    expect(semMeta.savingsGoalCents).toBe(0);
+    expect(semMeta.savingsGoalSavedCents).toBe(0);
+    expect(semMeta.goalRemainingCents).toBe(0);
+    expect(atingida.savingsGoalCents).toBe(0);
+    expect(atingida.savingsGoalSavedCents).toBe(0);
+    expect(atingida.goalRemainingCents).toBe(0);
   });
 
   it("não inclui rótulos, descrições ou qualquer string", () => {
@@ -167,6 +355,31 @@ describe("buildPurchasePrompt — privacidade", () => {
     const system = messages.find((message) => message.role === "system");
 
     expect(system?.content).toContain(VERDICT_LABELS.cuidado);
+  });
+
+  it("cita parcelamento e meta (quando há meta) no system prompt", () => {
+    const comMeta = buildPurchasePrompt(
+      {
+        ...base,
+        purchaseCents: 100000,
+        installmentsTotal: 3,
+        savingsGoalCents: 100000,
+        savingsGoalSavedCents: 25000,
+      },
+      "ok",
+    );
+    const comMetaSystem = comMeta.find((message) => message.role === "system");
+    expect(comMetaSystem?.content).toContain("installmentCents");
+    expect(comMetaSystem?.content).toContain("installmentsTotal");
+    expect(comMetaSystem?.content).toContain("meta de economia");
+
+    const semMeta = buildPurchasePrompt(
+      { ...base, purchaseCents: 100000, installmentsTotal: 3 },
+      "ok",
+    );
+    const semMetaSystem = semMeta.find((message) => message.role === "system");
+    expect(semMetaSystem?.content).toContain("installmentCents");
+    expect(semMetaSystem?.content).not.toContain("meta de economia");
   });
 });
 
