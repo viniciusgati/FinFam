@@ -19,8 +19,8 @@ describe("NAV_ICONS", () => {
     }
   });
 
-  it("inclui o ícone de ajuda (círculo com interrogação) entre os 8 itens", () => {
-    expect(NAV_ITEMS).toHaveLength(8);
+  it("inclui o ícone de ajuda (círculo com interrogação) entre os 9 itens", () => {
+    expect(NAV_ITEMS).toHaveLength(9);
     const html = renderToStaticMarkup(NAV_ICONS.ajuda);
     expect(html).toContain('viewBox="0 0 24 24"');
     expect(html).toContain('stroke="currentColor"');

@@ -3,6 +3,7 @@ export type NavIconName =
   | "entradas"
   | "saidas"
   | "gastos"
+  | "compras"
   | "cartoes"
   | "historico"
   | "configuracoes"
@@ -19,6 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/entradas", label: "Entradas", icon: "entradas" },
   { href: "/saidas", label: "Saídas fixas", icon: "saidas" },
   { href: "/gastos", label: "Gastos avulsos", icon: "gastos" },
+  { href: "/compras", label: "Lista de compras", icon: "compras" },
   { href: "/cartoes", label: "Cartões", icon: "cartoes" },
   { href: "/historico", label: "Histórico", icon: "historico" },
   { href: "/configuracoes", label: "Configurações", icon: "configuracoes" },

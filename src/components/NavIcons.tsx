@@ -58,6 +58,13 @@ export const NAV_ICONS: Record<NavIconName, ReactElement> = {
       <path d="M9 12h6" />
     </Icon>
   ),
+  compras: (
+    <Icon>
+      <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6" />
+      <circle cx="10" cy="20" r="1" />
+      <circle cx="18" cy="20" r="1" />
+    </Icon>
+  ),
   cartoes: (
     <Icon>
       <rect x="2" y="5" width="20" height="14" rx="2" />
