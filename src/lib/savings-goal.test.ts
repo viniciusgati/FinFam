@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  savingsGoalHistory,
+  savingsGoalHistoryLabel,
   savingsGoalInputToCents,
   savingsGoalPreview,
   savingsGoalProgress,
@@ -125,6 +127,110 @@ describe("savingsGoalSavedCents", () => {
     });
     expect(progress?.percent).toBe(10);
     expect(progress?.achieved).toBe(false);
+  });
+});
+
+const metMonth = (monthKey: string) => ({
+  monthKey,
+  incomeCents: 600000,
+  consumedCents: 300000,
+});
+
+const missedMonth = (monthKey: string) => ({
+  monthKey,
+  incomeCents: 600000,
+  consumedCents: 550000,
+});
+
+const emptyMonth = (monthKey: string) => ({
+  monthKey,
+  incomeCents: 0,
+  consumedCents: 0,
+});
+
+describe("savingsGoalHistory", () => {
+  it("conta apenas meses com dados e os que bateram a meta", () => {
+    const months = [
+      metMonth("2025-01"),
+      metMonth("2025-02"),
+      missedMonth("2025-03"),
+      metMonth("2025-04"),
+      emptyMonth("2025-05"),
+      metMonth("2025-06"),
+      missedMonth("2025-07"),
+      metMonth("2025-08"),
+      metMonth("2025-09"),
+      emptyMonth("2025-10"),
+      missedMonth("2025-11"),
+      emptyMonth("2025-12"),
+    ];
+
+    const history = savingsGoalHistory(months, 100000);
+    expect(history).not.toBeNull();
+    expect(history?.metCount).toBe(6);
+    expect(history?.evaluatedCount).toBe(9);
+    expect(history?.months.map((month) => month.monthKey)).toEqual([
+      "2025-01",
+      "2025-02",
+      "2025-03",
+      "2025-04",
+      "2025-06",
+      "2025-07",
+      "2025-08",
+      "2025-09",
+      "2025-11",
+    ]);
+  });
+
+  it("exclui meses sem movimentação do denominador", () => {
+    const history = savingsGoalHistory(
+      [emptyMonth("2025-01"), metMonth("2025-02"), emptyMonth("2025-03")],
+      100000,
+    );
+    expect(history?.evaluatedCount).toBe(1);
+    expect(history?.metCount).toBe(1);
+  });
+
+  it("mês com consumo maior que a renda guarda zero e não conta como atingido", () => {
+    const history = savingsGoalHistory(
+      [{ monthKey: "2025-01", incomeCents: 300000, consumedCents: 350000 }],
+      100000,
+    );
+    expect(history?.months[0]).toEqual({
+      monthKey: "2025-01",
+      savedCents: 0,
+      met: false,
+    });
+    expect(history?.metCount).toBe(0);
+    expect(history?.evaluatedCount).toBe(1);
+  });
+
+  it("retorna null quando não há meta", () => {
+    expect(savingsGoalHistory([metMonth("2025-01")], null)).toBeNull();
+    expect(savingsGoalHistory([metMonth("2025-01")], 0)).toBeNull();
+  });
+
+  it("produz o texto exato do card conforme a contagem", () => {
+    const months = [
+      metMonth("2025-01"),
+      metMonth("2025-02"),
+      missedMonth("2025-03"),
+    ];
+    expect(savingsGoalHistoryLabel(savingsGoalHistory(months, 100000))).toBe(
+      "Meta atingida em 2 de 3 meses fechados nos últimos 12 meses.",
+    );
+  });
+
+  it("informa quando ainda não há meses fechados com dados", () => {
+    expect(savingsGoalHistoryLabel(savingsGoalHistory([], 100000))).toBe(
+      "Ainda não há meses fechados suficientes para o histórico.",
+    );
+    expect(
+      savingsGoalHistoryLabel(savingsGoalHistory([emptyMonth("2025-01")], 100000)),
+    ).toBe("Ainda não há meses fechados suficientes para o histórico.");
+    expect(savingsGoalHistoryLabel(null)).toBe(
+      "Ainda não há meses fechados suficientes para o histórico.",
+    );
   });
 });
 
