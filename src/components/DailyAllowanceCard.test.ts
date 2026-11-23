@@ -116,7 +116,7 @@ describe("DailyAllowanceCard (renderização)", () => {
     expect(html).toContain('href="/ajuda#diaria"');
     expect(html).toContain('aria-label="Saiba mais sobre Diária"');
     expect(html).toContain(
-      'aria-label="Pode gastar por dia: R$ 0,00. Orçamento do ciclo esgotado. Ciclo financeiro · início dia 20"',
+      'aria-label="Pode gastar por dia: R$ 0,00. Orçamento do ciclo esgotado. Hoje você pode gastar R$ 0,00. Ciclo financeiro · início dia 20"',
     );
   });
 });

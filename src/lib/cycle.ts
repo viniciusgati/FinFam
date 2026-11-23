@@ -441,8 +441,20 @@ export interface DailyAllowanceCard {
    * Vazio sem dados ou com orçamento livre zerado (esgotado/estourado).
    */
   freeBudgetLabel: string;
+  /** Quanto ainda pode ser gasto hoje, em centavos (≥ 0). */
+  todayCents: number;
+  /**
+   * Ex.: `Hoje você pode gastar R$ 125,00`. Vazio sem dados ou quando a linha
+   * de hoje está oculta (prévia de ciclo futuro).
+   */
+  todayLabel: string;
   /** Texto alternativo para leitor de tela / `aria-label`. */
   ariaLabel: string;
+}
+
+export interface DailyAllowanceCardOptions {
+  /** Exibe a linha "Hoje você pode gastar..." (padrão: `true`). */
+  showToday?: boolean;
 }
 
 /** Rótulo da janela do ciclo a partir do dia de início. */
@@ -459,14 +471,35 @@ function cyclePeriodLabel(startDay: number): string {
  */
 export function dailyAllowanceCard(
   allowance: DailyAllowance,
+  options: DailyAllowanceCardOptions = {},
 ): DailyAllowanceCard {
   const periodLabel = cyclePeriodLabel(allowance.window.startDay);
+  const showToday = options.showToday ?? true;
   // Só exibe o saldo com orçamento livre de fato: esgotado/estourado já têm o
   // detalhe do estado, e "Ainda tem R$ 0,00" contradiz a diária negativa.
   const freeBudgetLabel =
     allowance.hasData && allowance.freeBudgetCents > 0
       ? `Ainda tem ${formatCents(allowance.freeBudgetCents)} até o fim do ciclo`
       : "";
+
+  // A linha "Hoje" depende dos valores já calculados do ciclo, sem consulta
+  // extra: só aparece com dados e quando não é uma prévia de ciclo futuro.
+  const todayCents =
+    allowance.hasData && showToday
+      ? todaySpendableCents({
+          freeBudgetCents: allowance.freeBudgetCents,
+          dailyCents: allowance.dailyCents,
+          remainingDays: allowance.remainingDays,
+        })
+      : 0;
+  const todayLabel =
+    allowance.hasData && showToday
+      ? `Hoje você pode gastar ${formatCents(todayCents)}`
+      : "";
+  // Sufixo do aria-label: inclui o valor de hoje antes do rótulo do período.
+  const ariaSuffix = todayLabel
+    ? `${todayLabel}. ${periodLabel}`
+    : periodLabel;
 
   if (!allowance.hasData) {
     const value = "Sem dados do ciclo";
@@ -479,7 +512,9 @@ export function dailyAllowanceCard(
       detail: "",
       periodLabel,
       freeBudgetLabel,
-      ariaLabel: `Pode gastar por dia: ${value}. ${periodLabel}`,
+      todayCents,
+      todayLabel,
+      ariaLabel: `Pode gastar por dia: ${value}. ${ariaSuffix}`,
     };
   }
 
@@ -496,7 +531,9 @@ export function dailyAllowanceCard(
       detail: "Orçamento do ciclo estourado",
       periodLabel,
       freeBudgetLabel,
-      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo estourado. ${periodLabel}`,
+      todayCents,
+      todayLabel,
+      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo estourado. ${ariaSuffix}`,
     };
   }
 
@@ -511,7 +548,9 @@ export function dailyAllowanceCard(
       detail: "Orçamento do ciclo esgotado",
       periodLabel,
       freeBudgetLabel,
-      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo esgotado. ${periodLabel}`,
+      todayCents,
+      todayLabel,
+      ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo esgotado. ${ariaSuffix}`,
     };
   }
 
@@ -527,7 +566,9 @@ export function dailyAllowanceCard(
       detail: "Último dia do ciclo",
       periodLabel,
       freeBudgetLabel,
-      ariaLabel: `Pode gastar por dia: ${value}. Último dia do ciclo. ${periodLabel}`,
+      todayCents,
+      todayLabel,
+      ariaLabel: `Pode gastar por dia: ${value}. Último dia do ciclo. ${ariaSuffix}`,
     };
   }
 
@@ -540,7 +581,9 @@ export function dailyAllowanceCard(
     detail: `${allowance.remainingDays} dias restantes no ciclo`,
     periodLabel,
     freeBudgetLabel,
-    ariaLabel: `Pode gastar por dia: ${value}, ${allowance.remainingDays} dias restantes no ciclo. ${periodLabel}`,
+    todayCents,
+    todayLabel,
+    ariaLabel: `Pode gastar por dia: ${value}, ${allowance.remainingDays} dias restantes no ciclo. ${ariaSuffix}`,
   };
 }
 
