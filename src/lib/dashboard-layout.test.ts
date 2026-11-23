@@ -43,16 +43,18 @@ describe("layout do dashboard", () => {
     expect(page).not.toMatch(/mx-auto flex w-full/);
   });
 
-  it("deixa o card principal em largura total, fora do grid", () => {
+  it("coloca a lista de compras ao lado do card principal em md+", () => {
     const page = readSource("../app/(app)/page.tsx");
 
     // O hero não usa mais o span de grid do layout antigo.
     expect(page).not.toContain('className={isCalendarMonth ? "" : "md:col-span-2"}');
 
-    const month = page.indexOf("<MonthSpendCard");
-    const gridStart = page.indexOf("grid items-stretch gap-6 md:grid-cols-2");
-    expect(month).toBeGreaterThanOrEqual(0);
-    expect(gridStart).toBeGreaterThan(month);
+    const gridStart = page.indexOf("grid gap-6 md:grid-cols-2 items-stretch");
+    const month = page.indexOf("{monthSpendCard}", gridStart);
+    const shopping = page.indexOf("<ShoppingListCard");
+    expect(gridStart).toBeGreaterThanOrEqual(0);
+    expect(month).toBeGreaterThan(gridStart);
+    expect(shopping).toBeGreaterThan(month);
   });
 
   it("coloca o lançamento rápido ao lado do Pode gastar por dia", () => {
@@ -298,6 +300,7 @@ describe("estados de navegação e onboarding do ciclo", () => {
 
 const ALL_DASHBOARD_BLOCKS: DashboardBlock[] = [
   { id: "month-spend", state: "ok" },
+  { id: "shopping-list", state: "ok" },
   { id: "spend-advice", state: "ok" },
   { id: "quick-expense", state: "ok" },
   { id: "daily-allowance", state: "ok" },
@@ -314,7 +317,7 @@ const ALL_DASHBOARD_BLOCKS: DashboardBlock[] = [
 ];
 
 describe("zonas de decisão do dashboard", () => {
-  it("organiza os 14 blocos ok nas quatro zonas na ordem canônica", () => {
+  it("organiza os 15 blocos ok nas quatro zonas na ordem canônica", () => {
     const { zones, failed } = buildDashboardLayout(ALL_DASHBOARD_BLOCKS);
 
     expect(failed).toEqual([]);
@@ -334,6 +337,7 @@ describe("zonas de decisão do dashboard", () => {
 
     expect(zones[0].blocks).toEqual([
       { id: "month-spend", state: "ok" },
+      { id: "shopping-list", state: "ok" },
       { id: "spend-advice", state: "ok" },
     ]);
     expect(zones[1].blocks).toEqual([
@@ -353,6 +357,36 @@ describe("zonas de decisão do dashboard", () => {
     expect(zones[3].blocks).toEqual([
       { id: "family-help", state: "ok" },
       { id: "month-review", state: "ok" },
+    ]);
+  });
+
+  it("inclui shopping-list na zona summary logo após month-spend", () => {
+    const { zones, failed } = buildDashboardLayout([
+      { id: "spend-advice", state: "ok" },
+      { id: "shopping-list", state: "ok" },
+      { id: "month-spend", state: "ok" },
+    ]);
+
+    expect(failed).toEqual([]);
+    expect(zones[0].id).toBe("summary");
+    expect(zones[0].blocks.map((block) => block.id)).toEqual([
+      "month-spend",
+      "shopping-list",
+      "spend-advice",
+    ]);
+  });
+
+  it("move shopping-list para failed quando a leitura da lista falha", () => {
+    const { zones, failed } = buildDashboardLayout([
+      { id: "month-spend", state: "ok" },
+      { id: "shopping-list", state: "error" },
+      { id: "spend-advice", state: "ok" },
+    ]);
+
+    expect(failed).toEqual(["shopping-list"]);
+    expect(zones[0].blocks.map((block) => block.id)).toEqual([
+      "month-spend",
+      "spend-advice",
     ]);
   });
 
@@ -418,6 +452,7 @@ describe("zonas de decisão do dashboard", () => {
     ]);
     expect(zones[0].blocks).toEqual([
       { id: "month-spend", state: "empty" },
+      { id: "shopping-list", state: "ok" },
       { id: "spend-advice", state: "ok" },
     ]);
     expect(zones[3].blocks).toEqual([
@@ -434,6 +469,7 @@ describe("zonas de decisão do dashboard", () => {
       { id: "savings-goal", state: "ok" },
       { id: "month-spend", state: "ok" },
       { id: "daily-consumption", state: "ok" },
+      { id: "shopping-list", state: "ok" },
       { id: "spend-advice", state: "ok" },
       { id: "daily-allowance", state: "ok" },
       { id: "card-adjustment", state: "ok" },
@@ -457,6 +493,7 @@ describe("zonas de decisão do dashboard", () => {
     ]);
     expect(zones[0].blocks.map((block) => block.id)).toEqual([
       "month-spend",
+      "shopping-list",
       "spend-advice",
     ]);
     expect(zones[1].blocks.map((block) => block.id)).toEqual([
@@ -574,6 +611,7 @@ describe("zonas de decisão do dashboard", () => {
 describe("página do dashboard em zonas de decisão", () => {
   const DASHBOARD_COMPONENTS = [
     "MonthSpendCard",
+    "ShoppingListCard",
     "SpendAdviceCard",
     "QuickExpenseCard",
     "DailyAllowanceCard",
@@ -589,7 +627,7 @@ describe("página do dashboard em zonas de decisão", () => {
     "MonthReviewPanel",
   ];
 
-  it("renderiza cada um dos 14 blocos exatamente uma vez na fonte", () => {
+  it("renderiza cada um dos 15 blocos exatamente uma vez na fonte", () => {
     const page = readSource(DASHBOARD_PAGE);
 
     for (const component of DASHBOARD_COMPONENTS) {
@@ -597,6 +635,22 @@ describe("página do dashboard em zonas de decisão", () => {
         1,
       );
     }
+  });
+
+  it("carrega a lista ativa e isola falhas no bloco shopping-list", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    expect(page).toContain("loadActiveShoppingItems");
+    expect(page).toContain("buildShoppingPlan");
+    expect(page).toContain("shoppingLoadFailed = true");
+    expect(page).toContain(
+      '{ id: "shopping-list" as const, state: "ok" as const }',
+    );
+    expect(page).toContain(
+      '{ id: "shopping-list" as const, state: "error" as const }',
+    );
+    // Sem itens ativos o bloco não entra no layout e nada é renderizado.
+    expect(page).toContain("{shoppingPlan !== null ? (");
   });
 
   it("inclui o bloco A pagar na zona de Compromissos", () => {

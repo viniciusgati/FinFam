@@ -17,6 +17,7 @@
 
 export type DashboardBlockId =
   | "month-spend"
+  | "shopping-list"
   | "spend-advice"
   | "quick-expense"
   | "daily-allowance"
@@ -64,7 +65,7 @@ const ZONE_DEFINITIONS: readonly ZoneDefinition[] = [
     id: "summary",
     title: "Resumo do ciclo",
     priority: 1,
-    blocks: ["month-spend", "spend-advice"],
+    blocks: ["month-spend", "shopping-list", "spend-advice"],
   },
   {
     id: "actions",

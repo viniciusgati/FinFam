@@ -67,6 +67,9 @@ import PurchaseSimulator from "@/components/PurchaseSimulator";
 import QuickExpenseCard from "@/components/QuickExpenseCard";
 import MonthSpendCard from "@/components/MonthSpendCard";
 import DailyAllowanceCard from "@/components/DailyAllowanceCard";
+import ShoppingListCard from "@/components/ShoppingListCard";
+import { buildShoppingPlan, type ShoppingItem } from "@/lib/shopping-list";
+import { loadActiveShoppingItems } from "@/lib/shopping-items";
 import SpendAdviceCard from "@/components/SpendAdviceCard";
 import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
 import FutureCommitmentsCard from "@/components/FutureCommitmentsCard";
@@ -132,6 +135,8 @@ export default async function DashboardPage({
   let endingSoon: UpcomingEndingSoon[] = [];
   let hasFutureCommitments = false;
   let openExpenses: OpenExpensesSummary = { totalCents: 0, count: 0 };
+  let shoppingItems: ShoppingItem[] = [];
+  let shoppingLoadFailed = false;
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
   let cycleStartDay = defaultSettings().cycleStartDay;
@@ -266,6 +271,23 @@ export default async function DashboardPage({
     });
   }
 
+  // A lista de compras é lida fora do bloco principal: uma falha nela não pode
+  // derrubar o dashboard — o bloco apenas vai para `failed`.
+  if (view.state === "ok") {
+    try {
+      shoppingItems = await loadActiveShoppingItems();
+    } catch {
+      shoppingLoadFailed = true;
+    }
+  }
+
+  const todayIso = isoDateInTimeZone(now, resolveTimeZone());
+  // O plano usa a diária já calculada do ciclo, sem novas consultas financeiras.
+  const shoppingPlan =
+    shoppingItems.length > 0
+      ? buildShoppingPlan(shoppingItems, allowance?.dailyCents ?? 0)
+      : null;
+
   // Sugestões de categoria para o lançamento rápido: só fazem sentido no ciclo
   // corrente (quando o card aparece); falha de leitura cai para [].
   const categorySuggestions = isCurrentCycle
@@ -300,6 +322,11 @@ export default async function DashboardPage({
   // bloco: o que não pode ser exibido entra como `error` e fica fora das zonas.
   const blocks: DashboardBlock[] = [
     { id: "month-spend", state: "ok" },
+    ...(shoppingPlan !== null
+      ? [{ id: "shopping-list" as const, state: "ok" as const }]
+      : shoppingLoadFailed
+        ? [{ id: "shopping-list" as const, state: "error" as const }]
+        : []),
     { id: "spend-advice", state: spendAdvice !== null ? "ok" : "error" },
     { id: "quick-expense", state: isCurrentCycle ? "ok" : "error" },
     { id: "daily-allowance", state: allowance !== null ? "ok" : "error" },
@@ -327,6 +354,23 @@ export default async function DashboardPage({
     { id: "month-review", state: "ok" },
   ];
   const { zones } = buildDashboardLayout(blocks);
+
+  const monthSpendCard =
+    view.state === "ok" ? (
+      <MonthSpendCard
+        backgroundColor={backgroundColor}
+        percent={view.percent}
+        level={level}
+        invoiceDue={invoicePaymentLabel ?? ""}
+        countdownLabel={countdownLabel}
+        feedback={view.feedback}
+        projectedPercent={view.projectedPercent}
+        projectedRisk={view.projectedRisk}
+        incomeCents={incomeCents}
+        consumedCents={consumedCents}
+        projectedCents={projectedCents}
+      />
+    ) : null;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -392,19 +436,18 @@ export default async function DashboardPage({
                 case "summary":
                   return (
                     <>
-                      <MonthSpendCard
-                        backgroundColor={backgroundColor}
-                        percent={view.percent}
-                        level={level}
-                        invoiceDue={invoicePaymentLabel ?? ""}
-                        countdownLabel={countdownLabel}
-                        feedback={view.feedback}
-                        projectedPercent={view.projectedPercent}
-                        projectedRisk={view.projectedRisk}
-                        incomeCents={incomeCents}
-                        consumedCents={consumedCents}
-                        projectedCents={projectedCents}
-                      />
+                      {shoppingPlan !== null ? (
+                        <div className="grid gap-6 md:grid-cols-2 items-stretch">
+                          {monthSpendCard}
+                          <ShoppingListCard
+                            plan={shoppingPlan}
+                            items={shoppingItems}
+                            referenceDate={todayIso}
+                          />
+                        </div>
+                      ) : (
+                        monthSpendCard
+                      )}
 
                       {spendAdvice !== null && (
                         <SpendAdviceCard advice={spendAdvice} />
