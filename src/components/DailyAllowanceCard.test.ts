@@ -23,9 +23,14 @@ function makeAllowance(overrides: Partial<DailyAllowance>): DailyAllowance {
   };
 }
 
-function render(allowance: DailyAllowance): string {
+function render(
+  allowance: DailyAllowance,
+  options?: { showToday?: boolean },
+): string {
   return renderToStaticMarkup(
-    createElement(DailyAllowanceCard, { card: dailyAllowanceCard(allowance) }),
+    createElement(DailyAllowanceCard, {
+      card: dailyAllowanceCard(allowance, options),
+    }),
   ).replace(/\u00a0/g, " ");
 }
 
@@ -108,6 +113,37 @@ describe("DailyAllowanceCard (renderização)", () => {
     const html = render(makeAllowance({ hasData: false }));
 
     expect(html).toContain("Sem dados do ciclo");
+  });
+
+  it("mostra quanto ainda pode gastar hoje no ciclo corrente", () => {
+    const html = render(
+      makeAllowance({
+        dailyCents: 12500,
+        freeBudgetCents: 325000,
+        remainingDays: 26,
+      }),
+    );
+
+    expect(html).toContain("Hoje você pode gastar R$ 125,00");
+  });
+
+  it("no-data não exibe a linha de hoje", () => {
+    const html = render(makeAllowance({ hasData: false }));
+
+    expect(html).not.toContain("Hoje você pode gastar");
+  });
+
+  it("com showToday = false (prévia de ciclo futuro) não exibe a linha de hoje", () => {
+    const html = render(
+      makeAllowance({
+        dailyCents: 12500,
+        freeBudgetCents: 325000,
+        remainingDays: 26,
+      }),
+      { showToday: false },
+    );
+
+    expect(html).not.toContain("Hoje você pode gastar");
   });
 
   it("leva ao glossário da diária sem mudar o aria-label do card", () => {
