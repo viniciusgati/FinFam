@@ -23,8 +23,10 @@ import {
   loadCycleDashboardData,
   loadDashboardData,
   loadOpenCycleExpenses,
+  loadSavingsGoalHistory,
   resolveCycleReference,
 } from "./dashboard";
+import { savingsGoalHistory } from "./savings-goal";
 import { computeFinanceStatus, dashboardView } from "./finance";
 import { buildMonthSpendStats } from "./month-spend";
 
@@ -1318,5 +1320,46 @@ describe("loadOpenCycleExpenses — a pagar do ciclo (task #364)", () => {
     const summary = await loadOpenCycleExpenses(now);
 
     expect(summary).toEqual({ totalCents: 0, count: 0 });
+  });
+});
+
+describe("loadSavingsGoalHistory", () => {
+  it("consulta os 12 meses fechados anteriores ao mês de now, em ordem ascendente", async () => {
+    const now = new Date("2026-03-25T15:00:00.000Z");
+    prismaMock.monthlySnapshot.findMany.mockResolvedValue([]);
+
+    await loadSavingsGoalHistory(now, now);
+
+    expect(captureClosedMonthsMock).toHaveBeenCalledTimes(1);
+    const [args] = prismaMock.monthlySnapshot.findMany.mock.calls[0];
+    expect(args.where.monthKey).toEqual({ gte: "2025-03", lt: "2026-03" });
+    expect(args.orderBy).toEqual({ monthKey: "asc" });
+    expect(args.take).toBe(12);
+    expect(args.select).toEqual({
+      monthKey: true,
+      incomeCents: true,
+      consumedCents: true,
+    });
+  });
+
+  it("mapeia os snapshots para a função pura do histórico", async () => {
+    const now = new Date("2026-03-25T15:00:00.000Z");
+    prismaMock.monthlySnapshot.findMany.mockResolvedValue([
+      { monthKey: "2025-12", incomeCents: 500000, consumedCents: 100000 },
+      { monthKey: "2026-01", incomeCents: 500000, consumedCents: 450000 },
+      { monthKey: "2026-02", incomeCents: 0, consumedCents: 0 },
+    ]);
+
+    const months = await loadSavingsGoalHistory(now, now);
+
+    expect(months.map((month) => month.monthKey)).toEqual([
+      "2025-12",
+      "2026-01",
+      "2026-02",
+    ]);
+    expect(savingsGoalHistory(months, 100000)).toMatchObject({
+      metCount: 1,
+      evaluatedCount: 2,
+    });
   });
 });

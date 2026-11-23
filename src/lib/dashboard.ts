@@ -51,6 +51,7 @@ import {
   sumOpenExpenses,
   type OpenExpensesSummary,
 } from "./open-expenses";
+import type { SavingsGoalHistoryMonthInput } from "./savings-goal";
 import { defaultSettings, getSettings } from "./settings";
 import { resolveTimeZone, zonedDateParts, zonedTimeToUtc } from "./time";
 import { isCountedInBudget, PAYMENT_METHODS } from "./variable-expenses";
@@ -904,4 +905,42 @@ export async function loadOpenCycleExpenses(
       to: window.nextStart.toISOString(),
     },
   );
+}
+
+/**
+ * Carrega os snapshots dos até `months` meses calendário **fechados** anteriores
+ * ao mês de `now`, para o histórico da meta de economia (SPEC §4.7).
+ *
+ * Antes de ler, dispara `captureClosedMonths()` (rede de segurança de leitura,
+ * idempotente e sem sobrescrever snapshots existentes). A janela é
+ * `[shiftMonthKey(monthKey(now), -months), monthKey(now))`, ou seja, exclui o
+ * mês corrente e nunca busca além do limite. Devolve os meses em ordem
+ * cronológica no formato puro de `savingsGoalHistory`, que filtra os meses sem
+ * movimentação e aplica a meta.
+ *
+ * `referenceDate` é mantido por simetria com os demais loaders e serve de
+ * valor padrão para `now`; quando informado junto, `now` define a janela.
+ */
+export async function loadSavingsGoalHistory(
+  referenceDate: Date,
+  now: Date = referenceDate,
+  months = 12,
+): Promise<SavingsGoalHistoryMonthInput[]> {
+  await captureClosedMonths();
+
+  const currentMonthKey = monthKey(now);
+  const startMonthKey = shiftMonthKey(currentMonthKey, -months);
+
+  const rows = await prisma.monthlySnapshot.findMany({
+    where: { monthKey: { gte: startMonthKey, lt: currentMonthKey } },
+    orderBy: { monthKey: "asc" },
+    take: months,
+    select: { monthKey: true, incomeCents: true, consumedCents: true },
+  });
+
+  return rows.map((row) => ({
+    monthKey: row.monthKey,
+    incomeCents: row.incomeCents,
+    consumedCents: row.consumedCents,
+  }));
 }
