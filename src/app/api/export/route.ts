@@ -37,6 +37,8 @@ const TABLE_QUERIES: Record<ExportTableName, () => Promise<ExportRow[]>> = {
     prisma.appSettings.findMany({ orderBy: [...ORDER_BY] }),
   monthly_reviews: () =>
     prisma.monthlyReview.findMany({ orderBy: [...ORDER_BY] }),
+  shopping_items: () =>
+    prisma.shoppingItem.findMany({ orderBy: [...ORDER_BY] }),
 };
 
 function pad2(value: number): string {

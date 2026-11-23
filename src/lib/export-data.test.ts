@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe("EXPORT_TABLES", () => {
-  it("lista as 10 tabelas do domínio na ordem de exportação com rótulos pt-BR", () => {
+  it("lista as 11 tabelas do domínio na ordem de exportação com rótulos pt-BR", () => {
     expect(EXPORT_TABLE_NAMES).toEqual([
       "incomes",
       "variable_incomes",
@@ -55,6 +55,7 @@ describe("EXPORT_TABLES", () => {
       "monthly_category_snapshots",
       "app_settings",
       "monthly_reviews",
+      "shopping_items",
     ]);
     expect(EXPORT_TABLE_NAMES.map((name) => EXPORT_TABLES[name].label)).toEqual(
       [
@@ -68,7 +69,17 @@ describe("EXPORT_TABLES", () => {
         "Fechamentos por categoria",
         "Configurações do app",
         "Revisões mensais",
+        "Lista de compras",
       ],
+    );
+  });
+
+  it("define o cabeçalho exato de shopping_items na ordem do schema", () => {
+    const header = EXPORT_TABLES.shopping_items.columns
+      .map((column) => column.key)
+      .join(",");
+    expect(header).toBe(
+      "id,name,kind,category,quantity,estimatedUnitPriceCents,priceSource,priceSampleCount,priceFetchedAt,purchased,purchasedAt,addedOn,createdAt,updatedAt",
     );
   });
 
@@ -83,7 +94,7 @@ describe("EXPORT_TABLES", () => {
 });
 
 describe("buildExportBundle / toJsonExport", () => {
-  it("inclui versao, geradoEm ISO, fuso e as 10 chaves de tabela", () => {
+  it("inclui versao, geradoEm ISO, fuso e as 11 chaves de tabela", () => {
     const bundle = buildExportBundle({
       generatedAt: GENERATED_AT,
       timeZone: TIME_ZONE,
@@ -127,6 +138,50 @@ describe("buildExportBundle / toJsonExport", () => {
     expect(bundle.tabelas.incomes[0].updatedAt).toBe(
       "2026-10-04T10:00:00.000Z",
     );
+  });
+
+  it("exporta shopping_items com preço em centavos e addedOn como YYYY-MM-DD", () => {
+    const bundle = buildExportBundle({
+      generatedAt: GENERATED_AT,
+      timeZone: TIME_ZONE,
+      tables: {
+        shopping_items: [
+          {
+            id: "shop_1",
+            name: "Leite",
+            kind: "ESSENCIAL",
+            category: "Mercado",
+            quantity: 2,
+            estimatedUnitPriceCents: 550,
+            priceSource: "google_shopping",
+            priceSampleCount: 3,
+            priceFetchedAt: new Date("2026-10-04T10:00:00.000Z"),
+            purchased: false,
+            purchasedAt: null,
+            addedOn: "2026-10-02",
+            createdAt: new Date("2026-10-02T10:00:00.000Z"),
+            updatedAt: new Date("2026-10-04T10:00:00.000Z"),
+          },
+        ],
+      },
+    });
+
+    expect(bundle.tabelas.shopping_items[0]).toEqual({
+      id: "shop_1",
+      name: "Leite",
+      kind: "ESSENCIAL",
+      category: "Mercado",
+      quantity: 2,
+      estimatedUnitPriceCents: 550,
+      priceSource: "google_shopping",
+      priceSampleCount: 3,
+      priceFetchedAt: "2026-10-04T10:00:00.000Z",
+      purchased: false,
+      purchasedAt: null,
+      addedOn: "2026-10-02",
+      createdAt: "2026-10-02T10:00:00.000Z",
+      updatedAt: "2026-10-04T10:00:00.000Z",
+    });
   });
 
   it("tabela sem registros vira array vazio no JSON", () => {
