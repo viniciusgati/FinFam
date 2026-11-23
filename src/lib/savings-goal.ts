@@ -7,8 +7,10 @@
  *
  * Definições (SPEC):
  * - a meta é por ciclo financeiro e `null`/`0` significam "sem meta";
- * - o guardado é **estimado** pelo orçamento variável não consumido do ciclo,
- *   nunca um valor efetivamente transferido;
+ * - o guardado é **realizado até hoje**: o que sobraria do orçamento variável
+ *   proporcional aos dias decorridos, descontado o consumo variável real
+ *   (`G = max(0, round(B × dias_decorridos / dias_da_janela) − consumo)` com
+ *   `B = max(renda − fixas, 0)`), nunca o orçamento variável inteiro;
  * - a prévia diária usa `round(meta / dias_da_janela)`;
  * - o "por dia restante" usa `ceil(restante / dias_restantes)`, e com zero
  *   dias restantes mostra o restante integral.
@@ -19,10 +21,23 @@ import { formatCents, parseAmountToCents } from "./money";
 export interface SavingsGoalProgressInput {
   /** Meta do ciclo em centavos; `null`/`0` desligam o acompanhamento. */
   goalCents: number | null;
-  /** Guardado estimado do ciclo em centavos. */
+  /** Guardado **realizado** até hoje em centavos (não o orçamento livre). */
   savedCents: number;
   /** Dias restantes da janela do ciclo (0 = último dia). */
   remainingDays: number;
+}
+
+export interface SavingsGoalSavedInput {
+  /** Renda do ciclo em centavos. */
+  incomeCents: number;
+  /** Saídas fixas do ciclo em centavos. */
+  fixedExpensesCents: number;
+  /** Consumo variável já realizado no ciclo em centavos. */
+  variableSpentCents: number;
+  /** Dias decorridos da janela (o dia de hoje conta). */
+  elapsedDays: number;
+  /** Tamanho da janela do ciclo em dias. */
+  windowDays: number;
 }
 
 export interface SavingsGoalProgress {
@@ -64,8 +79,31 @@ export function savingsGoalInputToCents(value: string): number | null {
 }
 
 /**
+ * Guardado **realizado até hoje** no ciclo, em centavos.
+ *
+ * `G = max(0, round(B × elapsedDays / windowDays) − variableSpentCents)`, onde
+ * `B = max(incomeCents − fixedExpensesCents, 0)` é o orçamento variável do ciclo.
+ * `elapsedDays` segue a convenção de `elapsedCycleDays` (o dia de hoje conta).
+ * `windowDays <= 0` é tratado como `1` para nunca dividir por zero.
+ */
+export function savingsGoalSavedCents({
+  incomeCents,
+  fixedExpensesCents,
+  variableSpentCents,
+  elapsedDays,
+  windowDays,
+}: SavingsGoalSavedInput): number {
+  const budgetCents = Math.max(incomeCents - fixedExpensesCents, 0);
+  const days = windowDays > 0 ? windowDays : 1;
+  const elapsed = Math.max(elapsedDays, 0);
+  const proportionalCents = Math.round((budgetCents * elapsed) / days);
+  return Math.max(0, proportionalCents - variableSpentCents);
+}
+
+/**
  * Progresso da meta do ciclo. Retorna `null` quando não há meta (`null` ou
- * `0`), para o card não ser renderizado.
+ * `0`), para o card não ser renderizado. `savedCents` deve ser o guardado
+ * **realizado** (ver `savingsGoalSavedCents`), não o orçamento livre do ciclo.
  */
 export function savingsGoalProgress({
   goalCents,

@@ -3,6 +3,7 @@ import {
   savingsGoalInputToCents,
   savingsGoalPreview,
   savingsGoalProgress,
+  savingsGoalSavedCents,
 } from "./savings-goal";
 
 const normalize = (value: string) => value.replace(/\u00a0/g, " ");
@@ -58,6 +59,75 @@ describe("savingsGoalInputToCents", () => {
   });
 });
 
+describe("savingsGoalSavedCents", () => {
+  it("projeta o orçamento variável pelos dias decorridos e desconta o gasto", () => {
+    expect(
+      savingsGoalSavedCents({
+        incomeCents: 600000,
+        fixedExpensesCents: 300000,
+        variableSpentCents: 50000,
+        elapsedDays: 10,
+        windowDays: 30,
+      }),
+    ).toBe(50000);
+  });
+
+  it("nunca deixa o guardado negativo", () => {
+    expect(
+      savingsGoalSavedCents({
+        incomeCents: 600000,
+        fixedExpensesCents: 300000,
+        variableSpentCents: 200000,
+        elapsedDays: 10,
+        windowDays: 30,
+      }),
+    ).toBe(0);
+  });
+
+  it("trata renda menor que as fixas como orçamento variável zero", () => {
+    expect(
+      savingsGoalSavedCents({
+        incomeCents: 200000,
+        fixedExpensesCents: 300000,
+        variableSpentCents: 0,
+        elapsedDays: 10,
+        windowDays: 30,
+      }),
+    ).toBe(0);
+  });
+
+  it("não divide por zero quando a janela é inválida", () => {
+    const saved = savingsGoalSavedCents({
+      incomeCents: 600000,
+      fixedExpensesCents: 300000,
+      variableSpentCents: 0,
+      elapsedDays: 1,
+      windowDays: 0,
+    });
+    expect(saved).toBe(300000);
+    expect(Number.isFinite(saved)).toBe(true);
+  });
+
+  it("regressão: meta atingida no início do ciclo não deve aparecer sem guardado real", () => {
+    const savedCents = savingsGoalSavedCents({
+      incomeCents: 600000,
+      fixedExpensesCents: 300000,
+      variableSpentCents: 0,
+      elapsedDays: 1,
+      windowDays: 30,
+    });
+    expect(savedCents).toBe(10000);
+
+    const progress = savingsGoalProgress({
+      goalCents: 100000,
+      savedCents,
+      remainingDays: 20,
+    });
+    expect(progress?.percent).toBe(10);
+    expect(progress?.achieved).toBe(false);
+  });
+});
+
 describe("savingsGoalProgress", () => {
   it("retorna null quando não há meta", () => {
     expect(
@@ -90,6 +160,19 @@ describe("savingsGoalProgress", () => {
       remainingCents: 75000,
       dailyRemainingCents: 7500,
       percent: 25,
+      achieved: false,
+    });
+  });
+
+  it("calcula o progresso a partir do guardado realizado", () => {
+    expect(
+      savingsGoalProgress({ goalCents: 100000, savedCents: 50000, remainingDays: 20 }),
+    ).toEqual({
+      goalCents: 100000,
+      savedCents: 50000,
+      remainingCents: 50000,
+      dailyRemainingCents: 2500,
+      percent: 50,
       achieved: false,
     });
   });
