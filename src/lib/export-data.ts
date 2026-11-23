@@ -179,6 +179,25 @@ export const EXPORT_TABLES = {
       { key: "updatedAt", type: "datetime" },
     ],
   },
+  shopping_items: {
+    label: "Lista de compras",
+    columns: [
+      { key: "id", type: "string" },
+      { key: "name", type: "string" },
+      { key: "kind", type: "string" },
+      { key: "category", type: "string" },
+      { key: "quantity", type: "integer" },
+      { key: "estimatedUnitPriceCents", type: "cents" },
+      { key: "priceSource", type: "string" },
+      { key: "priceSampleCount", type: "integer" },
+      { key: "priceFetchedAt", type: "datetime" },
+      { key: "purchased", type: "boolean" },
+      { key: "purchasedAt", type: "datetime" },
+      { key: "addedOn", type: "string" },
+      { key: "createdAt", type: "datetime" },
+      { key: "updatedAt", type: "datetime" },
+    ],
+  },
 } as const satisfies Record<string, ExportTableDefinition>;
 
 export type ExportTableName = keyof typeof EXPORT_TABLES;

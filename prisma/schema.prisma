@@ -18,6 +18,12 @@ enum PaymentMethod {
   CREDIT
 }
 
+/// Classificação do item da lista de compras: consumível básico ou desejo.
+enum ShoppingItemKind {
+  ESSENCIAL
+  DESEJAVEL
+}
+
 /// Entrada fixa recorrente (ex.: salário).
 model Income {
   id          String   @id @default(cuid())
@@ -180,6 +186,33 @@ model AppSettings {
   updatedAt        DateTime @updatedAt
 
   @@map("app_settings")
+}
+
+/// Item da lista de compras da família (história #376). O item ativo
+/// (`purchased = false`) entra na lista e no planejamento do dashboard; marcar
+/// como comprado apenas o remove da lista ativa, preservando o histórico — a
+/// compra não gera gasto automaticamente.
+model ShoppingItem {
+  id                      String           @id @default(cuid())
+  name                    String
+  kind                    ShoppingItemKind
+  category                String?
+  quantity                Int              @default(1)
+  /// Preço unitário estimado em centavos; `null` = "sem preço".
+  estimatedUnitPriceCents Int?
+  /// Origem do preço pesquisado (ex.: `google_shopping`).
+  priceSource             String?
+  priceSampleCount        Int              @default(0)
+  priceFetchedAt          DateTime?
+  purchased               Boolean          @default(false)
+  purchasedAt             DateTime?
+  addedOn                 String // YYYY-MM-DD no fuso da família
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  @@index([purchased])
+  @@index([addedOn])
+  @@map("shopping_items")
 }
 
 /// Avaliação de um mês fechado gerada por IA, cacheada por `monthKey` para não

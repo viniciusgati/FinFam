@@ -35,10 +35,10 @@ describe("ExportDataCard (estado inicial)", () => {
     expect(html).toContain(EXPORT_EMPTY_NOTE);
   });
 
-  it("lista as 10 tabelas com o href CSV e o rótulo pt-BR", () => {
+  it("lista as 11 tabelas com o href CSV e o rótulo pt-BR", () => {
     const html = render().replace(/&amp;/g, "&");
 
-    expect(EXPORT_TABLE_NAMES).toHaveLength(10);
+    expect(EXPORT_TABLE_NAMES).toHaveLength(11);
 
     for (const name of EXPORT_TABLE_NAMES) {
       expect(html).toContain(`href="/api/export?formato=csv&tabela=${name}"`);
@@ -55,6 +55,7 @@ describe("ExportDataCard (estado inicial)", () => {
     expect(html).toContain(">Fechamentos por categoria<");
     expect(html).toContain(">Configurações do app<");
     expect(html).toContain(">Revisões mensais<");
+    expect(html).toContain(">Lista de compras<");
   });
 
   it("começa sem carregamento, sem download iniciado e com links habilitados", () => {

@@ -36,6 +36,7 @@ vermelho** conforme a situação dos gastos do mês.
 | **Compra no cartão** | Gasto atribuído a um cartão, que pode ser parcelado. |
 | **Fatura** | Soma das compras do cartão dentro de um ciclo (fechamento). |
 | **Mês de competência** | Mês em que a despesa impacta o orçamento (ver §5). |
+| **Item da lista de compras** | Produto a comprar, essencial ou desejável, com quantidade, preço unitário estimado e dia de inclusão. |
 
 ### 3.1 Entradas fixas
 
@@ -123,6 +124,39 @@ gastos avulsos, §4). CRUD em `/entradas` e `/api/variable-incomes`.
   diferença; valor igual é no-op; valor menor é recusado com `400`) e depois
   chama `router.refresh()`. O bloco **só aumenta** o total; reduzir a fatura
   continua exigindo editar/excluir lançamentos em `/cartoes`.
+
+### 3.5 Lista de compras
+
+Itens que a família precisa comprar ou que estão acabando, mantidos em uma lista
+ativa na tela `/compras` (e resumidos no dashboard, §4). Cada item é
+**essencial** (consumível básico) ou **desejável**; a lista ativa ordena
+essenciais primeiro e desejáveis ao final, ambos do mais antigo para o mais novo,
+com desempate por nome pt-BR. Comprados saem da lista ativa, mantendo o
+histórico, e **não** geram gasto automaticamente.
+
+- **Campos** (`shopping_items`): nome (1–120), `kind` (`ESSENCIAL`/`DESEJAVEL`),
+  categoria opcional, quantidade (1–999, padrão 1), preço unitário estimado em
+  centavos (opcional; `0`/ausente = "sem preço"), fonte/quantidade de amostras/
+  data do preço, `purchased`/`purchasedAt` e `addedOn` (`YYYY-MM-DD` no fuso da
+  família, imutável após a criação).
+- **API**: `GET/POST /api/shopping-items` e
+  `PATCH/DELETE /api/shopping-items/[id]` (POST `201` com `Location`, PATCH
+  parcial `200`, DELETE `204`, validação `400`, id inexistente `404`).
+- **Pesquisa de preço sob demanda**: `POST /api/shopping-items/[id]/price` usa
+  uma fonte externa compatível com a API do SerpAPI para Google Shopping
+  (`engine=google_shopping`, `gl=br`, `hl=pt-br`), configurável por
+  `PRICE_SEARCH_API_URL` (padrão `https://serpapi.com/search.json`) e
+  `PRICE_SEARCH_API_KEY`. Sem a chave a rota responde `503` sem chamar o
+  provedor; falha/timeout (5s) responde `502` sem alterar o item. Envia **apenas
+  o nome do produto** ao provedor. O preço estimado é a **moda** das amostras
+  (empate → menor; sem repetição → mediana, no par a menor das centrais) e é
+  sempre **unitário**; o total do item é `unitário × quantidade`.
+- **Planejamento**: `buildShoppingPlan` soma só itens com preço, separa
+  essenciais/desejáveis, informa quantos estão sem preço e converte o total em
+  dias da diária do ciclo (`ceil(total / diária)`), sem reservar nem alterar os
+  cálculos financeiros. Desejáveis com 30 dias ou mais recebem o rótulo
+  **"adiado"**. O dashboard só exibe o card com ao menos 1 item ativo, limitado
+  a 8 itens (`previewShoppingItems`), com link "Ver todos" para `/compras`.
 
 > Regra central: o mesmo gasto nunca é contado duas vezes. Gasto pago no
 > cartão substitui o gasto avulso correspondente — por isso um gasto avulso
@@ -517,6 +551,7 @@ o mês calendário. Com `cycleStartDay = 1` as duas coisas coincidem.
 | `/saidas` | CRUD de saídas fixas. |
 | `/gastos` | Lançamento e listagem de gastos avulsos. |
 | `/cartoes` | Cartões e compras/faturas. |
+| `/compras` | Lista de compras (essenciais/desejáveis), pesquisa de preço e planejamento do gasto. |
 | `/historico` | Histórico mensal e comparações. |
 | `/configuracoes` | Configurações do app e bloco "Baixar meus dados". |
 
@@ -527,16 +562,17 @@ são entregas seguintes.
 
 Em `/configuracoes`, o bloco **"Baixar meus dados"** permite à família baixar
 uma cópia completa dos dados: o botão principal **"Baixar tudo (JSON)"** e a
-lista **"CSV por tabela"** com um link para cada uma das 10 tabelas do domínio
+lista **"CSV por tabela"** com um link para cada uma das 11 tabelas do domínio
 (`incomes`, `variable_incomes`, `fixed_expenses`, `credit_cards`,
 `variable_expenses`, `card_purchases`, `monthly_snapshots`,
-`monthly_category_snapshots`, `app_settings`, `monthly_reviews`), rotuladas em
-pt-BR a partir de `EXPORT_TABLES`.
+`monthly_category_snapshots`, `app_settings`, `monthly_reviews`,
+`shopping_items`), rotuladas em pt-BR a partir de `EXPORT_TABLES` (a lista de
+compras aparece como **"Lista de compras"**).
 
 Contrato de `GET /api/export` (autenticado; sem sessão responde 401):
 
 - **JSON completo** (`/api/export` ou `?formato=json`): corpo
-  `{ versao: 1, geradoEm, fuso, tabelas: { <tabela>: [...] } }` com as 10
+  `{ versao: 1, geradoEm, fuso, tabelas: { <tabela>: [...] } }` com as 11
   chaves; valores monetários em centavos inteiros; data de negócio `date`/
   `purchaseDate` como `YYYY-MM-DD` no fuso da família; `createdAt`/`updatedAt`
   em ISO 8601 UTC. Arquivo `finfam-dados-YYYY-MM-DD.json`.

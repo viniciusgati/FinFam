@@ -12,6 +12,7 @@ const { prismaMock, getSessionMock } = vi.hoisted(() => ({
     monthlyCategorySnapshot: { findMany: vi.fn() },
     appSettings: { findMany: vi.fn() },
     monthlyReview: { findMany: vi.fn() },
+    shoppingItem: { findMany: vi.fn() },
   },
   getSessionMock: vi.fn(),
 }));
@@ -85,7 +86,7 @@ describe("GET /api/export sem sessão", () => {
 });
 
 describe("GET /api/export JSON", () => {
-  it("sem formato retorna o bundle completo com as 10 chaves", async () => {
+  it("sem formato retorna o bundle completo com as 11 chaves", async () => {
     prismaMock.income.findMany.mockResolvedValue([incomeRow]);
 
     const response = await GET(exportRequest());
@@ -110,7 +111,7 @@ describe("GET /api/export JSON", () => {
     });
   });
 
-  it("aceita formato=json explícito e consulta as 10 tabelas", async () => {
+  it("aceita formato=json explícito e consulta as 11 tabelas", async () => {
     const response = await GET(exportRequest("?formato=json"));
 
     expect(response.status).toBe(200);
@@ -118,7 +119,7 @@ describe("GET /api/export JSON", () => {
       expect(delegate.findMany).toHaveBeenCalledWith({ orderBy: ORDER_BY });
     }
     const body = await response.json();
-    expect(Object.keys(body.tabelas)).toHaveLength(10);
+    expect(Object.keys(body.tabelas)).toHaveLength(11);
   });
 
   it("tabela vazia vira array vazio no JSON", async () => {
@@ -127,6 +128,7 @@ describe("GET /api/export JSON", () => {
 
     expect(body.tabelas.incomes).toEqual([]);
     expect(body.tabelas.monthly_reviews).toEqual([]);
+    expect(body.tabelas.shopping_items).toEqual([]);
   });
 
   it("não inclui segredos de ambiente mesmo quando definidos", async () => {
