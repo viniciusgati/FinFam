@@ -11,6 +11,7 @@ import {
   cycleWindowForKey,
   dailyAllowanceCents,
   dailyAllowanceCard,
+  dailyAllowanceScenarios,
   dailyCentsForBudget,
   dayInCycleWindow,
   elapsedCycleDays,
@@ -309,6 +310,154 @@ describe("dailyAllowanceCents", () => {
 
     expect(allowance.freeBudgetCents).toBe(480000);
     expect(allowance.dailyCents).toBeGreaterThan(0);
+  });
+});
+
+describe("dailyAllowanceScenarios", () => {
+  // cycleStartDay = 14 e NOW = 25/03 ⇒ janela 14/03–13/04, 20 dias restantes.
+  const BASE = {
+    incomeCents: 600000,
+    fixedExpensesCents: 300000,
+    variableSpentCents: 0,
+    cycleStartDay: 14,
+    now: NOW,
+  };
+
+  function normalize(value: string): string {
+    return value.replace(/\u00a0/g, " ");
+  }
+
+  it("calcula a diária com e sem a meta nos mesmos dias restantes", () => {
+    const scenarios = dailyAllowanceScenarios({
+      ...BASE,
+      savingsGoalCents: 100000,
+    });
+
+    expect(scenarios.goalCents).toBe(100000);
+    expect(scenarios.withoutGoal.remainingDays).toBe(20);
+    expect(scenarios.withGoal.remainingDays).toBe(20);
+    expect(scenarios.withGoal.dailyCents).toBe(10000);
+    expect(scenarios.withoutGoal.dailyCents).toBe(15000);
+  });
+
+  it("expõe os textos exatos com meta e sem meta no card", () => {
+    const scenarios = dailyAllowanceScenarios({
+      ...BASE,
+      savingsGoalCents: 100000,
+    });
+    const card = dailyAllowanceCard(scenarios.withGoal, {
+      withoutGoal: scenarios.withoutGoal,
+    });
+
+    expect(normalize(card.label)).toBe("R$ 100,00 por dia");
+    expect(normalize(card.semGoalLabel)).toBe("Sem a meta: R$ 150,00 por dia");
+    expect(normalize(card.todayLabel)).toBe("Hoje com a meta: R$ 100,00");
+    expect(normalize(card.todayWithoutGoalLabel)).toBe(
+      "Hoje sem a meta: R$ 150,00",
+    );
+    // A diária com meta nunca é maior que a sem meta.
+    expect(scenarios.withGoal.dailyCents).toBeLessThanOrEqual(
+      scenarios.withoutGoal.dailyCents,
+    );
+  });
+
+  it("sem meta mantém os textos atuais e não cria comparativo", () => {
+    for (const savingsGoalCents of [null, 0]) {
+      const scenarios = dailyAllowanceScenarios({
+        ...BASE,
+        savingsGoalCents,
+      });
+
+      expect(scenarios.goalCents).toBeNull();
+      expect(scenarios.withGoal).toEqual(scenarios.withoutGoal);
+
+      const card = dailyAllowanceCard(scenarios.withGoal);
+      expect(normalize(card.label)).toBe("R$ 150,00 por dia");
+      expect(normalize(card.todayLabel)).toBe(
+        "Hoje você pode gastar R$ 150,00",
+      );
+      expect(card.semGoalLabel).toBe("");
+      expect(card.todayWithoutGoalLabel).toBe("");
+      expect(card.ariaLabel).not.toContain("Sem a meta");
+    }
+  });
+
+  it("deriva no-data dos dados-base, mesmo com meta configurada", () => {
+    const scenarios = dailyAllowanceScenarios({
+      incomeCents: 0,
+      fixedExpensesCents: 0,
+      savingsGoalCents: 100000,
+      variableSpentCents: 0,
+      cycleStartDay: 14,
+      now: NOW,
+    });
+
+    expect(scenarios.withGoal.hasData).toBe(false);
+    expect(scenarios.withoutGoal.hasData).toBe(false);
+
+    const card = dailyAllowanceCard(scenarios.withGoal, {
+      withoutGoal: scenarios.withoutGoal,
+    });
+    expect(card.state).toBe("no-data");
+    expect(card.semGoalLabel).toBe("");
+    expect(card.todayWithoutGoalLabel).toBe("");
+    expect(Number.isFinite(card.dailyCents)).toBe(true);
+  });
+
+  it("mantém over-budget, exhausted e last-day corretos nos dois cenários", () => {
+    const cases = [
+      {
+        label: "over-budget",
+        incomeCents: 300000,
+        fixedExpensesCents: 300000,
+        savingsGoalCents: 100000,
+        expectedWithGoal: "over-budget",
+        expectedWithoutGoal: "exhausted",
+      },
+      {
+        label: "exhausted",
+        incomeCents: 300000,
+        fixedExpensesCents: 200000,
+        savingsGoalCents: 100000,
+        expectedWithGoal: "exhausted",
+        expectedWithoutGoal: "ready",
+      },
+      {
+        label: "last-day",
+        incomeCents: 600000,
+        fixedExpensesCents: 300000,
+        savingsGoalCents: 100000,
+        cycleStartDay: 26,
+        expectedWithGoal: "last-day",
+        expectedWithoutGoal: "last-day",
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const scenarios = dailyAllowanceScenarios({
+        incomeCents: testCase.incomeCents,
+        fixedExpensesCents: testCase.fixedExpensesCents,
+        savingsGoalCents: testCase.savingsGoalCents,
+        variableSpentCents: 0,
+        cycleStartDay:
+          "cycleStartDay" in testCase ? testCase.cycleStartDay : BASE.cycleStartDay,
+        now: NOW,
+      });
+
+      const withGoalCard = dailyAllowanceCard(scenarios.withGoal, {
+        withoutGoal: scenarios.withoutGoal,
+      });
+      const withoutGoalCard = dailyAllowanceCard(scenarios.withoutGoal);
+
+      expect(withGoalCard.state, testCase.label).toBe(testCase.expectedWithGoal);
+      expect(withoutGoalCard.state, testCase.label).toBe(
+        testCase.expectedWithoutGoal,
+      );
+      expect(Number.isFinite(withGoalCard.dailyCents)).toBe(true);
+      expect(Number.isFinite(withoutGoalCard.dailyCents)).toBe(true);
+      expect(Number.isNaN(withGoalCard.todayCents)).toBe(false);
+      expect(Number.isNaN(withoutGoalCard.todayCents)).toBe(false);
+    }
   });
 });
 

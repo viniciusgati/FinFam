@@ -389,6 +389,72 @@ export function dailyAllowanceCents(
   };
 }
 
+export interface DailyAllowanceScenariosInput {
+  incomeCents: number;
+  fixedExpensesCents: number;
+  /** Meta de economia do ciclo; `null`/`0` desligam o comparativo. */
+  savingsGoalCents: number | null;
+  variableSpentCents: number;
+  cycleStartDay: number;
+  now: Date;
+  timeZone?: string;
+}
+
+export interface DailyAllowanceScenarios {
+  /** Cenário com a meta reservada antes da diária (`obrigações = fixas + meta`). */
+  withGoal: DailyAllowance;
+  /** Cenário sem a meta (`obrigações = fixas`). */
+  withoutGoal: DailyAllowance;
+  /** Meta efetiva do comparativo; `null` quando não há meta (> 0). */
+  goalCents: number | null;
+}
+
+/**
+ * Diária do ciclo em dois cenários: reservando a meta antes de calcular o que
+ * sobra por dia (`withGoal`) e considerando apenas as saídas fixas
+ * (`withoutGoal`). Sem meta (ou meta `<= 0`) os dois cenários são idênticos.
+ *
+ * `hasData` é derivado dos dados-base (renda/fixas, **sem** somar a meta), para
+ * que "sem dados do ciclo" continue igual nos dois cenários: configurar uma
+ * meta não pode inventar dados do ciclo.
+ */
+export function dailyAllowanceScenarios(
+  input: DailyAllowanceScenariosInput,
+): DailyAllowanceScenarios {
+  const timeZone = input.timeZone ?? resolveTimeZone();
+  const base = {
+    incomeCents: input.incomeCents,
+    variableSpentCents: input.variableSpentCents,
+    cycleStartDay: input.cycleStartDay,
+    now: input.now,
+    timeZone,
+  };
+
+  const withoutGoal = dailyAllowanceCents({
+    ...base,
+    obligationsCents: input.fixedExpensesCents,
+  });
+
+  const goalCents =
+    input.savingsGoalCents !== null && input.savingsGoalCents > 0
+      ? input.savingsGoalCents
+      : null;
+  if (goalCents === null) {
+    return { withGoal: withoutGoal, withoutGoal, goalCents: null };
+  }
+
+  const withGoal = dailyAllowanceCents({
+    ...base,
+    obligationsCents: input.fixedExpensesCents + goalCents,
+  });
+
+  return {
+    withGoal: { ...withGoal, hasData: withoutGoal.hasData },
+    withoutGoal,
+    goalCents,
+  };
+}
+
 export interface UsualDailySpendInput {
   /** Gastos avulsos (PIX/débito/dinheiro) dentro do ciclo. */
   variableSpentCents: number;
@@ -444,10 +510,21 @@ export interface DailyAllowanceCard {
   /** Quanto ainda pode ser gasto hoje, em centavos (≥ 0). */
   todayCents: number;
   /**
-   * Ex.: `Hoje você pode gastar R$ 125,00`. Vazio sem dados ou quando a linha
+   * Ex.: `Hoje você pode gastar R$ 125,00` (sem meta) ou
+   * `Hoje com a meta: R$ 125,00` (com meta). Vazio sem dados ou quando a linha
    * de hoje está oculta (prévia de ciclo futuro).
    */
   todayLabel: string;
+  /**
+   * Comparativo sem a meta. Ex.: `Sem a meta: R$ 150,00 por dia`. Vazio quando
+   * não há meta ou não há dados do ciclo.
+   */
+  semGoalLabel: string;
+  /**
+   * Comparativo de hoje sem a meta. Ex.: `Hoje sem a meta: R$ 150,00`. Vazio
+   * quando não há meta, sem dados ou com a linha de hoje oculta.
+   */
+  todayWithoutGoalLabel: string;
   /** Texto alternativo para leitor de tela / `aria-label`. */
   ariaLabel: string;
 }
@@ -455,6 +532,12 @@ export interface DailyAllowanceCard {
 export interface DailyAllowanceCardOptions {
   /** Exibe a linha "Hoje você pode gastar..." (padrão: `true`). */
   showToday?: boolean;
+  /**
+   * Cenário sem a meta (só as saídas fixas). Quando informado, o card passa a
+   * exibir o comparativo "com meta × sem meta" e o rótulo de hoje vira
+   * "Hoje com a meta: ...". Deve ser omitido quando não há meta.
+   */
+  withoutGoal?: DailyAllowance;
 }
 
 /** Rótulo da janela do ciclo a partir do dia de início. */
@@ -475,6 +558,10 @@ export function dailyAllowanceCard(
 ): DailyAllowanceCard {
   const periodLabel = cyclePeriodLabel(allowance.window.startDay);
   const showToday = options.showToday ?? true;
+  const withoutGoal = options.withoutGoal;
+  // O comparativo só faz sentido quando há uma meta configurada (cenário sem
+  // meta informado) e dados-base do ciclo.
+  const compareGoal = withoutGoal !== undefined && allowance.hasData;
   // Só exibe o saldo com orçamento livre de fato: esgotado/estourado já têm o
   // detalhe do estado, e "Ainda tem R$ 0,00" contradiz a diária negativa.
   const freeBudgetLabel =
@@ -494,11 +581,35 @@ export function dailyAllowanceCard(
       : 0;
   const todayLabel =
     allowance.hasData && showToday
-      ? `Hoje você pode gastar ${formatCents(todayCents)}`
+      ? compareGoal
+        ? `Hoje com a meta: ${formatCents(todayCents)}`
+        : `Hoje você pode gastar ${formatCents(todayCents)}`
       : "";
-  // Sufixo do aria-label: inclui o valor de hoje antes do rótulo do período.
-  const ariaSuffix = todayLabel
-    ? `${todayLabel}. ${periodLabel}`
+
+  const semGoalLabel =
+    compareGoal && withoutGoal
+      ? `Sem a meta: ${formatCents(withoutGoal.dailyCents)} por dia`
+      : "";
+  const todayWithoutGoalCents =
+    compareGoal && withoutGoal && showToday
+      ? todaySpendableCents({
+          freeBudgetCents: withoutGoal.freeBudgetCents,
+          dailyCents: withoutGoal.dailyCents,
+          remainingDays: withoutGoal.remainingDays,
+        })
+      : 0;
+  const todayWithoutGoalLabel =
+    compareGoal && withoutGoal && showToday
+      ? `Hoje sem a meta: ${formatCents(todayWithoutGoalCents)}`
+      : "";
+
+  // Sufixo do aria-label: inclui o valor de hoje (com e sem meta) antes do
+  // rótulo do período.
+  const todaySuffix = [todayLabel, todayWithoutGoalLabel]
+    .filter(Boolean)
+    .join(". ");
+  const ariaSuffix = todaySuffix
+    ? `${todaySuffix}. ${periodLabel}`
     : periodLabel;
 
   if (!allowance.hasData) {
@@ -514,6 +625,8 @@ export function dailyAllowanceCard(
       freeBudgetLabel,
       todayCents,
       todayLabel,
+      semGoalLabel,
+      todayWithoutGoalLabel,
       ariaLabel: `Pode gastar por dia: ${value}. ${ariaSuffix}`,
     };
   }
@@ -533,6 +646,8 @@ export function dailyAllowanceCard(
       freeBudgetLabel,
       todayCents,
       todayLabel,
+      semGoalLabel,
+      todayWithoutGoalLabel,
       ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo estourado. ${ariaSuffix}`,
     };
   }
@@ -550,6 +665,8 @@ export function dailyAllowanceCard(
       freeBudgetLabel,
       todayCents,
       todayLabel,
+      semGoalLabel,
+      todayWithoutGoalLabel,
       ariaLabel: `Pode gastar por dia: ${value}. Orçamento do ciclo esgotado. ${ariaSuffix}`,
     };
   }
@@ -568,6 +685,8 @@ export function dailyAllowanceCard(
       freeBudgetLabel,
       todayCents,
       todayLabel,
+      semGoalLabel,
+      todayWithoutGoalLabel,
       ariaLabel: `Pode gastar por dia: ${value}. Último dia do ciclo. ${ariaSuffix}`,
     };
   }
@@ -583,6 +702,8 @@ export function dailyAllowanceCard(
     freeBudgetLabel,
     todayCents,
     todayLabel,
+    semGoalLabel,
+    todayWithoutGoalLabel,
     ariaLabel: `Pode gastar por dia: ${value}, ${allowance.remainingDays} dias restantes no ciclo. ${ariaSuffix}`,
   };
 }
