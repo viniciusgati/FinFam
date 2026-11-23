@@ -73,6 +73,8 @@ const PURCHASED_ERROR_MESSAGE =
 const DELETE_SUCCESS_MESSAGE = "Item excluído.";
 const DELETE_ERROR_MESSAGE =
   "Não foi possível excluir o item. Tente novamente.";
+const PRICE_SAVE_ERROR_MESSAGE =
+  "Não foi possível salvar o preço. Tente novamente.";
 const EMPTY_LIST_MESSAGE =
   "Sua lista de compras está vazia. Adicione o primeiro item no formulário acima.";
 
@@ -98,11 +100,17 @@ function priceLineTotal(item: ShoppingItem): number | null {
   return Math.round(unit) * quantity;
 }
 
+function centsToPriceInput(value: number | null | undefined): string {
+  if (value === null || value === undefined || value <= 0) return "";
+  return (Math.round(value) / 100).toFixed(2).replace(".", ",");
+}
+
 /**
  * Tela `/compras`: formulário de cadastro e lista ativa ordenada (essenciais
  * primeiro, do mais antigo para o mais novo), com pesquisa de preço sob
- * demanda, marcação de compra e exclusão. O preço anterior é sempre preservado
- * quando a pesquisa falha ou não encontra amostras válidas.
+ * demanda, preço manual editável por item, marcação de compra e exclusão. O
+ * preço anterior é sempre preservado quando a pesquisa falha ou não encontra
+ * amostras válidas.
  */
 export default function ShoppingItemsManager({
   initialItems,
@@ -119,6 +127,10 @@ export default function ShoppingItemsManager({
   const [searchingId, setSearchingId] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [priceEditorId, setPriceEditorId] = useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = useState("");
+  const [priceError, setPriceError] = useState<string | null>(null);
+  const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (feedback?.type !== "success") return;
@@ -260,6 +272,73 @@ export default function ShoppingItemsManager({
       setFeedback({ type: "error", message: PRICE_ERROR_MESSAGE });
     } finally {
       setSearchingId(null);
+    }
+  }
+
+  function openPriceEditor(item: ShoppingItem) {
+    setPriceEditorId(item.id);
+    setPriceDraft(centsToPriceInput(item.estimatedUnitPriceCents));
+    setPriceError(null);
+    setFeedback(null);
+  }
+
+  function closePriceEditor() {
+    setPriceEditorId(null);
+    setPriceDraft("");
+    setPriceError(null);
+  }
+
+  async function handleSavePrice(
+    event: FormEvent<HTMLFormElement>,
+    item: ShoppingItem,
+  ) {
+    event.preventDefault();
+
+    const trimmed = priceDraft.trim();
+    let priceCents: number | null = null;
+    if (trimmed) {
+      priceCents = parsePriceToCents(trimmed);
+      if (priceCents === null) {
+        setPriceError(VALIDATION_MESSAGES.price);
+        return;
+      }
+    }
+
+    setPriceError(null);
+    setSavingPriceId(item.id);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/shopping-items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estimatedUnitPriceCents:
+            priceCents !== null && priceCents > 0 ? priceCents : null,
+        }),
+      });
+
+      if (!response.ok) {
+        setFeedback({ type: "error", message: PRICE_SAVE_ERROR_MESSAGE });
+        return;
+      }
+
+      const updated: ShoppingItem = await response.json();
+      setItems((prev) =>
+        prev.map((current) => (current.id === updated.id ? updated : current)),
+      );
+      setPriceEditorId(null);
+      setPriceDraft("");
+      setFeedback({
+        type: "success",
+        message: `Preço salvo: ${formatCents(
+          updated.estimatedUnitPriceCents ?? 0,
+        )}.`,
+      });
+      router.refresh();
+    } catch {
+      setFeedback({ type: "error", message: PRICE_SAVE_ERROR_MESSAGE });
+    } finally {
+      setSavingPriceId(null);
     }
   }
 
@@ -498,7 +577,9 @@ export default function ShoppingItemsManager({
               const searching = searchingId === item.id;
               const marking = markingId === item.id;
               const deleting = deletingId === item.id;
-              const busy = searching || marking || deleting;
+              const savingPrice = savingPriceId === item.id;
+              const editingPrice = priceEditorId === item.id;
+              const busy = searching || marking || deleting || savingPrice;
               const stale = isStaleDesirable(item, today);
               const age = ageLabel(daysOnList(item.addedOn, today), stale);
               const unitPrice = item.estimatedUnitPriceCents;
@@ -555,6 +636,16 @@ export default function ShoppingItemsManager({
                     </button>
                     <button
                       type="button"
+                      onClick={() => openPriceEditor(item)}
+                      disabled={busy}
+                      className="rounded-lg border border-border-strong bg-surface-raised px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
+                    >
+                      {unitPrice !== null && unitPrice > 0
+                        ? "Editar preço"
+                        : "Informar preço"}
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleMarkPurchased(item)}
                       disabled={busy}
                       aria-busy={marking}
@@ -572,6 +663,64 @@ export default function ShoppingItemsManager({
                       {deleting ? "Excluindo…" : "Excluir"}
                     </button>
                   </div>
+                  {editingPrice ? (
+                    <form
+                      onSubmit={(event) => handleSavePrice(event, item)}
+                      noValidate
+                      className="basis-full space-y-2 rounded-xl border border-border-strong bg-surface-raised p-3"
+                    >
+                      <label
+                        htmlFor={`shopping-price-${item.id}`}
+                        className="flex flex-col gap-1 text-sm font-medium text-foreground-muted"
+                      >
+                        Preço unitário (R$)
+                        <input
+                          id={`shopping-price-${item.id}`}
+                          name="price"
+                          type="text"
+                          inputMode="decimal"
+                          value={priceDraft}
+                          onChange={(event) =>
+                            setPriceDraft(event.target.value)
+                          }
+                          aria-invalid={Boolean(priceError)}
+                          aria-describedby={
+                            priceError
+                              ? `erro-shopping-price-${item.id}`
+                              : undefined
+                          }
+                          placeholder="0,00"
+                          className="rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+                        />
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={savingPrice}
+                          aria-busy={savingPrice}
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
+                        >
+                          {savingPrice ? "Salvando…" : "Salvar preço"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={closePriceEditor}
+                          disabled={savingPrice}
+                          className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:opacity-60"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      {priceError ? (
+                        <span
+                          id={`erro-shopping-price-${item.id}`}
+                          className="text-xs font-normal text-red-400"
+                        >
+                          {priceError}
+                        </span>
+                      ) : null}
+                    </form>
+                  ) : null}
                 </li>
               );
             })}

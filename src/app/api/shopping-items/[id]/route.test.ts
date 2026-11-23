@@ -56,6 +56,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("PATCH /api/shopping-items/:id", () => {
@@ -96,6 +97,53 @@ describe("PATCH /api/shopping-items/:id", () => {
     expect(args.data.purchased).toBe(true);
     expect(args.data.purchasedAt).toEqual(new Date("2026-11-23T15:00:00.000Z"));
     expect(args.data).not.toHaveProperty("addedOn");
+  });
+
+  it("preço manual grava fonte manual, zera amostras e não chama provedor", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    findUniqueMock.mockResolvedValue(row());
+    updateMock.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve(row(data)),
+    );
+
+    const response = await PATCH(
+      jsonRequest("PATCH", { estimatedUnitPriceCents: 1250 }),
+      params("item-1"),
+    );
+
+    expect(response.status).toBe(200);
+    const [args] = updateMock.mock.calls[0];
+    expect(args.data).toEqual({
+      estimatedUnitPriceCents: 1250,
+      priceSource: "manual",
+      priceSampleCount: 0,
+      priceFetchedAt: null,
+    });
+    expect(args.data).not.toHaveProperty("addedOn");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("preço manual 0 ou nulo significa sem preço", async () => {
+    findUniqueMock.mockResolvedValue(row());
+    updateMock.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve(row(data)),
+    );
+
+    const response = await PATCH(
+      jsonRequest("PATCH", { estimatedUnitPriceCents: 0 }),
+      params("item-1"),
+    );
+
+    expect(response.status).toBe(200);
+    const [args] = updateMock.mock.calls[0];
+    expect(args.data).toEqual({
+      estimatedUnitPriceCents: null,
+      priceSource: null,
+      priceSampleCount: 0,
+      priceFetchedAt: null,
+    });
   });
 
   it("retorna 400 sem atualizar quando o payload é inválido", async () => {
