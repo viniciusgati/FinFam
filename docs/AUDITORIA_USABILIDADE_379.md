@@ -214,7 +214,7 @@ autoia/task-379
 $ git status --short
 (limpo antes da auditoria)
 $ find src/app -name 'page.tsx' | wc -l
-11 (login, dashboard e 9 páginas do app)
+11 (9 em `src/app/(app)` + login + offline)
 $ find src/app/api -name route.ts | wc -l
 24
 $ grep -c '^  | "' src/lib/dashboard-layout.ts
