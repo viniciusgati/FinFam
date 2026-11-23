@@ -11,6 +11,7 @@
  */
 
 import type { ShoppingItem as ShoppingItemRow } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "./db";
 import { todayISO } from "./quick-expense";
 import {
@@ -42,6 +43,76 @@ export interface UpdateShoppingItemInput {
   purchased?: boolean;
   purchasedAt?: Date | null;
 }
+
+/** Mensagens de validação compartilhadas com a UI (textos exatos). */
+export const SHOPPING_NAMES = {
+  nameRequired: "Informe um nome",
+  quantityRange: "Informe uma quantidade entre 1 e 999",
+  kindRequired: "Escolha essencial ou desejável",
+  priceInvalid: "Informe um preço válido",
+} as const;
+
+const shoppingKindSchema = z.enum(["ESSENCIAL", "DESEJAVEL"], {
+  errorMap: () => ({ message: SHOPPING_NAMES.kindRequired }),
+});
+
+const shoppingNameSchema = z
+  .string()
+  .trim()
+  .min(1, SHOPPING_NAMES.nameRequired)
+  .max(120, "O nome deve ter no máximo 120 caracteres");
+
+const shoppingQuantitySchema = z
+  .number({
+    invalid_type_error: SHOPPING_NAMES.quantityRange,
+  })
+  .int(SHOPPING_NAMES.quantityRange)
+  .min(1, SHOPPING_NAMES.quantityRange)
+  .max(999, SHOPPING_NAMES.quantityRange);
+
+const shoppingCategorySchema = z
+  .string()
+  .trim()
+  .max(120, "A categoria deve ter no máximo 120 caracteres")
+  .nullish();
+
+const shoppingPriceSchema = z
+  .number({ invalid_type_error: SHOPPING_NAMES.priceInvalid })
+  .int(SHOPPING_NAMES.priceInvalid)
+  .min(0, SHOPPING_NAMES.priceInvalid)
+  .nullish();
+
+const shoppingItemFields = {
+  name: shoppingNameSchema,
+  kind: shoppingKindSchema,
+  category: shoppingCategorySchema,
+  quantity: shoppingQuantitySchema,
+  estimatedUnitPriceCents: shoppingPriceSchema,
+};
+
+/** Corpo aceito no `POST /api/shopping-items` (quantidade default 1). */
+export const createShoppingItemSchema = z.object({
+  ...shoppingItemFields,
+  quantity: shoppingQuantitySchema.default(1),
+});
+
+/**
+ * Corpo aceito no `PATCH /api/shopping-items/[id]`: todos os campos opcionais e
+ * nenhum `addedOn` (o dia de inclusão é imutável).
+ */
+export const updateShoppingItemSchema = z
+  .object({
+    ...shoppingItemFields,
+    purchased: z.boolean(),
+  })
+  .partial();
+
+export type CreateShoppingItemPayload = z.infer<
+  typeof createShoppingItemSchema
+>;
+export type UpdateShoppingItemPayload = z.infer<
+  typeof updateShoppingItemSchema
+>;
 
 /** `0`, negativo, `NaN` ou ausente significa "sem preço". */
 function readPriceCents(value: number | null | undefined): number | null {
