@@ -2,15 +2,17 @@ import Link from "next/link";
 import {
   loadCycleDashboardData,
   loadOpenCycleExpenses,
+  loadSavingsGoalHistory,
   resolveCycleReference,
 } from "@/lib/dashboard";
 import type { OpenExpensesSummary } from "@/lib/open-expenses";
 import {
   cycleEndCountdownLabel,
+  cycleLengthDays,
   cycleRangeLabel,
   cycleStartCountdownLabel,
   dailyAllowanceCard,
-  dailyAllowanceCents,
+  dailyAllowanceScenarios,
   daysUntilCycleStart,
   remainingCycleDays,
   usualDailySpendCents,
@@ -18,7 +20,12 @@ import {
   type DailyAllowance,
 } from "@/lib/cycle";
 import { defaultSettings, getSettings } from "@/lib/settings";
-import { savingsGoalProgress } from "@/lib/savings-goal";
+import {
+  savingsGoalHistory,
+  savingsGoalProgress,
+  savingsGoalSavedCents,
+  type SavingsGoalHistory,
+} from "@/lib/savings-goal";
 import {
   computeFinanceStatus,
   dashboardView,
@@ -127,6 +134,8 @@ export default async function DashboardPage({
   let invoicePaymentLabel: string | null = null;
   let localMonthSummary = "Ainda não há dados suficientes para avaliar o mês.";
   let allowance: DailyAllowance | null = null;
+  let allowanceWithoutGoal: DailyAllowance | null = null;
+  let cycleIncomeCents = 0;
   let spendAdvice: SpendAdvice | null = null;
   let categoryBreakdown: CategoryBreakdown | null = null;
   let cardAdjustmentData: CardAdjustmentData | null = null;
@@ -212,16 +221,23 @@ export default async function DashboardPage({
 
     // O card de diária segue o ciclo real; só faz sentido no ciclo corrente ou
     // na previsão do próximo (com a janela inteira por decorrer). O cartão
-    // entra como consumo (compras pela data), não como obrigação.
+    // entra como consumo (compras pela data), não como obrigação. Com meta
+    // configurada, o cenário principal reserva a meta antes da diária; o
+    // comparativo sem meta fica disponível para o card.
     if (isCurrentCycle || reference.isFuture) {
-      allowance = dailyAllowanceCents({
+      const scenarios = dailyAllowanceScenarios({
         incomeCents: data.monthlyIncomeCents,
-        obligationsCents: data.fixedExpensesCents,
+        fixedExpensesCents: data.fixedExpensesCents,
+        savingsGoalCents,
         variableSpentCents:
           data.variableExpensesCents + data.cardExpensesCents,
         cycleStartDay,
         now: isCurrentCycle ? now : reference.asOf,
       });
+      allowance = scenarios.withGoal;
+      allowanceWithoutGoal =
+        scenarios.goalCents !== null ? scenarios.withoutGoal : null;
+      cycleIncomeCents = data.monthlyIncomeCents;
     }
 
     // Um único bloco de recomendação no ciclo corrente: compara o consumo
@@ -294,17 +310,36 @@ export default async function DashboardPage({
     ? await loadCategorySuggestions()
     : [];
 
-  // Guardado estimado do ciclo = orçamento variável que sobrou até agora
-  // (`allowance.freeBudgetCents`, nunca negativo). Sem diária calculada não há
-  // progresso para acompanhar.
+  // Guardado realizado do ciclo até hoje (não o orçamento variável inteiro):
+  // `max(0, round(B × dias_decorridos / dias_da_janela) − consumo variável)`.
+  // Sem diária calculada não há progresso para acompanhar.
   const savingsGoal =
     allowance !== null
       ? savingsGoalProgress({
           goalCents: savingsGoalCents,
-          savedCents: allowance.freeBudgetCents,
+          savedCents: savingsGoalSavedCents({
+            incomeCents: cycleIncomeCents,
+            fixedExpensesCents,
+            variableSpentCents: variableExpensesCents + cardExpensesCents,
+            elapsedDays: allowance.elapsedDays,
+            windowDays: cycleLengthDays(allowance.window),
+          }),
           remainingDays: allowance.remainingDays,
         })
       : null;
+
+  // Histórico dos meses fechados que bateram a meta: só faz sentido com meta
+  // configurada. Uma falha na leitura não pode derrubar o dashboard — o card
+  // continua sem a seção de histórico.
+  let savingsGoalHistoryResult: SavingsGoalHistory | null = null;
+  if (savingsGoal !== null && savingsGoalCents > 0) {
+    try {
+      const months = await loadSavingsGoalHistory(now);
+      savingsGoalHistoryResult = savingsGoalHistory(months, savingsGoalCents);
+    } catch {
+      savingsGoalHistoryResult = null;
+    }
+  }
 
   // Ritmo recente de consumo do ciclo — base do simulador "Posso comprar?":
   // avulsos + compras do cartão do ciclo, ÷ dias decorridos.
@@ -492,6 +527,7 @@ export default async function DashboardPage({
                             <DailyAllowanceCard
                               card={dailyAllowanceCard(allowance, {
                                 showToday: isCurrentCycle,
+                                withoutGoal: allowanceWithoutGoal ?? undefined,
                               })}
                             />
                           )}
@@ -536,7 +572,10 @@ export default async function DashboardPage({
                       )}
 
                       {savingsGoal !== null && (
-                        <SavingsGoalCard progress={savingsGoal} />
+                        <SavingsGoalCard
+                          progress={savingsGoal}
+                          history={savingsGoalHistoryResult}
+                        />
                       )}
 
                       <FutureCommitmentsCard

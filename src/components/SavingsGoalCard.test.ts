@@ -1,10 +1,19 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { savingsGoalProgress } from "@/lib/savings-goal";
+import {
+  savingsGoalHistory,
+  savingsGoalProgress,
+  type SavingsGoalHistory,
+} from "@/lib/savings-goal";
 import SavingsGoalCard from "./SavingsGoalCard";
 
-function render(goalCents: number, savedCents: number, remainingDays: number): string {
+function render(
+  goalCents: number,
+  savedCents: number,
+  remainingDays: number,
+  history: SavingsGoalHistory | null = null,
+): string {
   const progress = savingsGoalProgress({
     goalCents,
     savedCents,
@@ -12,7 +21,7 @@ function render(goalCents: number, savedCents: number, remainingDays: number): s
   });
   if (progress === null) throw new Error("progresso inesperadamente nulo");
   return renderToStaticMarkup(
-    createElement(SavingsGoalCard, { progress }),
+    createElement(SavingsGoalCard, { progress, history }),
   ).replace(/\u00a0/g, " ");
 }
 
@@ -47,5 +56,27 @@ describe("SavingsGoalCard (renderização)", () => {
     expect(html).toContain("R$ 750,00");
     expect(html).not.toContain("Infinity");
     expect(html).not.toContain("NaN");
+  });
+
+  it("mostra o histórico dos meses fechados quando informado", () => {
+    const history = savingsGoalHistory(
+      [
+        { monthKey: "2026-01", incomeCents: 200000, consumedCents: 50000 },
+        { monthKey: "2026-02", incomeCents: 200000, consumedCents: 190000 },
+      ],
+      100000,
+    );
+
+    const html = render(100000, 25000, 10, history);
+
+    expect(html).toContain(
+      "Meta atingida em 1 de 2 meses fechados nos últimos 12 meses.",
+    );
+  });
+
+  it("sem histórico não renderiza a seção de meses fechados", () => {
+    const html = render(100000, 25000, 10);
+
+    expect(html).not.toContain("meses fechados");
   });
 });
