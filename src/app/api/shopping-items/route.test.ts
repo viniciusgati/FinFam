@@ -116,6 +116,9 @@ describe("POST /api/shopping-items", () => {
       kind: "ESSENCIAL",
       quantity: 2,
       estimatedUnitPriceCents: 1000,
+      priceSource: "manual",
+      priceSampleCount: 0,
+      priceFetchedAt: null,
       addedOn: "2026-11-23",
     });
     expect(createMock).toHaveBeenCalledTimes(1);

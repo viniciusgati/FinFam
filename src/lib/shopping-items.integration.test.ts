@@ -75,7 +75,23 @@ describe("shopping items — integração com PostgreSQL", () => {
     const persisted = await prisma.shoppingItem.findUnique({
       where: { id: zero.id },
     });
-    expect(persisted?.estimatedUnitPriceCents).toBe(0);
+    expect(persisted?.estimatedUnitPriceCents).toBeNull();
+    expect(persisted?.priceSource).toBeNull();
+    expect(persisted?.priceSampleCount).toBe(0);
+    expect(persisted?.priceFetchedAt).toBeNull();
+  });
+
+  it("preço manual no cadastro grava fonte manual sem amostras", async () => {
+    const item = await createShoppingItem({
+      name: "Café",
+      kind: "DESEJAVEL",
+      estimatedUnitPriceCents: 1299,
+    });
+
+    expect(item.estimatedUnitPriceCents).toBe(1299);
+    expect(item.priceSource).toBe("manual");
+    expect(item.priceSampleCount).toBe(0);
+    expect(item.priceFetchedAt).toBeNull();
   });
 
   it("update altera o preço sem tocar em addedOn e marca comprado com purchasedAt", async () => {
@@ -93,6 +109,9 @@ describe("shopping items — integração com PostgreSQL", () => {
 
     expect(updated?.name).toBe("Sabão em pó");
     expect(updated?.estimatedUnitPriceCents).toBe(1234);
+    expect(updated?.priceSource).toBe("manual");
+    expect(updated?.priceSampleCount).toBe(0);
+    expect(updated?.priceFetchedAt).toBeNull();
     expect(updated?.addedOn).toBe("2026-11-01");
 
     const purchasedAt = new Date("2026-11-24T12:00:00.000Z");

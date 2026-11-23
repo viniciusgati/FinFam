@@ -142,8 +142,16 @@ histórico, e **não** geram gasto automaticamente.
 - **API**: `GET/POST /api/shopping-items` e
   `PATCH/DELETE /api/shopping-items/[id]` (POST `201` com `Location`, PATCH
   parcial `200`, DELETE `204`, validação `400`, id inexistente `404`).
-- **Pesquisa de preço sob demanda**: `POST /api/shopping-items/[id]/price` usa
-  uma fonte externa compatível com a API do SerpAPI para Google Shopping
+- **Preço manual (entrada de primeira classe)**: o preço pode ser informado no
+  cadastro (campo opcional) ou a qualquer momento por item, pela ação
+  "Informar preço"/"Editar preço", persistido em centavos pelo
+  `PATCH /api/shopping-items/[id]` com `priceSource = "manual"`,
+  `priceSampleCount = 0` e `priceFetchedAt = null`. Não chama o provedor
+  externo e funciona mesmo sem `PRICE_SEARCH_API_KEY` (inclusive quando a
+  pesquisa responde `503`). Preço vazio ou `0` significa "sem preço" e não entra
+  no total.
+- **Pesquisa de preço sob demanda (opcional)**: `POST /api/shopping-items/[id]/price`
+  usa uma fonte externa compatível com a API do SerpAPI para Google Shopping
   (`engine=google_shopping`, `gl=br`, `hl=pt-br`), configurável por
   `PRICE_SEARCH_API_URL` (padrão `https://serpapi.com/search.json`) e
   `PRICE_SEARCH_API_KEY`. Sem a chave a rota responde `503` sem chamar o

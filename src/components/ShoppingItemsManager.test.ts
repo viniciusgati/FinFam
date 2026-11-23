@@ -135,13 +135,27 @@ describe("ShoppingItemsManager (markup estático)", () => {
     expect(html).toContain("Sem preço estimado");
   });
 
-  it("expõe as três ações por item com os textos exatos", () => {
+  it("expõe as ações por item com os textos exatos", () => {
     const html = render([item({ id: "arroz", name: "Arroz" })]);
 
     expect(html).toContain("Pesquisar preço");
+    expect(html).toContain("Informar preço");
     expect(html).toContain("Marcar como comprado");
     expect(html).toContain("Excluir");
     expect(html).toContain('type="button"');
+  });
+
+  it("mostra 'Editar preço' quando o item já tem preço", () => {
+    const html = render([
+      item({
+        id: "arroz",
+        name: "Arroz",
+        estimatedUnitPriceCents: 1000,
+      }),
+    ]);
+
+    expect(html).toContain("Editar preço");
+    expect(html).not.toContain("Informar preço");
   });
 
   it("mantém as mensagens de carregando e de feedback no código da tela", () => {
@@ -160,6 +174,8 @@ describe("ShoppingItemsManager (markup estático)", () => {
       "Não encontramos preços para este item.",
       "Pesquisa de preço indisponível. Informe o preço manualmente ou configure a integração.",
       "Não foi possível pesquisar o preço agora. Tente novamente.",
+      "Preço salvo:",
+      "Não foi possível salvar o preço. Tente novamente.",
       "Item marcado como comprado.",
       "Não foi possível marcar o item como comprado. Tente novamente.",
       "Item excluído.",

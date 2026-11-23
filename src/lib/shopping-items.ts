@@ -44,6 +44,9 @@ export interface UpdateShoppingItemInput {
   purchasedAt?: Date | null;
 }
 
+/** Fonte gravada quando o preço é informado manualmente pelo usuário. */
+export const MANUAL_PRICE_SOURCE = "manual";
+
 /** Mensagens de validação compartilhadas com a UI (textos exatos). */
 export const SHOPPING_NAMES = {
   nameRequired: "Informe um nome",
@@ -178,19 +181,25 @@ export async function getShoppingItem(
 
 /**
  * Cria um item. Sem `addedOn` explícito, grava o dia corrente no fuso da
- * família (`now` é injetável para testes).
+ * família (`now` é injetável para testes). Preço informado no cadastro é
+ * tratado como manual: grava `priceSource = "manual"`, sem amostras e sem
+ * data de coleta externa.
  */
 export async function createShoppingItem(
   input: CreateShoppingItemInput,
   now: Date = new Date(),
 ): Promise<ShoppingItem> {
+  const priceCents = readPriceCents(input.estimatedUnitPriceCents);
   const row = await prisma.shoppingItem.create({
     data: {
       name: input.name.trim(),
       kind: input.kind,
       category: trimOrNull(input.category),
       quantity: input.quantity ?? 1,
-      estimatedUnitPriceCents: input.estimatedUnitPriceCents ?? null,
+      estimatedUnitPriceCents: priceCents,
+      priceSource: priceCents === null ? null : MANUAL_PRICE_SOURCE,
+      priceSampleCount: 0,
+      priceFetchedAt: null,
       addedOn: input.addedOn ?? todayISO(now, resolveTimeZone()),
     },
   });
@@ -200,7 +209,10 @@ export async function createShoppingItem(
 /**
  * Atualiza só os campos enviados. `addedOn` é imutável: mesmo que apareça no
  * input, é ignorado. Marcar como comprado preenche `purchasedAt` quando não
- * vier explicitamente. Devolve `null` se o id não existe.
+ * vier explicitamente. Um `estimatedUnitPriceCents` sem fonte explícita é
+ * gravado como preço manual (`priceSampleCount = 0`, `priceFetchedAt = null`);
+ * a pesquisa externa informa a própria fonte/amostras. Devolve `null` se o id
+ * não existe.
  */
 export async function updateShoppingItem(
   id: string,
@@ -214,14 +226,20 @@ export async function updateShoppingItem(
   if (input.category !== undefined) data.category = trimOrNull(input.category);
   if (input.quantity !== undefined) data.quantity = input.quantity;
   if (input.estimatedUnitPriceCents !== undefined) {
-    data.estimatedUnitPriceCents = input.estimatedUnitPriceCents;
-  }
-  if (input.priceSource !== undefined) data.priceSource = input.priceSource;
-  if (input.priceSampleCount !== undefined) {
-    data.priceSampleCount = input.priceSampleCount;
-  }
-  if (input.priceFetchedAt !== undefined) {
-    data.priceFetchedAt = input.priceFetchedAt;
+    const priceCents = readPriceCents(input.estimatedUnitPriceCents);
+    data.estimatedUnitPriceCents = priceCents;
+    data.priceSource =
+      input.priceSource ?? (priceCents === null ? null : MANUAL_PRICE_SOURCE);
+    data.priceSampleCount = input.priceSampleCount ?? 0;
+    data.priceFetchedAt = input.priceFetchedAt ?? null;
+  } else {
+    if (input.priceSource !== undefined) data.priceSource = input.priceSource;
+    if (input.priceSampleCount !== undefined) {
+      data.priceSampleCount = input.priceSampleCount;
+    }
+    if (input.priceFetchedAt !== undefined) {
+      data.priceFetchedAt = input.priceFetchedAt;
+    }
   }
   if (input.purchased !== undefined) {
     data.purchased = input.purchased;
