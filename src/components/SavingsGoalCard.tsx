@@ -1,8 +1,14 @@
-import type { SavingsGoalProgress } from "@/lib/savings-goal";
+import {
+  savingsGoalHistoryLabel,
+  type SavingsGoalHistory,
+  type SavingsGoalProgress,
+} from "@/lib/savings-goal";
 import { formatCents } from "@/lib/money";
 
 export interface SavingsGoalCardProps {
   progress: SavingsGoalProgress;
+  /** Histórico dos meses fechados; `null`/omitido esconde a seção. */
+  history?: SavingsGoalHistory | null;
   className?: string;
 }
 
@@ -13,6 +19,7 @@ export interface SavingsGoalCardProps {
  */
 export default function SavingsGoalCard({
   progress,
+  history = null,
   className = "",
 }: SavingsGoalCardProps) {
   return (
@@ -23,6 +30,12 @@ export default function SavingsGoalCard({
       <h2 className="text-sm font-medium uppercase tracking-widest text-subtle">
         Meta de economia
       </h2>
+
+      {history !== null && (
+        <p className="mt-2 text-sm text-foreground-muted">
+          {savingsGoalHistoryLabel(history)}
+        </p>
+      )}
 
       {progress.achieved ? (
         <p className="mt-2 text-lg font-semibold text-emerald-300">

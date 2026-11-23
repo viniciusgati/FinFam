@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  savingsGoalHistory,
+  savingsGoalHistoryLabel,
   savingsGoalInputToCents,
   savingsGoalPreview,
   savingsGoalProgress,
+  savingsGoalSavedCents,
 } from "./savings-goal";
 
 const normalize = (value: string) => value.replace(/\u00a0/g, " ");
@@ -58,6 +61,179 @@ describe("savingsGoalInputToCents", () => {
   });
 });
 
+describe("savingsGoalSavedCents", () => {
+  it("projeta o orçamento variável pelos dias decorridos e desconta o gasto", () => {
+    expect(
+      savingsGoalSavedCents({
+        incomeCents: 600000,
+        fixedExpensesCents: 300000,
+        variableSpentCents: 50000,
+        elapsedDays: 10,
+        windowDays: 30,
+      }),
+    ).toBe(50000);
+  });
+
+  it("nunca deixa o guardado negativo", () => {
+    expect(
+      savingsGoalSavedCents({
+        incomeCents: 600000,
+        fixedExpensesCents: 300000,
+        variableSpentCents: 200000,
+        elapsedDays: 10,
+        windowDays: 30,
+      }),
+    ).toBe(0);
+  });
+
+  it("trata renda menor que as fixas como orçamento variável zero", () => {
+    expect(
+      savingsGoalSavedCents({
+        incomeCents: 200000,
+        fixedExpensesCents: 300000,
+        variableSpentCents: 0,
+        elapsedDays: 10,
+        windowDays: 30,
+      }),
+    ).toBe(0);
+  });
+
+  it("não divide por zero quando a janela é inválida", () => {
+    const saved = savingsGoalSavedCents({
+      incomeCents: 600000,
+      fixedExpensesCents: 300000,
+      variableSpentCents: 0,
+      elapsedDays: 1,
+      windowDays: 0,
+    });
+    expect(saved).toBe(300000);
+    expect(Number.isFinite(saved)).toBe(true);
+  });
+
+  it("regressão: meta atingida no início do ciclo não deve aparecer sem guardado real", () => {
+    const savedCents = savingsGoalSavedCents({
+      incomeCents: 600000,
+      fixedExpensesCents: 300000,
+      variableSpentCents: 0,
+      elapsedDays: 1,
+      windowDays: 30,
+    });
+    expect(savedCents).toBe(10000);
+
+    const progress = savingsGoalProgress({
+      goalCents: 100000,
+      savedCents,
+      remainingDays: 20,
+    });
+    expect(progress?.percent).toBe(10);
+    expect(progress?.achieved).toBe(false);
+  });
+});
+
+const metMonth = (monthKey: string) => ({
+  monthKey,
+  incomeCents: 600000,
+  consumedCents: 300000,
+});
+
+const missedMonth = (monthKey: string) => ({
+  monthKey,
+  incomeCents: 600000,
+  consumedCents: 550000,
+});
+
+const emptyMonth = (monthKey: string) => ({
+  monthKey,
+  incomeCents: 0,
+  consumedCents: 0,
+});
+
+describe("savingsGoalHistory", () => {
+  it("conta apenas meses com dados e os que bateram a meta", () => {
+    const months = [
+      metMonth("2025-01"),
+      metMonth("2025-02"),
+      missedMonth("2025-03"),
+      metMonth("2025-04"),
+      emptyMonth("2025-05"),
+      metMonth("2025-06"),
+      missedMonth("2025-07"),
+      metMonth("2025-08"),
+      metMonth("2025-09"),
+      emptyMonth("2025-10"),
+      missedMonth("2025-11"),
+      emptyMonth("2025-12"),
+    ];
+
+    const history = savingsGoalHistory(months, 100000);
+    expect(history).not.toBeNull();
+    expect(history?.metCount).toBe(6);
+    expect(history?.evaluatedCount).toBe(9);
+    expect(history?.months.map((month) => month.monthKey)).toEqual([
+      "2025-01",
+      "2025-02",
+      "2025-03",
+      "2025-04",
+      "2025-06",
+      "2025-07",
+      "2025-08",
+      "2025-09",
+      "2025-11",
+    ]);
+  });
+
+  it("exclui meses sem movimentação do denominador", () => {
+    const history = savingsGoalHistory(
+      [emptyMonth("2025-01"), metMonth("2025-02"), emptyMonth("2025-03")],
+      100000,
+    );
+    expect(history?.evaluatedCount).toBe(1);
+    expect(history?.metCount).toBe(1);
+  });
+
+  it("mês com consumo maior que a renda guarda zero e não conta como atingido", () => {
+    const history = savingsGoalHistory(
+      [{ monthKey: "2025-01", incomeCents: 300000, consumedCents: 350000 }],
+      100000,
+    );
+    expect(history?.months[0]).toEqual({
+      monthKey: "2025-01",
+      savedCents: 0,
+      met: false,
+    });
+    expect(history?.metCount).toBe(0);
+    expect(history?.evaluatedCount).toBe(1);
+  });
+
+  it("retorna null quando não há meta", () => {
+    expect(savingsGoalHistory([metMonth("2025-01")], null)).toBeNull();
+    expect(savingsGoalHistory([metMonth("2025-01")], 0)).toBeNull();
+  });
+
+  it("produz o texto exato do card conforme a contagem", () => {
+    const months = [
+      metMonth("2025-01"),
+      metMonth("2025-02"),
+      missedMonth("2025-03"),
+    ];
+    expect(savingsGoalHistoryLabel(savingsGoalHistory(months, 100000))).toBe(
+      "Meta atingida em 2 de 3 meses fechados nos últimos 12 meses.",
+    );
+  });
+
+  it("informa quando ainda não há meses fechados com dados", () => {
+    expect(savingsGoalHistoryLabel(savingsGoalHistory([], 100000))).toBe(
+      "Ainda não há meses fechados suficientes para o histórico.",
+    );
+    expect(
+      savingsGoalHistoryLabel(savingsGoalHistory([emptyMonth("2025-01")], 100000)),
+    ).toBe("Ainda não há meses fechados suficientes para o histórico.");
+    expect(savingsGoalHistoryLabel(null)).toBe(
+      "Ainda não há meses fechados suficientes para o histórico.",
+    );
+  });
+});
+
 describe("savingsGoalProgress", () => {
   it("retorna null quando não há meta", () => {
     expect(
@@ -90,6 +266,19 @@ describe("savingsGoalProgress", () => {
       remainingCents: 75000,
       dailyRemainingCents: 7500,
       percent: 25,
+      achieved: false,
+    });
+  });
+
+  it("calcula o progresso a partir do guardado realizado", () => {
+    expect(
+      savingsGoalProgress({ goalCents: 100000, savedCents: 50000, remainingDays: 20 }),
+    ).toEqual({
+      goalCents: 100000,
+      savedCents: 50000,
+      remainingCents: 50000,
+      dailyRemainingCents: 2500,
+      percent: 50,
       achieved: false,
     });
   });

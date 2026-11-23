@@ -25,7 +25,7 @@ function makeAllowance(overrides: Partial<DailyAllowance>): DailyAllowance {
 
 function render(
   allowance: DailyAllowance,
-  options?: { showToday?: boolean },
+  options?: { showToday?: boolean; withoutGoal?: DailyAllowance },
 ): string {
   return renderToStaticMarkup(
     createElement(DailyAllowanceCard, {
@@ -154,5 +154,52 @@ describe("DailyAllowanceCard (renderização)", () => {
     expect(html).toContain(
       'aria-label="Pode gastar por dia: R$ 0,00. Orçamento do ciclo esgotado. Hoje você pode gastar R$ 0,00. Ciclo financeiro · início dia 20"',
     );
+  });
+
+  it("com meta mostra a diária e o gasto de hoje com e sem a meta", () => {
+    const withGoal = makeAllowance({
+      dailyCents: 10000,
+      freeBudgetCents: 200000,
+      remainingDays: 20,
+    });
+    const withoutGoal = makeAllowance({
+      dailyCents: 15000,
+      freeBudgetCents: 300000,
+      remainingDays: 20,
+    });
+
+    const html = render(withGoal, { withoutGoal });
+
+    expect(html).toContain("R$ 100,00 por dia");
+    expect(html).toContain("Sem a meta: R$ 150,00 por dia");
+    expect(html).toContain("Hoje com a meta: R$ 100,00");
+    expect(html).toContain("Hoje sem a meta: R$ 150,00");
+  });
+
+  it("sem meta não exibe nenhuma linha Sem a meta", () => {
+    const html = render(
+      makeAllowance({
+        dailyCents: 15000,
+        freeBudgetCents: 300000,
+        remainingDays: 20,
+      }),
+    );
+
+    expect(html).toContain("R$ 150,00 por dia");
+    expect(html).toContain("Hoje você pode gastar R$ 150,00");
+    expect(html).not.toContain("Sem a meta");
+    expect(html).not.toContain("Hoje com a meta");
+  });
+
+  it("no-data com meta continua mostrando Sem dados do ciclo nos dois cenários", () => {
+    const withGoal = makeAllowance({ hasData: false });
+    const withoutGoal = makeAllowance({ hasData: false });
+
+    const html = render(withGoal, { withoutGoal });
+
+    expect(html).toContain("Sem dados do ciclo");
+    expect(html).not.toContain("Sem a meta");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("Infinity");
   });
 });

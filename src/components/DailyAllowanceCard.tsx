@@ -31,9 +31,19 @@ export default function DailyAllowanceCard({ card }: DailyAllowanceCardProps) {
           {card.freeBudgetLabel}
         </p>
       )}
+      {card.semGoalLabel && (
+        <p className="text-lg font-semibold text-foreground">
+          {card.semGoalLabel}
+        </p>
+      )}
       {card.todayLabel && (
         <p className="text-lg font-semibold text-foreground">
           {card.todayLabel}
+        </p>
+      )}
+      {card.todayWithoutGoalLabel && (
+        <p className="text-lg font-semibold text-foreground">
+          {card.todayWithoutGoalLabel}
         </p>
       )}
       <TermHelpLink termId="diaria" className="mt-1" />
