@@ -15,6 +15,7 @@ import {
   dayInCycleWindow,
   elapsedCycleDays,
   remainingCycleDays,
+  todaySpendableCents,
   usualDailySpendCents,
   type DailyAllowance,
 } from "./cycle";
@@ -158,6 +159,62 @@ describe("dailyCentsForBudget", () => {
   });
 });
 
+describe("todaySpendableCents", () => {
+  it("preserva a diária para os dias restantes", () => {
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 325000,
+        dailyCents: 12500,
+        remainingDays: 26,
+      }),
+    ).toBe(12500);
+  });
+
+  it("no último dia todo o orçamento livre pode ser gasto hoje", () => {
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 5000,
+        dailyCents: 5000,
+        remainingDays: 1,
+      }),
+    ).toBe(5000);
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 5000,
+        dailyCents: 5000,
+        remainingDays: 0,
+      }),
+    ).toBe(5000);
+  });
+
+  it("orçamento esgotado ou diária negativa devolve 0", () => {
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 0,
+        dailyCents: 0,
+        remainingDays: 10,
+      }),
+    ).toBe(0);
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 0,
+        dailyCents: -1250,
+        remainingDays: 8,
+      }),
+    ).toBe(0);
+  });
+
+  it("ritmo já comprometido fica no piso 0, nunca negativo", () => {
+    const today = todaySpendableCents({
+      freeBudgetCents: 200000,
+      dailyCents: 10000,
+      remainingDays: 26,
+    });
+
+    expect(today).toBe(0);
+  });
+});
+
 describe("dailyAllowanceCents", () => {
   it("R$ 3.250,00 livres com 26 dias restantes → R$ 125,00/dia", () => {
     const allowance = dailyAllowanceCents({
@@ -281,6 +338,73 @@ describe("dailyAllowanceCard", () => {
     expect(card.state).toBe("ready");
     expect(card.label.replace(/\u00a0/g, " ")).toBe("R$ 125,00 por dia");
     expect(card.detail).toBe("26 dias restantes no ciclo");
+  });
+
+  it("expõe quanto ainda pode gastar hoje por padrão", () => {
+    const card = dailyAllowanceCard(
+      allowance({
+        dailyCents: 12500,
+        freeBudgetCents: 325000,
+        remainingDays: 26,
+      }),
+    );
+
+    expect(card.todayCents).toBe(12500);
+    expect(card.todayLabel.replace(/\u00a0/g, " ")).toBe(
+      "Hoje você pode gastar R$ 125,00",
+    );
+    expect(card.ariaLabel.replace(/\u00a0/g, " ")).toContain(
+      "Hoje você pode gastar R$ 125,00.",
+    );
+  });
+
+  it("esgotado e estourado mostram hoje como R$ 0,00", () => {
+    const exhausted = dailyAllowanceCard(
+      allowance({ freeBudgetCents: 0, remainingDays: 10 }),
+    );
+    expect(exhausted.todayCents).toBe(0);
+    expect(exhausted.todayLabel.replace(/\u00a0/g, " ")).toBe(
+      "Hoje você pode gastar R$ 0,00",
+    );
+
+    const over = dailyAllowanceCard(
+      allowance({ dailyCents: -1250, freeBudgetCents: 0, remainingDays: 8 }),
+    );
+    expect(over.todayCents).toBe(0);
+    expect(over.todayLabel.replace(/\u00a0/g, " ")).toBe(
+      "Hoje você pode gastar R$ 0,00",
+    );
+  });
+
+  it("no último dia todo o saldo livre pode ser gasto hoje", () => {
+    const card = dailyAllowanceCard(
+      allowance({ dailyCents: 5000, freeBudgetCents: 5000, remainingDays: 0 }),
+    );
+
+    expect(card.state).toBe("last-day");
+    expect(card.todayCents).toBe(5000);
+    expect(card.todayLabel.replace(/\u00a0/g, " ")).toBe(
+      "Hoje você pode gastar R$ 50,00",
+    );
+  });
+
+  it("sem dados ou com showToday falso não exibe a linha de hoje", () => {
+    const noData = dailyAllowanceCard(allowance({ hasData: false }));
+    expect(noData.todayCents).toBe(0);
+    expect(noData.todayLabel).toBe("");
+    expect(noData.ariaLabel).not.toContain("Hoje");
+
+    const preview = dailyAllowanceCard(
+      allowance({
+        dailyCents: 12500,
+        freeBudgetCents: 325000,
+        remainingDays: 26,
+      }),
+      { showToday: false },
+    );
+    expect(preview.todayCents).toBe(0);
+    expect(preview.todayLabel).toBe("");
+    expect(preview.ariaLabel).not.toContain("Hoje");
   });
 
   it("prévia futura exibe diária, dias restantes, janela e saldo livre", () => {
