@@ -490,7 +490,9 @@ export default async function DashboardPage({
                           )}
                           {allowance !== null && (
                             <DailyAllowanceCard
-                              card={dailyAllowanceCard(allowance)}
+                              card={dailyAllowanceCard(allowance, {
+                                showToday: isCurrentCycle,
+                              })}
                             />
                           )}
                         </div>
