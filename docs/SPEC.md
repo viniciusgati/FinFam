@@ -406,6 +406,10 @@ Esta seção **supersede** restrições anteriores desta SPEC onde houver confli
   (restante `0`) o veredito é idêntico ao cenário sem meta. A IA (opcional)
   recebe apenas agregados **numéricos** da simulação (incluindo parcelas e
   meta); sem chave ou em falha, o resultado local é exibido.
+- **Meta de economia acionável** (história #378): o card de progresso usa o
+  **guardado realizado até hoje** (não o orçamento variável inteiro), a diária
+  compara "com meta × sem meta" e o card exibe quantos dos últimos 12 meses
+  fechados bateram a meta — fórmulas, convenção de dias e textos exatos no §4.8.
 - O seletor de mês do dashboard navega para `/?mes=YYYY-MM` (prop `basePath`),
   onde `YYYY-MM` é o **mês de início do ciclo** — exibido, no dashboard, pelo
   **mês da fatura** (`início + 1`: `?mes=2026-10` aparece como "novembro de
@@ -514,7 +518,65 @@ Adiantado/atrasado/no ritmo usam `role="status"`/`aria-live="polite"`.
 em ciclo fechado/futuro, sem renda, sem orçamento variável ou sem movimentação
 nada é renderizado (sem espaço vazio). O `DailyAllowanceCard` segue como única
 fonte de "Ainda tem…/por dia"; `MonthSpendCard` e `IncomeAllocationCard` não
-repetem esses números nem a orientação.
+repetem esses números nem a orientação. Com meta configurada, o
+`DailyAllowanceCard` também mostra o comparativo "com meta × sem meta" (§4.8).
+
+### 4.8 Meta de economia acionável (história #378)
+
+A meta de economia (`AppSettings.savingsGoalCents`) é um valor **único atual**,
+aplicado **retroativamente** aos meses fechados — não há histórico versionado de
+meta por mês/ciclo no banco. `null`/`0` = sem meta: o card de meta/histórico não
+é renderizado, o comparativo não aparece e o dashboard mantém o comportamento
+anterior.
+
+**Guardado realizado até hoje** (`savingsGoalSavedCents`) — substitui a leitura
+antiga que usava o orçamento variável inteiro (`renda − fixas − gasto`) como
+"guardado estimado", que inflava o valor no início do ciclo:
+
+```
+B = max(renda_ciclo − saídas_fixas, 0)
+G = max(0, round(B × dias_decorridos / dias_da_janela) − consumo_variável)
+```
+
+- `dias_decorridos = elapsedCycleDays` e `dias_da_janela = cycleLengthDays`
+  seguem a convenção **inclusiva** existente: o dia de hoje conta como decorrido
+  e `remainingDays` também conta hoje, portanto
+  `dias_decorridos + remainingDays = dias_da_janela + 1`.
+- `consumo_variável` = avulsos + compras do cartão pela data (§4.1).
+- `windowDays <= 0` ⇒ tratado como `1` (nunca há divisão por zero).
+- No fechamento do ciclo o critério é o mesmo do histórico: `G = renda −
+  consumo_total` (guardado do mês = `max(0, incomeCents − consumedCents)`).
+- Card "Meta de economia" (`savingsGoalProgress`): `percent =
+  min(100, round(G / meta × 100))`, `restante = max(meta − G, 0)`,
+  `por dia restante = ceil(restante / remainingDays)`; com `remainingDays = 0`
+  exibe o restante integral (finito, sem `Infinity`/`NaN`). O card mostra
+  "Guardado estimado", "Restante" e "Por dia restante".
+
+**Comparativo com meta × sem meta** na diária (`dailyAllowanceScenarios` /
+`dailyAllowanceCard`): "com meta" reserva a meta antes de calcular a diária
+(`obrigações = fixas + meta`); "sem meta" considera somente as fixas. O card
+exibe `R$ X por dia` (com meta), `Sem a meta: R$ Y por dia`,
+`Hoje com a meta: R$ Z` e `Hoje sem a meta: R$ W`; a diária com meta é sempre
+**menor ou igual** à sem meta. `hasData` dos dois cenários é derivado dos
+dados-base (renda/fixas, sem somar a meta), então configurar a meta **não**
+inventa dados do ciclo e o estado `no-data` é idêntico nos dois. Sem meta o card
+mantém `R$ Y por dia` e `Hoje você pode gastar R$ W`, sem nenhuma linha
+"Sem a meta".
+
+**Histórico dos últimos 12 meses** (`loadSavingsGoalHistory` +
+`savingsGoalHistory`): usa os snapshots mensais **calendário** (§4.6), no máximo
+os **12 meses fechados anteriores**, **excluindo o mês/ciclo corrente**. Só
+entra no **denominador** o mês com movimentação (`incomeCents > 0` ou
+`consumedCents > 0`); meses sem snapshot/dados ficam fora, sem virar "meta não
+atingida". Um mês bateu a meta ⇔ `max(0, incomeCents − consumedCents) >= meta`.
+Texto exato com dados: `Meta atingida em {metCount} de {evaluatedCount} meses
+fechados nos últimos 12 meses.`; sem meses com dados: `Ainda não há meses
+fechados suficientes para o histórico.`
+
+- Com `cycleStartDay ≠ 1` o histórico continua por **mês calendário** (limitação
+  conhecida); não é alinhado à janela do ciclo financeiro.
+- A meta não altera as fórmulas de projeção de fechamento nem do simulador
+  "Posso comprar?" (§4.4) além de reutilizar o novo guardado realizado.
 
 ## 5. Regras de negócio relevantes
 
@@ -642,3 +704,6 @@ arquivo apenas com o cabeçalho, e a tela avisa isso.
   ponto flutuante.
 - Percentuais são derivados, nunca armazenados como fonte de verdade (exceto
   cache de histórico, se necessário).
+- A **meta de economia** é um valor único atual em centavos (`AppSettings`), sem
+  histórico versionado; é aplicada retroativamente aos meses fechados (§4.8).
+- "Guardado realizado" é sempre `G` (§4.8), não o orçamento variável inteiro.
