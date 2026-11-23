@@ -15,6 +15,7 @@ import {
   dayInCycleWindow,
   elapsedCycleDays,
   remainingCycleDays,
+  todaySpendableCents,
   usualDailySpendCents,
   type DailyAllowance,
 } from "./cycle";
@@ -155,6 +156,62 @@ describe("dailyCentsForBudget", () => {
 
   it("remainingDays = 0 não divide por zero: devolve o restante disponível", () => {
     expect(dailyCentsForBudget(5000, 0)).toBe(5000);
+  });
+});
+
+describe("todaySpendableCents", () => {
+  it("preserva a diária para os dias restantes", () => {
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 325000,
+        dailyCents: 12500,
+        remainingDays: 26,
+      }),
+    ).toBe(12500);
+  });
+
+  it("no último dia todo o orçamento livre pode ser gasto hoje", () => {
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 5000,
+        dailyCents: 5000,
+        remainingDays: 1,
+      }),
+    ).toBe(5000);
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 5000,
+        dailyCents: 5000,
+        remainingDays: 0,
+      }),
+    ).toBe(5000);
+  });
+
+  it("orçamento esgotado ou diária negativa devolve 0", () => {
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 0,
+        dailyCents: 0,
+        remainingDays: 10,
+      }),
+    ).toBe(0);
+    expect(
+      todaySpendableCents({
+        freeBudgetCents: 0,
+        dailyCents: -1250,
+        remainingDays: 8,
+      }),
+    ).toBe(0);
+  });
+
+  it("ritmo já comprometido fica no piso 0, nunca negativo", () => {
+    const today = todaySpendableCents({
+      freeBudgetCents: 200000,
+      dailyCents: 10000,
+      remainingDays: 26,
+    });
+
+    expect(today).toBe(0);
   });
 });
 

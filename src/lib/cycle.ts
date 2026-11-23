@@ -295,6 +295,32 @@ export function dailyCentsForBudget(
   return daily === 0 ? 0 : daily;
 }
 
+export interface TodaySpendableInput {
+  /** Orçamento livre do ciclo em centavos (nunca negativo). */
+  freeBudgetCents: number;
+  /** Diária do ciclo em centavos; negativa quando o ciclo foi estourado. */
+  dailyCents: number;
+  /** Dias restantes do ciclo, contando hoje. */
+  remainingDays: number;
+}
+
+/**
+ * Quanto ainda pode ser gasto hoje preservando a diária para os dias restantes
+ * do ciclo. É o orçamento livre descontadas as diárias dos dias que ainda vêm
+ * (`remainingDays - 1`), com piso em zero:
+ * `max(0, freeBudgetCents - dailyCents * (remainingDays - 1))`.
+ *
+ * No último dia (`remainingDays <= 1`) todo o orçamento livre pode ser gasto.
+ * Ciclo estourado (`dailyCents < 0`) ou esgotado resulta em `0` — nunca negativo.
+ */
+export function todaySpendableCents(input: TodaySpendableInput): number {
+  if (input.dailyCents < 0) return 0;
+  if (input.remainingDays <= 1) return Math.max(input.freeBudgetCents, 0);
+  const remaining =
+    input.freeBudgetCents - input.dailyCents * (input.remainingDays - 1);
+  return Math.max(remaining, 0);
+}
+
 export interface DailyAllowanceInput {
   incomeCents: number;
   obligationsCents: number;
