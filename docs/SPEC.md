@@ -769,3 +769,6 @@ arquivo apenas com o cabeçalho, e a tela avisa isso.
 - A **meta de economia** é um valor único atual em centavos (`AppSettings`), sem
   histórico versionado; é aplicada retroativamente aos meses fechados (§4.8).
 - "Guardado realizado" é sempre `G` (§4.8), não o orçamento variável inteiro.
+- O **modo de consumo do ciclo** (`AppSettings.consumptionMode`) é um valor único
+  atual, `INCOME` (default) ou `VARIABLE_BUDGET`, sem histórico versionado; só
+  altera o card principal da Home (§4.9), não snapshots nem histórico.
