@@ -55,6 +55,7 @@ import {
 } from "@/lib/dashboard-layout";
 import type { DailySeries } from "@/lib/dashboard-series";
 import CyclePreviewNotice from "@/components/CyclePreviewNotice";
+import ConsumptionModeToggle from "@/components/ConsumptionModeToggle";
 import DashboardZones from "@/components/DashboardZones";
 import {
   buildMonthReviewData,
@@ -506,6 +507,13 @@ export default async function DashboardPage({
                 case "summary":
                   return (
                     <>
+                      {(isCurrentCycle || isFutureCycle) && (
+                        <ConsumptionModeToggle
+                          initialMode={consumptionMode}
+                          cycleStartDay={cycleStartDay}
+                        />
+                      )}
+
                       {shoppingPlan !== null ? (
                         <div className="grid gap-6 md:grid-cols-2 items-stretch">
                           {monthSpendCard}
