@@ -11,6 +11,7 @@ import {
   consumptionModePercent,
   consumptionModeWithinBudgetFeedback,
   CONSUMPTION_MODE_NO_BUDGET_MESSAGE,
+  resolveConsumptionMode,
   type ConsumptionModeView,
 } from "./consumption-mode";
 
@@ -347,5 +348,19 @@ describe("buildConsumptionModeView", () => {
     const rendered = view.stats.map((stat) => plain(stat.value)).join(" ");
     expect(rendered).not.toContain("NaN");
     expect(rendered).not.toContain("Infinity");
+  });
+});
+
+describe("resolveConsumptionMode", () => {
+  it("respeita a configuração no ciclo corrente e na prévia futura", () => {
+    expect(resolveConsumptionMode("VARIABLE_BUDGET", false)).toBe(
+      "VARIABLE_BUDGET",
+    );
+    expect(resolveConsumptionMode("INCOME", false)).toBe("INCOME");
+  });
+
+  it("força o modo renda em ciclo fechado", () => {
+    expect(resolveConsumptionMode("VARIABLE_BUDGET", true)).toBe("INCOME");
+    expect(resolveConsumptionMode("INCOME", true)).toBe("INCOME");
   });
 });

@@ -40,6 +40,18 @@ export const CONSUMPTION_MODE_PROJECTION_LABEL = "Projeção até o fim do ciclo
 export const CONSUMPTION_MODE_NO_BUDGET_MESSAGE =
   "Sem orçamento variável: os gastos fixos consomem toda a renda do ciclo.";
 
+/**
+ * Modo efetivo do card para o ciclo exibido: a prévia futura e o ciclo corrente
+ * respeitam a configuração; o ciclo fechado continua no modo renda (comparação
+ * histórica), mesmo que a configuração esteja em `VARIABLE_BUDGET`.
+ */
+export function resolveConsumptionMode(
+  configuredMode: ConsumptionMode,
+  isClosedCycle: boolean,
+): ConsumptionMode {
+  return isClosedCycle ? "INCOME" : configuredMode;
+}
+
 /** Normaliza entradas não finitas (ou negativas, quando pedido) para 0. */
 function safeCents(value: number): number {
   if (!Number.isFinite(value) || value < 0) return 0;
@@ -242,6 +254,12 @@ export interface ConsumptionModeView {
   excessCents: number;
   pausePerDayCents: number;
   dailyAvailableCents: number;
+  /**
+   * Nota extra "Pausa por dia R$ P" para orçamento zero com consumo: o
+   * feedback vira o aviso de ausência de denominador e a pausa precisa ficar
+   * explícita mesmo assim. `null` nos demais casos.
+   */
+  pausePerDayLabel: string | null;
   /** `false` quando os gastos fixos consomem toda a renda do ciclo. */
   hasVariableBudget: boolean;
 }
@@ -336,6 +354,10 @@ export function buildConsumptionModeView(
     excessCents,
     pausePerDayCents,
     dailyAvailableCents,
+    pausePerDayLabel:
+      !hasVariableBudget && excessCents > 0
+        ? `Pausa por dia ${formatCents(pausePerDayCents)}`
+        : null,
     hasVariableBudget,
   };
 }

@@ -578,6 +578,68 @@ fechados suficientes para o histórico.`
 - A meta não altera as fórmulas de projeção de fechamento nem do simulador
   "Posso comprar?" (§4.4) além de reutilizar o novo guardado realizado.
 
+### 4.9 Modo de consumo do ciclo (história #380)
+
+A escolha entre medir o consumo pela **renda** (`INCOME`, default) ou pelo
+**orçamento variável** (`VARIABLE_BUDGET`) é um valor único persistido em
+`AppSettings.consumptionMode`. Recarregar a Home mantém a escolha. O seletor
+`ConsumptionModeToggle` ("Renda do ciclo" / "Orçamento variável") envia
+`{ cycleStartDay, consumptionMode }` para `PUT /api/settings`.
+
+- O modo alternativo vale para o **ciclo corrente** e a **prévia de ciclo
+  futuro**. Em **ciclo fechado** o card continua no modo renda (comparação
+  histórica), mesmo que a configuração esteja em `VARIABLE_BUDGET`.
+- `INCOME` preserva exatamente o comportamento anterior: título "Renda do ciclo
+  consumida", `% = consumo_total / renda`, `aria-valuetext` = "X% da renda
+  consumida".
+
+No modo `VARIABLE_BUDGET` a **meta de economia não é subtraída**:
+
+```
+gastos_fixos       = saídas fixas que vencem na janela do ciclo
+consumo_variável   = gastos avulsos da janela + compras do cartão pela data
+orcamento_variável = max(renda_ciclo − gastos_fixos, 0)
+percentual         = round(consumo_variável / orcamento_variável × 100)   # 0 se orçamento = 0
+excesso            = max(consumo_variável − orcamento_variável, 0)
+pausa_por_dia      = ceil(excesso / max(dias_restantes, 1))
+diária_disponível  = floor(max(orcamento_variável − consumo_variável, 0) / max(dias_restantes, 1))
+```
+
+`dias_restantes` é o `remainingDays` da diária (contando hoje). A barra fica
+limitada a `0..100`.
+
+**Textos do card** no modo variável:
+
+- título "Orçamento variável consumido";
+- estatísticas, nesta ordem: "Orçamento variável" (o orçamento), "Consumo
+  variável" (o consumo variável), "Ainda disponível" ou "Estourado em"
+  (`|orçamento − consumo|`) e "Projeção até o fim do ciclo";
+- a **projeção permanece na base renda** (mesmo valor/rótulo da coluna do `%`),
+  não muda de base nem é ocultada;
+- dentro do orçamento: "Dentro do orçamento variável, ainda dá para gastar
+  R$ X por dia nos Y dias restantes." (singular: "no dia restante.");
+- estourado: "Estourado em R$ E. Pausa por dia R$ P por Y dias restantes."
+  (singular: "pelo dia restante.");
+- `aria-valuetext` = "X% do orçamento variável consumido".
+
+**Orçamento variável zero** (renda ≤ gastos fixos): `% = 0` (sem `NaN`/
+`Infinity`), barra vazia (`aria-valuenow="0"`) e, em `role="status"`, "Sem
+orçamento variável: os gastos fixos consomem toda a renda do ciclo.". Havendo
+consumo variável > 0, o card mantém "Consumo variável", "Estourado em" e a
+pausa por dia, deixando claro que o `0%` é ausência de denominador, não de
+gasto.
+
+**Nível/cor** no modo variável usa o percentual do orçamento: `percent >= 100`
+⇒ `red`; as demais faixas seguem `classifyLevel` sobre `ratio = percent/100`.
+Com orçamento `0`: `red` se consumo variável > 0 e `green` se consumo = 0
+(razão de cor `2` ou `0`).
+
+**Fora do escopo do modo:** snapshots/histórico, comparação "melhores/piores que
+os últimos meses", projeção de fechamento, simulador "Posso comprar?", meta de
+economia e o bloco `SpendAdviceCard` continuam no modelo por renda. No modo
+variável, a linha de feedback do card principal mostra o texto do modo em vez da
+comparação histórica.
+
 ## 5. Regras de negócio relevantes
 
 No **dashboard** (com `cycleStartDay ≠ 1`), "mês" significa a **janela do

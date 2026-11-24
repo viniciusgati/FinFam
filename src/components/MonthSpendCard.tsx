@@ -8,6 +8,14 @@ import {
 import { buildMonthSpendStats } from "@/lib/month-spend";
 import TermHelpLink from "./TermHelpLink";
 
+/** Estatística exibida no card (view model já formatada em R$). */
+export interface MonthSpendCardStat {
+  key: string;
+  label: string;
+  value: string;
+  detail: string | null;
+}
+
 export interface MonthSpendCardProps {
   backgroundColor: string;
   percent: number;
@@ -24,6 +32,14 @@ export interface MonthSpendCardProps {
   consumedCents: number;
   /** Projeção de fechamento do mês em centavos. */
   projectedCents: number;
+  /** Título do hero; default reproduz o modo renda. */
+  title?: string;
+  /** Estatísticas prontas; default deriva de `buildMonthSpendStats`. */
+  stats?: MonthSpendCardStat[];
+  /** Texto acessível da barra; default reproduz o modo renda. */
+  ariaValueText?: string;
+  /** Nota extra no rodapé (ex.: pausa por dia com orçamento zero). */
+  statusNote?: string;
   className?: string;
 }
 
@@ -47,14 +63,22 @@ export default function MonthSpendCard({
   incomeCents,
   consumedCents,
   projectedCents,
+  title,
+  stats: statsOverride,
+  ariaValueText,
+  statusNote,
   className = "",
 }: MonthSpendCardProps) {
-  const stats = buildMonthSpendStats({
-    incomeCents,
-    consumedCents,
-    projectedCents,
-    consumedPercent: percent,
-  });
+  const stats =
+    statsOverride ??
+    buildMonthSpendStats({
+      incomeCents,
+      consumedCents,
+      projectedCents,
+      consumedPercent: percent,
+    });
+  const heading = title ?? "Renda do ciclo consumida";
+  const valueText = ariaValueText ?? `${percent}% da renda consumida`;
   const barPercent = Math.min(Math.max(percent, 0), 100);
 
   return (
@@ -72,7 +96,7 @@ export default function MonthSpendCard({
               FinFam
             </p>
             <h1 className="text-xl font-semibold opacity-90 sm:text-2xl">
-              Renda do ciclo consumida
+              {heading}
             </h1>
           </div>
 
@@ -105,7 +129,7 @@ export default function MonthSpendCard({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={barPercent}
-              aria-valuetext={`${percent}% da renda consumida`}
+              aria-valuetext={valueText}
               className="h-3 w-full overflow-hidden rounded-full bg-current/20"
             >
               <div
@@ -159,6 +183,7 @@ export default function MonthSpendCard({
 
           <p role="status" aria-live="polite" className="font-medium opacity-90">
             {feedback}
+            {statusNote ? ` ${statusNote}` : null}
           </p>
         </footer>
       </div>
