@@ -24,6 +24,14 @@ enum ShoppingItemKind {
   DESEJAVEL
 }
 
+/// Forma de medir o consumo do ciclo na Home (história #380): pela renda
+/// (`INCOME`, default/comportamento atual) ou pelo orçamento que sobra depois
+/// dos gastos fixos (`VARIABLE_BUDGET`).
+enum ConsumptionMode {
+  INCOME
+  VARIABLE_BUDGET
+}
+
 /// Entrada fixa recorrente (ex.: salário).
 model Income {
   id          String   @id @default(cuid())
@@ -179,11 +187,12 @@ model MonthlyCategorySnapshot {
 /// `cycleStartDay` é o dia do mês que marca o início do ciclo financeiro
 /// (default 1 = mês calendário).
 model AppSettings {
-  id               String   @id @default("singleton")
-  cycleStartDay    Int      @default(1)
+  id               String          @id @default("singleton")
+  cycleStartDay    Int             @default(1)
   savingsGoalCents Int?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  consumptionMode  ConsumptionMode @default(INCOME)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@map("app_settings")
 }
