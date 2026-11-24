@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import MonthSpendCard from "./MonthSpendCard";
+import { buildConsumptionModeView } from "@/lib/consumption-mode";
 
 function render(overrides: Partial<Parameters<typeof MonthSpendCard>[0]> = {}) {
   const props = {
@@ -150,5 +151,108 @@ describe("MonthSpendCard (renderização)", () => {
     expect(html).toContain(
       'aria-label="Saiba mais sobre % da renda consumida"',
     );
+  });
+});
+
+describe("MonthSpendCard no modo VARIABLE_BUDGET", () => {
+  function renderVariable(
+    variableConsumedCents: number,
+    remainingDays = 10,
+    overrides: Partial<Parameters<typeof MonthSpendCard>[0]> = {},
+  ) {
+    const view = buildConsumptionModeView({
+      mode: "VARIABLE_BUDGET",
+      incomeCents: 200000,
+      fixedExpensesCents: 50000,
+      variableConsumedCents,
+      projectedCents: 160000,
+      remainingDays,
+    });
+    if (!view) throw new Error("esperava view model do modo variável");
+    return render({
+      percent: view.percent,
+      level: view.level,
+      feedback: view.feedback,
+      title: view.title,
+      stats: view.stats,
+      ariaValueText: view.ariaValueText,
+      incomeCents: 200000,
+      consumedCents: 50000 + variableConsumedCents,
+      projectedCents: 160000,
+      ...overrides,
+    });
+  }
+
+  it("mostra o cenário dentro do orçamento (60%) com os valores e a diária", () => {
+    const html = renderVariable(90000);
+
+    expect(html).toContain("Orçamento variável consumido");
+    expect(html).toContain("60");
+    expect(html).toContain("Orçamento variável");
+    expect(html).toContain("R$ 1.500,00");
+    expect(html).toContain("Consumo variável");
+    expect(html).toContain("R$ 900,00");
+    expect(html).toContain("Ainda disponível");
+    expect(html).toContain("R$ 600,00");
+    expect(html).toContain("Projeção até o fim do ciclo");
+    expect(html).toContain(
+      "Dentro do orçamento variável, ainda dá para gastar R$ 60,00 por dia nos 10 dias restantes.",
+    );
+    expect(html).toContain(
+      'aria-valuetext="60% do orçamento variável consumido"',
+    );
+    expect(html).toContain('aria-valuenow="60"');
+    expect(html).not.toContain("Renda do ciclo consumida");
+  });
+
+  it("mostra o estouro (120%) com a pausa por dia e a barra limitada a 100", () => {
+    const html = renderVariable(180000);
+
+    expect(html).toContain("120");
+    expect(html).toContain("Estourado em");
+    expect(html).toContain("R$ 300,00");
+    expect(html).toContain(
+      "Estourado em R$ 300,00. Pausa por dia R$ 30,00 por 10 dias restantes.",
+    );
+    expect(html).toContain(
+      'aria-valuetext="120% do orçamento variável consumido"',
+    );
+    expect(html).toContain('aria-valuenow="100"');
+    expect(html).not.toContain("width:120%");
+    expect(html).toContain("Crítico");
+  });
+
+  it("renderiza o aviso de orçamento zero em role=status sem NaN/Infinity", () => {
+    const view = buildConsumptionModeView({
+      mode: "VARIABLE_BUDGET",
+      incomeCents: 100000,
+      fixedExpensesCents: 100000,
+      variableConsumedCents: 50000,
+      projectedCents: 120000,
+      remainingDays: 10,
+    });
+    if (!view) throw new Error("esperava view model do modo variável");
+
+    const html = render({
+      percent: view.percent,
+      level: view.level,
+      feedback: view.feedback,
+      title: view.title,
+      stats: view.stats,
+      ariaValueText: view.ariaValueText,
+      statusNote: view.pausePerDayLabel ?? undefined,
+    });
+
+    expect(html).toContain(
+      "Sem orçamento variável: os gastos fixos consomem toda a renda do ciclo.",
+    );
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-valuenow="0"');
+    expect(html).toContain("Consumo variável");
+    expect(html).toContain("R$ 500,00");
+    expect(html).toContain("Estourado em");
+    expect(html).toContain("Pausa por dia R$ 50,00");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("Infinity");
   });
 });

@@ -35,6 +35,7 @@ describe("GET /api/settings", () => {
     expect(await response.json()).toEqual({
       cycleStartDay: 1,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
   });
 
@@ -42,6 +43,7 @@ describe("GET /api/settings", () => {
     appSettingsMock.findUnique.mockResolvedValue({
       cycleStartDay: 20,
       savingsGoalCents: 50000,
+      consumptionMode: "VARIABLE_BUDGET",
     });
 
     const response = await GET();
@@ -50,6 +52,7 @@ describe("GET /api/settings", () => {
     expect(await response.json()).toEqual({
       cycleStartDay: 20,
       savingsGoalCents: 50000,
+      consumptionMode: "VARIABLE_BUDGET",
     });
   });
 
@@ -57,6 +60,7 @@ describe("GET /api/settings", () => {
     appSettingsMock.findUnique.mockResolvedValue({
       cycleStartDay: 10,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
 
     const response = await GET();
@@ -64,6 +68,7 @@ describe("GET /api/settings", () => {
     expect(await response.json()).toEqual({
       cycleStartDay: 10,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
   });
 });
@@ -73,6 +78,7 @@ describe("PUT /api/settings", () => {
     appSettingsMock.upsert.mockResolvedValue({
       cycleStartDay: 20,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
 
     const response = await PUT(jsonRequest("PUT", { cycleStartDay: 20 }));
@@ -81,10 +87,16 @@ describe("PUT /api/settings", () => {
     expect(await response.json()).toEqual({
       cycleStartDay: 20,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
     expect(appSettingsMock.upsert).toHaveBeenCalledWith({
       where: { id: "singleton" },
-      create: { id: "singleton", cycleStartDay: 20, savingsGoalCents: null },
+      create: {
+        id: "singleton",
+        cycleStartDay: 20,
+        savingsGoalCents: null,
+        consumptionMode: "INCOME",
+      },
       update: { cycleStartDay: 20 },
     });
   });
@@ -93,6 +105,7 @@ describe("PUT /api/settings", () => {
     appSettingsMock.upsert.mockResolvedValue({
       cycleStartDay: 5,
       savingsGoalCents: 50000,
+      consumptionMode: "INCOME",
     });
 
     const response = await PUT(
@@ -103,6 +116,7 @@ describe("PUT /api/settings", () => {
     expect(await response.json()).toEqual({
       cycleStartDay: 5,
       savingsGoalCents: 50000,
+      consumptionMode: "INCOME",
     });
     expect(appSettingsMock.upsert).toHaveBeenCalledWith({
       where: { id: "singleton" },
@@ -110,6 +124,7 @@ describe("PUT /api/settings", () => {
         id: "singleton",
         cycleStartDay: 5,
         savingsGoalCents: 50000,
+        consumptionMode: "INCOME",
       },
       update: { cycleStartDay: 5, savingsGoalCents: 50000 },
     });
@@ -119,6 +134,7 @@ describe("PUT /api/settings", () => {
     appSettingsMock.upsert.mockResolvedValue({
       cycleStartDay: 5,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
 
     const response = await PUT(
@@ -129,13 +145,64 @@ describe("PUT /api/settings", () => {
     expect(await response.json()).toEqual({
       cycleStartDay: 5,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
     expect(appSettingsMock.upsert).toHaveBeenCalledWith({
       where: { id: "singleton" },
-      create: { id: "singleton", cycleStartDay: 5, savingsGoalCents: null },
+      create: {
+        id: "singleton",
+        cycleStartDay: 5,
+        savingsGoalCents: null,
+        consumptionMode: "INCOME",
+      },
       update: { cycleStartDay: 5, savingsGoalCents: null },
     });
   });
+
+  it("grava o modo de consumo VARIABLE_BUDGET", async () => {
+    appSettingsMock.upsert.mockResolvedValue({
+      cycleStartDay: 5,
+      savingsGoalCents: null,
+      consumptionMode: "VARIABLE_BUDGET",
+    });
+
+    const response = await PUT(
+      jsonRequest("PUT", {
+        cycleStartDay: 5,
+        consumptionMode: "VARIABLE_BUDGET",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      cycleStartDay: 5,
+      savingsGoalCents: null,
+      consumptionMode: "VARIABLE_BUDGET",
+    });
+    expect(appSettingsMock.upsert).toHaveBeenCalledWith({
+      where: { id: "singleton" },
+      create: {
+        id: "singleton",
+        cycleStartDay: 5,
+        savingsGoalCents: null,
+        consumptionMode: "VARIABLE_BUDGET",
+      },
+      update: { cycleStartDay: 5, consumptionMode: "VARIABLE_BUDGET" },
+    });
+  });
+
+  it.each(["SAVINGS", "", "income"])(
+    "rejeita consumptionMode %p com 400 e não grava",
+    async (value) => {
+      const response = await PUT(
+        jsonRequest("PUT", { cycleStartDay: 1, consumptionMode: value }),
+      );
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("Modo de consumo inválido");
+      expect(appSettingsMock.upsert).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([0, 29, "abc"])(
     "rejeita cycleStartDay %p com 400 e não grava",

@@ -9,6 +9,7 @@
  */
 import { z } from "zod";
 
+import { CONSUMPTION_MODES } from "./consumption-mode";
 import { MAX_INSTALLMENTS_TOTAL } from "./invoices";
 
 const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -195,10 +196,12 @@ const CYCLE_START_DAY_MESSAGE = "Dia do ciclo deve ser entre 1 e 28";
 const SAVINGS_GOAL_MIN_MESSAGE = "Meta de economia deve ser maior ou igual a zero";
 const SAVINGS_GOAL_INT_MESSAGE =
   "Meta de economia deve ser um número inteiro em centavos";
+const CONSUMPTION_MODE_MESSAGE = "Modo de consumo inválido";
 
 /**
- * Configuração global: dia do mês em que começa o ciclo financeiro (1–28) e
- * meta de economia por ciclo em centavos (`null`/omitido = sem meta).
+ * Configuração global: dia do mês em que começa o ciclo financeiro (1–28),
+ * meta de economia por ciclo em centavos (`null`/omitido = sem meta) e modo de
+ * consumo do ciclo (`INCOME`/`VARIABLE_BUDGET`, omitido = preserva o atual).
  */
 export const settingsUpdateSchema = z.object({
   cycleStartDay: z
@@ -217,6 +220,11 @@ export const settingsUpdateSchema = z.object({
     .int(SAVINGS_GOAL_INT_MESSAGE)
     .min(0, SAVINGS_GOAL_MIN_MESSAGE)
     .nullable()
+    .optional(),
+  consumptionMode: z
+    .enum(CONSUMPTION_MODES, {
+      errorMap: () => ({ message: CONSUMPTION_MODE_MESSAGE }),
+    })
     .optional(),
 });
 

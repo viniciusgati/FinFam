@@ -343,6 +343,7 @@ describe("loadCycleAllowance — diária restante (regressão #231, moldura do c
     prismaMock.appSettings.findUnique.mockResolvedValue({
       id: "singleton",
       cycleStartDay: 20,
+      consumptionMode: "INCOME",
     });
     prismaMock.income.findMany.mockResolvedValue([
       { id: "i", amountCents: 1000000, receiveDay: 20, active: true, startMonth: null, endMonth: null },
@@ -387,6 +388,7 @@ describe("loadCycleAllowance — diária restante (regressão #231, moldura do c
     prismaMock.appSettings.findUnique.mockResolvedValue({
       id: "singleton",
       cycleStartDay: 1,
+      consumptionMode: "INCOME",
     });
     prismaMock.income.findMany.mockResolvedValue([
       { id: "i", amountCents: 500000, receiveDay: 1, active: true, startMonth: null, endMonth: null },
@@ -420,6 +422,7 @@ describe("loadCycleAllowance — diária restante (regressão #231, moldura do c
     prismaMock.appSettings.findUnique.mockResolvedValue({
       id: "singleton",
       cycleStartDay: 20,
+      consumptionMode: "INCOME",
     });
     prismaMock.income.findMany.mockResolvedValue([]);
     prismaMock.fixedExpense.findMany.mockResolvedValue([]);
@@ -670,6 +673,7 @@ describe("loadDashboardData — janela do ciclo para avulsos (ciclo ≠ mês)", 
     prismaMock.appSettings.findUnique.mockResolvedValue({
       id: "singleton",
       cycleStartDay: 15,
+      consumptionMode: "INCOME",
     });
     prismaMock.income.findMany.mockResolvedValue([
       {
@@ -825,6 +829,7 @@ describe("loadDashboardData — janela do ciclo para avulsos (ciclo ≠ mês)", 
     prismaMock.appSettings.findUnique.mockResolvedValue({
       id: "singleton",
       cycleStartDay: 1,
+      consumptionMode: "INCOME",
     });
     prismaMock.variableExpense.findMany.mockResolvedValue([
       {
@@ -859,6 +864,7 @@ describe("loadDashboardData — regressão: dia 1 do ciclo não herda o consumo 
     prismaMock.appSettings.findUnique.mockResolvedValue({
       id: "singleton",
       cycleStartDay: 15,
+      consumptionMode: "INCOME",
     });
     prismaMock.income.findMany.mockResolvedValue([
       {
@@ -1279,6 +1285,7 @@ describe("loadOpenCycleExpenses — a pagar do ciclo (task #364)", () => {
     prismaMock.appSettings.findUnique.mockResolvedValue({
       id: "singleton",
       cycleStartDay: 15,
+      consumptionMode: "INCOME",
     });
     prismaMock.variableExpense.findMany.mockResolvedValue([]);
   });

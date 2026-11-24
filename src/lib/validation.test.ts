@@ -238,6 +238,29 @@ describe("settingsUpdateSchema", () => {
     }
   });
 
+  it("aceita consumptionMode INCOME/VARIABLE_BUDGET e omissão", () => {
+    expect(settingsUpdateSchema.safeParse({ cycleStartDay: 1 }).success).toBe(
+      true,
+    );
+    for (const consumptionMode of ["INCOME", "VARIABLE_BUDGET"]) {
+      expect(
+        settingsUpdateSchema.safeParse({ cycleStartDay: 1, consumptionMode })
+          .success,
+      ).toBe(true);
+    }
+  });
+
+  it("rejeita consumptionMode fora do enum com mensagem pt-BR", () => {
+    const parsed = settingsUpdateSchema.safeParse({
+      cycleStartDay: 1,
+      consumptionMode: "SAVINGS",
+    });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toBe("Modo de consumo inválido");
+    }
+  });
+
   it("rejeita meta fracionária e string", () => {
     expect(
       settingsUpdateSchema.safeParse({

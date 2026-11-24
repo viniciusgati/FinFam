@@ -30,11 +30,18 @@ import {
   computeFinanceStatus,
   dashboardView,
   emptyStateCopy,
+  levelColor,
   monthKey,
   monthLabel,
   type DashboardView,
   type FinanceLevel,
 } from "@/lib/finance";
+import {
+  buildConsumptionModeView,
+  resolveConsumptionMode,
+  type ConsumptionMode,
+  type ConsumptionModeView,
+} from "@/lib/consumption-mode";
 import { cycleInvoicePaymentLabel } from "@/lib/invoices";
 import { invoiceMonthKeyForCycle } from "@/lib/card-adjustment";
 import {
@@ -48,6 +55,7 @@ import {
 } from "@/lib/dashboard-layout";
 import type { DailySeries } from "@/lib/dashboard-series";
 import CyclePreviewNotice from "@/components/CyclePreviewNotice";
+import ConsumptionModeToggle from "@/components/ConsumptionModeToggle";
 import DashboardZones from "@/components/DashboardZones";
 import {
   buildMonthReviewData,
@@ -150,6 +158,8 @@ export default async function DashboardPage({
   let familyHelpFallback = "";
   let cycleStartDay = defaultSettings().cycleStartDay;
   let savingsGoalCents = defaultSettings().savingsGoalCents ?? 0;
+  let consumptionMode: ConsumptionMode = defaultSettings().consumptionMode;
+  let consumptionView: ConsumptionModeView | null = null;
   let referenceMonthKey = monthKey(now);
   let referenceWindow: CycleWindow | null = null;
   let isCurrentCycle = false;
@@ -168,6 +178,12 @@ export default async function DashboardPage({
     isClosedCycle = !reference.isCurrent && !reference.isFuture;
     isFutureCycle = reference.isFuture;
     isNextDisabled = reference.isFuture;
+    // O modo alternativo vale para o ciclo corrente e a prévia futura; no ciclo
+    // fechado o card segue no modo renda (comparação histórica).
+    consumptionMode = resolveConsumptionMode(
+      settings.consumptionMode,
+      isClosedCycle,
+    );
 
     const data = await loadCycleDashboardData(reference, now);
     openExpenses = await loadOpenCycleExpenses(now);
@@ -239,6 +255,18 @@ export default async function DashboardPage({
         scenarios.goalCents !== null ? scenarios.withoutGoal : null;
       cycleIncomeCents = data.monthlyIncomeCents;
     }
+
+    // No modo `VARIABLE_BUDGET` o card compara o consumo variável com o que
+    // sobra da renda após os gastos fixos. A projeção continua na base renda.
+    consumptionView = buildConsumptionModeView({
+      mode: consumptionMode,
+      incomeCents: data.monthlyIncomeCents,
+      fixedExpensesCents: data.fixedExpensesCents,
+      variableConsumedCents:
+        data.variableExpensesCents + data.cardExpensesCents,
+      projectedCents: status.projectedCents,
+      remainingDays: allowance?.remainingDays ?? 0,
+    });
 
     // Um único bloco de recomendação no ciclo corrente: compara o consumo
     // variável do ciclo com o orçamento variável (renda − contas fixas − meta
@@ -393,17 +421,25 @@ export default async function DashboardPage({
   const monthSpendCard =
     view.state === "ok" ? (
       <MonthSpendCard
-        backgroundColor={backgroundColor}
-        percent={view.percent}
-        level={level}
+        backgroundColor={
+          consumptionView
+            ? levelColor(consumptionView.level, consumptionView.colorRatio)
+            : backgroundColor
+        }
+        percent={consumptionView?.percent ?? view.percent}
+        level={consumptionView?.level ?? level}
         invoiceDue={invoicePaymentLabel ?? ""}
         countdownLabel={countdownLabel}
-        feedback={view.feedback}
+        feedback={consumptionView?.feedback ?? view.feedback}
         projectedPercent={view.projectedPercent}
         projectedRisk={view.projectedRisk}
         incomeCents={incomeCents}
         consumedCents={consumedCents}
         projectedCents={projectedCents}
+        title={consumptionView?.title}
+        stats={consumptionView?.stats}
+        ariaValueText={consumptionView?.ariaValueText}
+        statusNote={consumptionView?.pausePerDayLabel ?? undefined}
       />
     ) : null;
 
@@ -471,6 +507,13 @@ export default async function DashboardPage({
                 case "summary":
                   return (
                     <>
+                      {(isCurrentCycle || isFutureCycle) && (
+                        <ConsumptionModeToggle
+                          initialMode={consumptionMode}
+                          cycleStartDay={cycleStartDay}
+                        />
+                      )}
+
                       {shoppingPlan !== null ? (
                         <div className="grid gap-6 md:grid-cols-2 items-stretch">
                           {monthSpendCard}

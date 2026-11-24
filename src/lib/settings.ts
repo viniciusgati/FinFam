@@ -9,12 +9,20 @@
  * `savingsGoalCents` é a meta de economia por ciclo, em centavos. `null`
  * significa "sem meta" e é o default (retrocompatível com bancos que ainda
  * não tinham a coluna).
+ *
+ * `consumptionMode` é a forma de medir o consumo do ciclo na Home (história
+ * #380). O default `INCOME` preserva o comportamento anterior.
  */
+import {
+  DEFAULT_CONSUMPTION_MODE,
+  type ConsumptionMode,
+} from "./consumption-mode";
 import { prisma } from "./db";
 
 export interface AppSettings {
   cycleStartDay: number;
   savingsGoalCents: number | null;
+  consumptionMode: ConsumptionMode;
 }
 
 export const CYCLE_START_DAY_MIN = 1;
@@ -25,7 +33,11 @@ export const SETTINGS_SINGLETON_ID = "singleton";
 
 /** Configuração usada quando ainda não há linha persistida. Pura. */
 export function defaultSettings(): AppSettings {
-  return { cycleStartDay: 1, savingsGoalCents: null };
+  return {
+    cycleStartDay: 1,
+    savingsGoalCents: null,
+    consumptionMode: DEFAULT_CONSUMPTION_MODE,
+  };
 }
 
 /** Lê a configuração global; devolve o default quando a linha não existe. */
@@ -37,6 +49,7 @@ export async function getSettings(): Promise<AppSettings> {
   return {
     cycleStartDay: row.cycleStartDay,
     savingsGoalCents: row.savingsGoalCents ?? null,
+    consumptionMode: row.consumptionMode ?? DEFAULT_CONSUMPTION_MODE,
   };
 }
 
@@ -44,10 +57,12 @@ export async function getSettings(): Promise<AppSettings> {
  * Grava (upsert) a configuração global do singleton.
  *
  * `savingsGoalCents` omitido mantém o valor persistido; `null` limpa a meta.
+ * `consumptionMode` omitido mantém o valor persistido.
  */
 export async function updateSettings(input: {
   cycleStartDay: number;
   savingsGoalCents?: number | null;
+  consumptionMode?: ConsumptionMode;
 }): Promise<AppSettings> {
   const row = await prisma.appSettings.upsert({
     where: { id: SETTINGS_SINGLETON_ID },
@@ -55,16 +70,21 @@ export async function updateSettings(input: {
       id: SETTINGS_SINGLETON_ID,
       cycleStartDay: input.cycleStartDay,
       savingsGoalCents: input.savingsGoalCents ?? null,
+      consumptionMode: input.consumptionMode ?? DEFAULT_CONSUMPTION_MODE,
     },
     update: {
       cycleStartDay: input.cycleStartDay,
       ...(input.savingsGoalCents !== undefined
         ? { savingsGoalCents: input.savingsGoalCents }
         : {}),
+      ...(input.consumptionMode !== undefined
+        ? { consumptionMode: input.consumptionMode }
+        : {}),
     },
   });
   return {
     cycleStartDay: row.cycleStartDay,
     savingsGoalCents: row.savingsGoalCents ?? null,
+    consumptionMode: row.consumptionMode ?? DEFAULT_CONSUMPTION_MODE,
   };
 }

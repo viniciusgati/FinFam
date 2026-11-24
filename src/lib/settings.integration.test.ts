@@ -21,13 +21,21 @@ describe("settings — integração com PostgreSQL", () => {
     await disconnectTestDatabase();
   });
 
-  it("defaultSettings retorna cycleStartDay 1 e sem meta", () => {
-    expect(defaultSettings()).toEqual({ cycleStartDay: 1, savingsGoalCents: null });
+  it("defaultSettings retorna cycleStartDay 1, sem meta e modo renda", () => {
+    expect(defaultSettings()).toEqual({
+      cycleStartDay: 1,
+      savingsGoalCents: null,
+      consumptionMode: "INCOME",
+    });
   });
 
   it("getSettings sem linha persistida retorna o default", async () => {
     const settings = await getSettings();
-    expect(settings).toEqual({ cycleStartDay: 1, savingsGoalCents: null });
+    expect(settings).toEqual({
+      cycleStartDay: 1,
+      savingsGoalCents: null,
+      consumptionMode: "INCOME",
+    });
   });
 
   it("getSettings converte coluna nula em savingsGoalCents null", async () => {
@@ -38,6 +46,7 @@ describe("settings — integração com PostgreSQL", () => {
     expect(await getSettings()).toEqual({
       cycleStartDay: 10,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
   });
 
@@ -47,6 +56,7 @@ describe("settings — integração com PostgreSQL", () => {
     expect(await getSettings()).toEqual({
       cycleStartDay: 20,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
 
     const rows = await prisma.appSettings.findMany();
@@ -60,6 +70,7 @@ describe("settings — integração com PostgreSQL", () => {
     expect(await getSettings()).toEqual({
       cycleStartDay: 5,
       savingsGoalCents: 50000,
+      consumptionMode: "INCOME",
     });
 
     const rows = await prisma.appSettings.findMany();
@@ -74,6 +85,7 @@ describe("settings — integração com PostgreSQL", () => {
     expect(await getSettings()).toEqual({
       cycleStartDay: 5,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
     expect(await prisma.appSettings.count()).toBe(1);
   });
@@ -85,6 +97,7 @@ describe("settings — integração com PostgreSQL", () => {
     expect(await getSettings()).toEqual({
       cycleStartDay: 15,
       savingsGoalCents: 50000,
+      consumptionMode: "INCOME",
     });
   });
 
@@ -95,7 +108,50 @@ describe("settings — integração com PostgreSQL", () => {
     expect(await getSettings()).toEqual({
       cycleStartDay: 15,
       savingsGoalCents: null,
+      consumptionMode: "INCOME",
     });
     expect(await prisma.appSettings.count()).toBe(1);
+  });
+
+  it("updateSettings grava e relê o modo de consumo", async () => {
+    await updateSettings({
+      cycleStartDay: 5,
+      consumptionMode: "VARIABLE_BUDGET",
+    });
+
+    expect(await getSettings()).toEqual({
+      cycleStartDay: 5,
+      savingsGoalCents: null,
+      consumptionMode: "VARIABLE_BUDGET",
+    });
+
+    const rows = await prisma.appSettings.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].consumptionMode).toBe("VARIABLE_BUDGET");
+  });
+
+  it("updateSettings sem consumptionMode preserva o modo persistido", async () => {
+    await updateSettings({
+      cycleStartDay: 5,
+      consumptionMode: "VARIABLE_BUDGET",
+    });
+    await updateSettings({ cycleStartDay: 10 });
+
+    expect(await getSettings()).toEqual({
+      cycleStartDay: 10,
+      savingsGoalCents: null,
+      consumptionMode: "VARIABLE_BUDGET",
+    });
+  });
+
+  it("migration aplica o default INCOME na coluna nova", async () => {
+    await prisma.appSettings.create({
+      data: { id: "singleton", cycleStartDay: 1 },
+    });
+
+    const row = await prisma.appSettings.findUnique({
+      where: { id: "singleton" },
+    });
+    expect(row?.consumptionMode).toBe("INCOME");
   });
 });
