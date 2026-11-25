@@ -98,6 +98,26 @@ Implementada em `src/lib/finance.ts` como funções puras:
 Entrada resumida (`FinanceInput`): renda, saídas fixas, gastos avulsos, faturas
 e data de referência. O percentual nunca é persistido; é sempre calculado.
 
+## Análise de período
+
+`src/lib/period-analysis.ts` é o motor **puro** do diagnóstico do período
+(evolução do "Ajuda à família"). Recebe snapshots fechados, o ciclo corrente,
+transações cruas, contas fixas, entradas, cartões e — opcionalmente — reserva e
+metas, e devolve seis dimensões estruturadas:
+
+- **Fluxo**: renda, consumo, sobra, taxa de poupança, média/mediana e tendência.
+- **Ritmo**: gasto variável no mesmo dia do ciclo vs. a mediana dos anteriores.
+- **Composição**: fixas/variáveis/cartão, categorias, desvios e sem categoria.
+- **Compromissos**: custo fixo, vencimentos, parcelas futuras e limite do cartão.
+- **Comportamento**: merchants, ticket/frequência, recorrência e compras atípicas.
+- **Qualidade**: categorização, crédito sem cartão, buracos e confiança da base.
+
+Nenhuma função acessa banco, rede ou relógio; a IA, quando entrar, recebe o
+resultado pronto e apenas narra/prioriza. A reserva confirmada
+(`ReserveSnapshot`) e as metas ainda não existem no schema — os campos ficam
+nulos/vazios até a migration, e `buildPeriodAnalysis` nunca lança para dados
+vazios. O cenário do seed está coberto em `period-analysis.test.ts`.
+
 ## Banco de dados
 
 - Migrations versionadas com Prisma (`prisma/migrations`).
