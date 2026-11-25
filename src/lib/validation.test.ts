@@ -5,6 +5,7 @@ import {
   creditCardCreateSchema,
   creditCardUpdateSchema,
   invoiceSetTotalSchema,
+  reserveSnapshotSchema,
   settingsUpdateSchema,
 } from "./validation";
 
@@ -272,6 +273,53 @@ describe("settingsUpdateSchema", () => {
       settingsUpdateSchema.safeParse({
         cycleStartDay: 1,
         savingsGoalCents: "100",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("reserveSnapshotSchema", () => {
+  it("aceita mês válido e saldo zero", () => {
+    expect(
+      reserveSnapshotSchema.safeParse({
+        monthKey: "2026-11",
+        amountCents: 0,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("aceita saldo positivo com observação", () => {
+    const parsed = reserveSnapshotSchema.safeParse({
+      monthKey: "2026-11",
+      amountCents: 160000,
+      note: "Conta poupança",
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejeita mês inválido, saldo negativo, fracionário e string", () => {
+    expect(
+      reserveSnapshotSchema.safeParse({
+        monthKey: "2026-13",
+        amountCents: 1000,
+      }).success,
+    ).toBe(false);
+    expect(
+      reserveSnapshotSchema.safeParse({
+        monthKey: "2026-11",
+        amountCents: -1,
+      }).success,
+    ).toBe(false);
+    expect(
+      reserveSnapshotSchema.safeParse({
+        monthKey: "2026-11",
+        amountCents: 100.5,
+      }).success,
+    ).toBe(false);
+    expect(
+      reserveSnapshotSchema.safeParse({
+        monthKey: "2026-11",
+        amountCents: "100",
       }).success,
     ).toBe(false);
   });

@@ -45,6 +45,12 @@ export interface PeriodAnalysisView {
   summaryLabel: string;
   paceLabel: string | null;
   commitmentLabel: string | null;
+  /** Texto completo quando há saldo confirmado; `null` caso contrário. */
+  reserveLabel: string | null;
+  /** Convite para confirmar o saldo quando ainda não há snapshot. */
+  reservePromptLabel: string | null;
+  /** Último saldo confirmado, usado para pré-preencher o formulário. */
+  reserveAmountCents: number | null;
   categoryMovers: PeriodMoverView[];
   anomalies: PeriodAnomalyView[];
   levers: PeriodLeverView[];
@@ -57,6 +63,8 @@ export interface PeriodAnalysisView {
 export const PERIOD_ANALYSIS_TITLE = "Diagnóstico do período";
 export const PERIOD_ANALYSIS_EMPTY_MESSAGE =
   "Ainda não há dados suficientes para o diagnóstico do período.";
+export const PERIOD_RESERVE_PROMPT =
+  "Reserva ainda não confirmada. Informe quanto você tem guardado para acompanhar a cobertura de emergência.";
 
 const LEVER_LABELS: Record<PeriodSavingsLeverKind, string> = {
   frequency: "Reduzir frequência",
@@ -160,6 +168,76 @@ function commitmentLabel(analysis: PeriodAnalysis): string | null {
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+function decimalLabel(value: number): string {
+  return String(value).replace(".", ",");
+}
+
+function monthsLabel(value: number): string {
+  return `${value} ${value === 1 ? "mês" : "meses"}`;
+}
+
+function reserveLabel(analysis: PeriodAnalysis): string | null {
+  const reserve = analysis.reserve;
+  if (reserve.confirmedCents === null) return null;
+
+  const parts: string[] = [];
+  let first = `Reserva confirmada: ${formatCents(reserve.confirmedCents)}`;
+  if (reserve.monthKey !== null) {
+    first += ` em ${monthLabel(reserve.monthKey)}`;
+  }
+  if (reserve.ageMonths !== null && reserve.ageMonths > 0) {
+    first += ` (há ${monthsLabel(reserve.ageMonths)})`;
+  }
+  parts.push(`${first}.`);
+
+  if (
+    reserve.averageFixedExpensesCents > 0 &&
+    reserve.coverageMonths !== null
+  ) {
+    parts.push(
+      `Cobre ${decimalLabel(reserve.coverageMonths)} ` +
+        `${reserve.coverageMonths === 1 ? "mês" : "meses"} de contas fixas.`,
+    );
+  }
+
+  if (reserve.averageFixedExpensesCents > 0 && reserve.gapCents !== null) {
+    if (reserve.gapCents === 0) {
+      parts.push(
+        `Alvo de ${monthsLabel(reserve.targetMonths)} atingido.`,
+      );
+    } else {
+      parts.push(
+        `Faltam ${formatCents(reserve.gapCents)} para ` +
+          `${monthsLabel(reserve.targetMonths)}.`,
+      );
+      if (reserve.monthsToTarget !== null) {
+        parts.push(
+          `No ritmo de sobra atual, ` +
+            `${monthsLabel(reserve.monthsToTarget)}.`,
+        );
+      }
+    }
+  }
+
+  if (
+    reserve.unaccountedCents !== null &&
+    reserve.unaccountedCents > 0
+  ) {
+    parts.push(
+      `${formatCents(reserve.unaccountedCents)} da sobra estimada ` +
+        "não apareceram na reserva.",
+    );
+  }
+
+  return parts.join(" ");
+}
+
+function reservePromptLabel(analysis: PeriodAnalysis): string | null {
+  return analysis.reserve.confirmedCents === null
+    ? PERIOD_RESERVE_PROMPT
+    : null;
+}
+
 function categoryMovers(analysis: PeriodAnalysis): PeriodMoverView[] {
   return analysis.composition.topMovers.slice(0, 3).map((mover) => {
     const direction = mover.deltaCents >= 0 ? "acima" : "abaixo";
@@ -229,6 +307,9 @@ export function periodAnalysisView(
     summaryLabel: summaryLabel(analysis),
     paceLabel: paceLabel(analysis),
     commitmentLabel: commitmentLabel(analysis),
+    reserveLabel: reserveLabel(analysis),
+    reservePromptLabel: reservePromptLabel(analysis),
+    reserveAmountCents: analysis.reserve.confirmedCents,
     categoryMovers: categoryMovers(analysis),
     anomalies: anomalies(analysis),
     levers: levers(analysis),

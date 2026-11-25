@@ -228,6 +228,24 @@ export const settingsUpdateSchema = z.object({
     .optional(),
 });
 
+/**
+ * Saldo guardado confirmado em um mês (`YYYY-MM`). Diferente dos demais valores
+ * monetários, `0` é válido: significa "não tenho reserva confirmada".
+ */
+export const reserveSnapshotSchema = z.object({
+  monthKey: z.string().regex(MONTH_REGEX, MONTH_MESSAGE),
+  amountCents: z
+    .number({
+      invalid_type_error: "Informe um saldo em centavos",
+      required_error: "Informe um saldo em centavos",
+    })
+    .int("Informe um saldo em centavos")
+    .min(0, "Saldo deve ser maior ou igual a zero"),
+  note: z.string().trim().max(200, "Observação muito longa").nullish(),
+});
+
+export type ReserveSnapshotInput = z.infer<typeof reserveSnapshotSchema>;
+
 export type IncomeCreateInput = z.infer<typeof incomeCreateSchema>;
 export type IncomeUpdateInput = z.infer<typeof incomeUpdateSchema>;
 export type FixedExpenseCreateInput = z.infer<typeof fixedExpenseCreateSchema>;

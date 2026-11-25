@@ -1,10 +1,15 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import PeriodDiagnosisCard from "./PeriodDiagnosisCard";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 import {
   PERIOD_ANALYSIS_EMPTY_MESSAGE,
   PERIOD_ANALYSIS_TITLE,
+  PERIOD_RESERVE_PROMPT,
   type PeriodAnalysisView,
 } from "@/lib/period-analysis-view";
 
@@ -18,6 +23,9 @@ function makeView(
     summaryLabel: "Sobra média de R$ 200,00 nos últimos 4 meses fechados.",
     paceLabel: "No dia 10, o consumo variável foi R$ 300,00.",
     commitmentLabel: "Contas fixas: R$ 600,00 (60% da renda média).",
+    reserveLabel: null,
+    reservePromptLabel: PERIOD_RESERVE_PROMPT,
+    reserveAmountCents: null,
     categoryMovers: [
       { category: "Mercado", detail: "acima da média em R$ 100,00 (+33.3%)" },
     ],
@@ -59,6 +67,10 @@ describe("PeriodDiagnosisCard", () => {
     expect(html).toContain("Sobra média de R$ 200,00");
     expect(html).toContain("No dia 10");
     expect(html).toContain("Contas fixas: R$ 600,00");
+    expect(html).toContain("Reserva de emergência");
+    expect(html).toContain("Reserva ainda não confirmada");
+    expect(html).toContain("Saldo guardado (R$)");
+    expect(html).toContain("Salvar saldo");
     expect(html).toContain("Maiores variações");
     expect(html).toContain("Mercado");
     expect(html).toContain("acima da média em R$ 100,00");
@@ -78,6 +90,7 @@ describe("PeriodDiagnosisCard", () => {
         view: makeView({
           paceLabel: null,
           commitmentLabel: null,
+          reservePromptLabel: null,
           categoryMovers: [],
           anomalies: [],
           levers: [],
@@ -93,6 +106,7 @@ describe("PeriodDiagnosisCard", () => {
     expect(html).not.toContain("Onde dá para cortar");
     expect(html).not.toContain("No dia 10");
     expect(html).not.toContain("Contas fixas");
+    expect(html).not.toContain("Reserva de emergência");
   });
 
   it("renderiza o estado vazio com a mensagem exata", () => {
@@ -111,5 +125,6 @@ describe("PeriodDiagnosisCard", () => {
     expect(html).not.toContain("Maiores variações");
     expect(html).not.toContain("Onde dá para cortar");
     expect(html).not.toContain("Leitura da IA");
+    expect(html).not.toContain("Reserva de emergência");
   });
 });

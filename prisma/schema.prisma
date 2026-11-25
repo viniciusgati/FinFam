@@ -224,6 +224,20 @@ model ShoppingItem {
   @@map("shopping_items")
 }
 
+/// Saldo guardado confirmado pela família em um mês (`YYYY-MM`). A sobra do
+/// período é estimada pelo fluxo; este valor é a fonte de verdade da reserva e
+/// permite reconciliar "quanto deveria ter sobrado" x "quanto a reserva subiu".
+model ReserveSnapshot {
+  id          String   @id @default(cuid())
+  monthKey    String   @unique // YYYY-MM
+  amountCents Int
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("reserve_snapshots")
+}
+
 /// Avaliação de um mês fechado gerada por IA, cacheada por `monthKey` para não
 /// repetir a chamada à DeepSeek. `summary` é o texto exibido no dashboard.
 model MonthlyReview {

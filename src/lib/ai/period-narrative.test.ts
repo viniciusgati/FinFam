@@ -120,6 +120,10 @@ function buildFixtureAnalysis() {
       },
     ],
     referenceMonthKey: "2026-05",
+    reserveSnapshots: [
+      { monthKey: "2026-01", amountCents: 100000 },
+      { monthKey: "2026-05", amountCents: 160000 },
+    ],
   });
 }
 
@@ -144,12 +148,18 @@ describe("buildPeriodAiFactSheet", () => {
         "composition",
         "commitments",
         "data-quality",
+        "reserve",
         "category-alimentação",
         "lever-0",
         "anomaly-0",
       ]),
     );
-    expect(factSheet.facts.reserve).toBeNull();
+    expect(factSheet.facts.reserve).toMatchObject({
+      confirmedCents: 160000,
+      coverageMonths: 3.2,
+      gapCents: 140000,
+      targetMonths: 6,
+    });
     expect(factSheet.facts.levers[0]).toMatchObject({
       id: "lever-0",
       kind: "frequency",
@@ -244,6 +254,9 @@ describe("localPeriodAiNarrative", () => {
 
     expect(normalizeMoneyText(narrative.summary)).toContain(
       "Sobra média de R$ 200,00",
+    );
+    expect(normalizeMoneyText(narrative.summary)).toContain(
+      "Reserva confirmada: R$ 1.600,00",
     );
     expect(normalizeMoneyText(narrative.summary)).toContain(
       "Cortes sugeridos: R$ 94,90/mês.",

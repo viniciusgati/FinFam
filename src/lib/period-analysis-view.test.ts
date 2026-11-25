@@ -4,6 +4,7 @@ import {
   periodAnalysisView,
   PERIOD_ANALYSIS_EMPTY_MESSAGE,
   PERIOD_ANALYSIS_TITLE,
+  PERIOD_RESERVE_PROMPT,
 } from "./period-analysis-view";
 
 const MONTHS = ["2026-01", "2026-02", "2026-03", "2026-04"];
@@ -157,6 +158,9 @@ describe("periodAnalysisView", () => {
     expect(normalizeMoneyText(view.commitmentLabel ?? "")).toBe(
       "Contas fixas: R$ 600,00 (60% da renda média). Parcelas: pico de R$ 300,00 em junho de 2026.",
     );
+    expect(view.reserveLabel).toBeNull();
+    expect(view.reservePromptLabel).toBe(PERIOD_RESERVE_PROMPT);
+    expect(view.reserveAmountCents).toBeNull();
     expect(view.categoryMovers[0].category).toBe("Alimentação");
     expect(normalizeMoneyText(view.categoryMovers[0].detail)).toBe(
       "acima da média em R$ 100,00 (+33.3%)",
@@ -225,6 +229,51 @@ describe("periodAnalysisView", () => {
     expect(view.confidenceLabel).toBe("Base confiável");
     expect(view.confidenceTone).toBe("positive");
     expect(view.dataQualityLabel).toBe("Base confiável");
+  });
+
+  it("descreve cobertura, gap e ritmo quando a reserva está confirmada", () => {
+    const view = periodAnalysisView(
+      buildPeriodAnalysis({
+        months: MONTHS.map(closedMonth),
+        referenceMonthKey: "2026-05",
+        reserveSnapshots: [
+          { monthKey: "2026-01", amountCents: 100000 },
+          { monthKey: "2026-05", amountCents: 160000 },
+        ],
+      }),
+    );
+
+    expect(normalizeMoneyText(view.reserveLabel ?? "")).toBe(
+      "Reserva confirmada: R$ 1.600,00 em maio de 2026. Cobre 3,2 meses de contas fixas. Faltam R$ 1.400,00 para 6 meses. No ritmo de sobra atual, 7 meses.",
+    );
+    expect(view.reservePromptLabel).toBeNull();
+    expect(view.reserveAmountCents).toBe(160000);
+  });
+
+  it("aponta sobra estimada que não apareceu na reserva", () => {
+    const view = periodAnalysisView(
+      buildPeriodAnalysis({
+        months: MONTHS.map(closedMonth),
+        referenceMonthKey: "2026-04",
+        reserveSnapshots: [
+          { monthKey: "2026-01", amountCents: 100000 },
+          { monthKey: "2026-04", amountCents: 130000 },
+        ],
+      }),
+    );
+
+    expect(normalizeMoneyText(view.reserveLabel ?? "")).toContain(
+      "R$ 300,00 da sobra estimada não apareceram na reserva.",
+    );
+  });
+
+  it("convida a confirmar o saldo quando ainda não há snapshot", () => {
+    const view = periodAnalysisView(
+      buildPeriodAnalysis({ months: MONTHS.map(closedMonth) }),
+    );
+    expect(view.reserveLabel).toBeNull();
+    expect(view.reservePromptLabel).toBe(PERIOD_RESERVE_PROMPT);
+    expect(view.reserveAmountCents).toBeNull();
   });
 
   it("devolve vazio explícito sem meses", () => {

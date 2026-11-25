@@ -640,6 +640,30 @@ economia e o bloco `SpendAdviceCard` continuam no modelo por renda. No modo
 variável, a linha de feedback do card principal mostra o texto do modo em vez da
 comparação histórica.
 
+### 4.10 Reserva de emergência
+
+O app mede **fluxo** (renda − consumo), não saldo bancário. Para responder "você
+tem esse dinheiro guardado?", a família confirma um saldo por mês em
+`ReserveSnapshot` (`monthKey` único, `amountCents`, `note` opcional). O saldo
+confirmado é a **fonte de verdade**; a sobra estimada serve para reconciliação.
+`amountCents: 0` é válido e significa "confirmei que não tenho reserva".
+
+- **Confirmação:** formulário no card "Diagnóstico do período" envia
+  `POST /api/reserve`; falha de leitura/gravação não derruba o dashboard.
+- **Alvo:** `meses_alvo` (default 6) × média das contas fixas dos meses fechados.
+- **Cobertura:** `saldo_confirmado / média_das_contas_fixas` (meses).
+- **Gap:** `max(alvo − saldo_confirmado, 0)`.
+- **Meses para o alvo:** `ceil(gap / sobra_mediana_mensal)` quando a sobra
+  mediana é positiva; sem sobra, fica indefinido (`null`).
+- **Reconciliação:** entre dois snapshots, `sobra_estimada = Σ sobra dos meses`
+  e `não_apareceu = sobra_estimada − (saldo_atual − saldo_anterior)`. Valor
+  positivo vira o aviso "R$ X da sobra estimada não apareceram na reserva".
+- **Metas por objetivo** (`FinancialGoal`/`GoalAllocation`) ainda não estão no
+  schema; o diagnóstico reserva o campo para a próxima fase.
+
+O diagnóstico de período usa esses números no card e no fact sheet da IA
+(§7); nomes de contas, metas e estabelecimentos não são enviados.
+
 ## 5. Regras de negócio relevantes
 
 No **dashboard** (com `cycleStartDay ≠ 1`), "mês" significa a **janela do

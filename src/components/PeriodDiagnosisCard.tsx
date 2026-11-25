@@ -4,6 +4,7 @@ import type {
 } from "@/lib/period-analysis-view";
 import type { PeriodAnomalySeverity } from "@/lib/period-analysis";
 import PeriodAiSummary from "@/components/PeriodAiSummary";
+import ReserveSnapshotForm from "@/components/ReserveSnapshotForm";
 
 export interface PeriodDiagnosisCardProps {
   view: PeriodAnalysisView;
@@ -38,6 +39,7 @@ export default function PeriodDiagnosisCard({
     view.summaryLabel,
     view.paceLabel,
     view.commitmentLabel,
+    view.reserveLabel,
     view.totalSavingsLabel,
   ]
     .filter((part): part is string => part !== null)
@@ -79,6 +81,23 @@ export default function PeriodDiagnosisCard({
             <p className="mt-1 text-sm text-foreground-muted">
               {view.commitmentLabel}
             </p>
+          )}
+
+          {(view.reserveLabel !== null ||
+            view.reservePromptLabel !== null) && (
+            <div className="mt-4 rounded-xl border border-border bg-surface-strong px-4 py-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-subtle">
+                Reserva de emergência
+              </h3>
+              <p className="mt-1 text-sm text-foreground">
+                {view.reserveLabel ?? view.reservePromptLabel}
+              </p>
+              <ReserveSnapshotForm
+                key={view.reserveAmountCents ?? "empty"}
+                monthKey={monthKey}
+                currentAmountCents={view.reserveAmountCents}
+              />
+            </div>
           )}
 
           {view.categoryMovers.length > 0 && (

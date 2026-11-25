@@ -7,6 +7,7 @@ const { prismaMock } = vi.hoisted(() => ({
     fixedExpense: { findMany: vi.fn() },
     income: { findMany: vi.fn() },
     creditCard: { findMany: vi.fn() },
+    reserveSnapshot: { findMany: vi.fn() },
   },
 }));
 
@@ -154,6 +155,7 @@ describe("loadPeriodAnalysis", () => {
     prismaMock.fixedExpense.findMany.mockResolvedValue([]);
     prismaMock.income.findMany.mockResolvedValue([]);
     prismaMock.creditCard.findMany.mockResolvedValue([]);
+    prismaMock.reserveSnapshot.findMany.mockResolvedValue([]);
   });
 
   it("monta a análise a partir do dashboard e dos lançamentos crus", async () => {
@@ -227,6 +229,10 @@ describe("loadPeriodAnalysis", () => {
         active: true,
       },
     ]);
+    prismaMock.reserveSnapshot.findMany.mockResolvedValue([
+      { monthKey: "2026-05", amountCents: 160000 },
+      { monthKey: "2026-01", amountCents: 100000 },
+    ]);
 
     const analysis = await loadPeriodAnalysis({
       data: makeData(now),
@@ -261,6 +267,14 @@ describe("loadPeriodAnalysis", () => {
       limitCents: 500000,
       futureCents: 90000,
     });
+    expect(analysis.reserve).toMatchObject({
+      confirmedCents: 160000,
+      coverageMonths: 3.2,
+      gapCents: 140000,
+      reserveDeltaCents: 60000,
+      unaccountedCents: 0,
+      ageMonths: 0,
+    });
 
     const [variableArgs] = prismaMock.variableExpense.findMany.mock.calls[0];
     expect(variableArgs.where.date.gte).toEqual(monthStart(2026, 1));
@@ -281,6 +295,10 @@ describe("loadPeriodAnalysis", () => {
     });
     expect(prismaMock.creditCard.findMany).toHaveBeenCalledWith({
       where: { active: true },
+    });
+    expect(prismaMock.reserveSnapshot.findMany).toHaveBeenCalledWith({
+      orderBy: { monthKey: "desc" },
+      take: 12,
     });
   });
 

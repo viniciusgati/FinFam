@@ -125,6 +125,10 @@ leitura apenas esconde o card. `PeriodDiagnosisCard` é renderizado na zona
 "Explorar", antes da ajuda à família. Os textos exatos ficam em
 `period-analysis-view.ts` e são testados sem DOM.
 
+A reserva de emergência é confirmada em `reserve_snapshots` (um saldo por mês,
+`POST /api/reserve`) e entra no diagnóstico como cobertura/gap/reconciliação. O
+card mostra o texto e o formulário `ReserveSnapshotForm`; `0` é um saldo válido.
+
 A narrativa por IA é opcional e sob demanda: `POST /api/ai/period-analysis`
 carrega o ciclo corrente, monta o **fact sheet anônimo**
 (`src/lib/ai/period-narrative.ts`) e chama a DeepSeek em modo JSON. A resposta

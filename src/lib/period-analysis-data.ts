@@ -22,6 +22,7 @@ import {
   type PeriodFixedExpense,
   type PeriodIncome,
   type PeriodMonth,
+  type PeriodReserveSnapshot,
   type PeriodTransaction,
 } from "./period-analysis";
 import {
@@ -85,19 +86,29 @@ export async function loadPeriodAnalysis(
       : startOfMonth(firstSnapshotKey, timeZone);
   const end = analysisEnd(reference, now, timeZone);
 
-  const [variableExpenses, cardPurchases, fixedExpenses, incomes, cards] =
-    await Promise.all([
-      prisma.variableExpense.findMany({
-        where: { date: { gte: analysisStart, lt: end } },
-      }),
-      prisma.cardPurchase.findMany({
-        where: { purchaseDate: { gte: analysisStart, lt: end } },
-        include: { card: true },
-      }),
-      prisma.fixedExpense.findMany({ where: { active: true } }),
-      prisma.income.findMany({ where: { active: true } }),
-      prisma.creditCard.findMany({ where: { active: true } }),
-    ]);
+  const [
+    variableExpenses,
+    cardPurchases,
+    fixedExpenses,
+    incomes,
+    cards,
+    reserveSnapshots,
+  ] = await Promise.all([
+    prisma.variableExpense.findMany({
+      where: { date: { gte: analysisStart, lt: end } },
+    }),
+    prisma.cardPurchase.findMany({
+      where: { purchaseDate: { gte: analysisStart, lt: end } },
+      include: { card: true },
+    }),
+    prisma.fixedExpense.findMany({ where: { active: true } }),
+    prisma.income.findMany({ where: { active: true } }),
+    prisma.creditCard.findMany({ where: { active: true } }),
+    prisma.reserveSnapshot.findMany({
+      orderBy: { monthKey: "desc" },
+      take: 12,
+    }),
+  ]);
 
   const closedMonths: PeriodMonth[] = data.snapshots.map((snapshot) => ({
     monthKey: snapshot.monthKey,
@@ -197,6 +208,17 @@ export async function loadPeriodAnalysis(
     }),
   );
 
+  // A consulta vem do mais recente para o mais antigo (para o `take` pegar os
+  // últimos 12); o motor espera ordem cronológica crescente.
+  const periodReserveSnapshots: PeriodReserveSnapshot[] = [
+    ...reserveSnapshots,
+  ]
+    .reverse()
+    .map((snapshot) => ({
+      monthKey: snapshot.monthKey,
+      amountCents: snapshot.amountCents,
+    }));
+
   const essentialCategories = [
     ...new Set(
       periodFixedExpenses
@@ -219,7 +241,7 @@ export async function loadPeriodAnalysis(
     monthsAhead: input.monthsAhead ?? 6,
     emergencyMonths: input.emergencyMonths ?? 6,
     essentialCategories,
-    reserveSnapshots: [],
+    reserveSnapshots: periodReserveSnapshots,
     goals: [],
   });
 }

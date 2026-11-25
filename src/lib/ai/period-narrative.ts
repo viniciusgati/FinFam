@@ -394,6 +394,7 @@ export function localPeriodAiNarrative(
         view.summaryLabel,
         view.paceLabel,
         view.commitmentLabel,
+        view.reserveLabel,
         view.totalSavingsLabel,
       ]
         .filter((part): part is string => part !== null)

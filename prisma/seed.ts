@@ -231,6 +231,7 @@ async function seedSnapshots(now: Date) {
 
 /** Único caminho destrutivo — só roda com a flag `--reset`. */
 async function resetDatabase() {
+  await prisma.reserveSnapshot.deleteMany();
   await prisma.shoppingItem.deleteMany();
   await prisma.cardPurchase.deleteMany();
   await prisma.variableExpense.deleteMany();

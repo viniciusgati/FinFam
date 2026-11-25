@@ -56,6 +56,7 @@ export function getTestPrisma(): PrismaClient {
  */
 const TABLES = [
   "shopping_items",
+  "reserve_snapshots",
   "app_settings",
   "card_purchases",
   "variable_expenses",
