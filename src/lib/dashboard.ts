@@ -67,6 +67,16 @@ export interface DashboardSnapshot {
   consumedPercent: number;
   /** Gastos do mês por categoria (rótulo exibido + valor). */
   categories: { category: string; amountCents: number }[];
+  /**
+   * Composição e série diária do snapshot, usadas pelo diagnóstico de período
+   * (`period-analysis.ts`). Opcionais para snapshots legados/parciais.
+   */
+  fixedExpensesCents?: number;
+  variableExpensesCents?: number;
+  cardExpensesCents?: number;
+  variableDailyCents?: number[];
+  obligationDailyCents?: number[];
+  daysInMonth?: number;
 }
 
 export interface DashboardData extends FinanceInput {
@@ -122,6 +132,40 @@ export interface DashboardData extends FinanceInput {
   upcoming?: UpcomingCommitments;
 }
 
+/** Linha de `monthly_snapshots` com o que o dashboard/análise consomem. */
+interface SnapshotRow {
+  monthKey: string;
+  incomeCents: number;
+  consumedCents: number;
+  consumedPercent: number;
+  fixedExpensesCents: number;
+  variableExpensesCents: number;
+  cardExpensesCents: number;
+  variableDailyCents: number[];
+  obligationDailyCents: number[];
+  daysInMonth: number;
+  categories: { categoryLabel: string; amountCents: number }[];
+}
+
+function toDashboardSnapshot(snapshot: SnapshotRow): DashboardSnapshot {
+  return {
+    monthKey: snapshot.monthKey,
+    incomeCents: snapshot.incomeCents,
+    consumedCents: snapshot.consumedCents,
+    consumedPercent: snapshot.consumedPercent,
+    categories: snapshot.categories.map((category) => ({
+      category: category.categoryLabel,
+      amountCents: category.amountCents,
+    })),
+    fixedExpensesCents: snapshot.fixedExpensesCents,
+    variableExpensesCents: snapshot.variableExpensesCents,
+    cardExpensesCents: snapshot.cardExpensesCents,
+    variableDailyCents: snapshot.variableDailyCents,
+    obligationDailyCents: snapshot.obligationDailyCents,
+    daysInMonth: snapshot.daysInMonth,
+  };
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function sumByAmount(items: { amountCents: number }[]): number {
@@ -174,16 +218,7 @@ async function loadClosedMonthData(
 
   // Comparações e médias só usam meses com dados (entrada e saída).
   const previousSnapshots = previous
-    .map((row) => ({
-      monthKey: row.monthKey,
-      incomeCents: row.incomeCents,
-      consumedCents: row.consumedCents,
-      consumedPercent: row.consumedPercent,
-      categories: row.categories.map((category) => ({
-        category: category.categoryLabel,
-        amountCents: category.amountCents,
-      })),
-    }))
+    .map(toDashboardSnapshot)
     .filter(hasComparisonData);
 
   const monthData = buildDashboardDataFromSnapshot(
@@ -366,16 +401,7 @@ export async function loadDashboardData(
 
   // Comparações e médias só usam meses fechados com dados (entrada e saída).
   const previousSnapshots = snapshots
-    .map((snapshot) => ({
-      monthKey: snapshot.monthKey,
-      incomeCents: snapshot.incomeCents,
-      consumedCents: snapshot.consumedCents,
-      consumedPercent: snapshot.consumedPercent,
-      categories: snapshot.categories.map((category) => ({
-        category: category.categoryLabel,
-        amountCents: category.amountCents,
-      })),
-    }))
+    .map(toDashboardSnapshot)
     .filter(hasComparisonData);
 
   // Parcelas cuja competência cai no mês, com o dia de vencimento do cartão e o
@@ -740,16 +766,7 @@ export async function loadCycleDashboardData(
   });
 
   const previousSnapshots = snapshots
-    .map((snapshot) => ({
-      monthKey: snapshot.monthKey,
-      incomeCents: snapshot.incomeCents,
-      consumedCents: snapshot.consumedCents,
-      consumedPercent: snapshot.consumedPercent,
-      categories: snapshot.categories.map((category) => ({
-        category: category.categoryLabel,
-        amountCents: category.amountCents,
-      })),
-    }))
+    .map(toDashboardSnapshot)
     .filter(hasComparisonData);
 
   const series = buildCycleDailySeries({

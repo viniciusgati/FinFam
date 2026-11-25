@@ -153,8 +153,16 @@ export interface PeriodAnalysisInput {
   months: PeriodMonth[];
   /** Ciclo corrente (alternativa a `months[].isCurrent`). */
   current?: PeriodMonth;
-  /** Transações dos últimos meses; inclua as compras de cartão para dedupe. */
+  /**
+   * Transações dos últimos meses; inclua as compras de cartão para dedupe.
+   * Por padrão são recortadas pelos `monthKey` de `months`/`current`.
+   */
   transactions?: PeriodTransaction[];
+  /**
+   * Quando `true`, `transactions` já vem recortada pelo chamador (necessário
+   * quando o ciclo financeiro cruza dois meses civis). O motor não filtra.
+   */
+  transactionsPreFiltered?: boolean;
   fixedExpenses?: PeriodFixedExpense[];
   incomes?: PeriodIncome[];
   cards?: PeriodCard[];
@@ -2156,10 +2164,9 @@ export function buildPeriodAnalysis(
   );
   const commitments = buildCommitments(input, display, flow);
 
-  const transactions = filterTransactionsByMonths(
-    input.transactions ?? [],
-    allMonths,
-  );
+  const transactions = input.transactionsPreFiltered
+    ? [...(input.transactions ?? [])]
+    : filterTransactionsByMonths(input.transactions ?? [], allMonths);
   // Comportamento usa só o que entra no orçamento (CREDIT fica para a
   // conciliação com a fatura, em `dataQuality`), evitando dupla contagem.
   const behaviorTransactions = transactions.filter(

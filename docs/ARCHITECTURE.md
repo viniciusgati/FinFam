@@ -118,6 +118,13 @@ resultado pronto e apenas narra/prioriza. A reserva confirmada
 nulos/vazios até a migration, e `buildPeriodAnalysis` nunca lança para dados
 vazios. O cenário do seed está coberto em `period-analysis.test.ts`.
 
+No dashboard, `loadPeriodAnalysis` (`period-analysis-data.ts`) monta o
+diagnóstico do **ciclo corrente** a partir dos dados já carregados
+(`loadCycleDashboardData`) + lançamentos crus da janela de comparação; falha de
+leitura apenas esconde o card. `PeriodDiagnosisCard` é renderizado na zona
+"Explorar", antes da ajuda à família. Os textos exatos ficam em
+`period-analysis-view.ts` e são testados sem DOM.
+
 ## Banco de dados
 
 - Migrations versionadas com Prisma (`prisma/migrations`).

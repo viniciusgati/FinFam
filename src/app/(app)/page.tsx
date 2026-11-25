@@ -72,6 +72,9 @@ import {
   type FamilyInsight,
 } from "@/lib/family-insights";
 import { buildSpendAdvice, type SpendAdvice } from "@/lib/spend-advice";
+import { loadPeriodAnalysis } from "@/lib/period-analysis-data";
+import { periodAnalysisView } from "@/lib/period-analysis-view";
+import type { PeriodAnalysis } from "@/lib/period-analysis";
 import RetryButton from "@/components/RetryButton";
 import MonthNavigation from "@/components/MonthNavigation";
 import DailyConsumptionChart from "@/components/DailyConsumptionChart";
@@ -90,6 +93,7 @@ import CategoryBreakdownCard from "@/components/CategoryBreakdownCard";
 import FutureCommitmentsCard from "@/components/FutureCommitmentsCard";
 import OpenExpensesCard from "@/components/OpenExpensesCard";
 import SavingsGoalCard from "@/components/SavingsGoalCard";
+import PeriodDiagnosisCard from "@/components/PeriodDiagnosisCard";
 import FamilyHelpCard from "@/components/FamilyHelpCard";
 import type { CategoryBreakdown } from "@/lib/category-breakdown";
 import type { FutureCommitmentMonth } from "@/lib/future-commitments";
@@ -156,6 +160,7 @@ export default async function DashboardPage({
   let shoppingLoadFailed = false;
   let familyInsights: FamilyInsight[] = [];
   let familyHelpFallback = "";
+  let periodAnalysis: PeriodAnalysis | null = null;
   let cycleStartDay = defaultSettings().cycleStartDay;
   let savingsGoalCents = defaultSettings().savingsGoalCents ?? 0;
   let consumptionMode: ConsumptionMode = defaultSettings().consumptionMode;
@@ -234,6 +239,20 @@ export default async function DashboardPage({
       projectedPercent: status.projectedPercent,
       previousPercents: data.previousPercents,
     });
+
+    // Diagnóstico do período: leitura complementar, só no ciclo corrente. Falha
+    // aqui esconde o card, mas não derruba o dashboard.
+    if (view.state === "ok" && isCurrentCycle && data.hasMovements) {
+      try {
+        periodAnalysis = await loadPeriodAnalysis({
+          data,
+          reference,
+          now,
+        });
+      } catch {
+        periodAnalysis = null;
+      }
+    }
 
     // O card de diária segue o ciclo real; só faz sentido no ciclo corrente ou
     // na previsão do próximo (com a janela inteira por decorrer). O cartão
@@ -652,6 +671,12 @@ export default async function DashboardPage({
                 case "explore":
                   return (
                     <>
+                      {periodAnalysis !== null && (
+                        <PeriodDiagnosisCard
+                          view={periodAnalysisView(periodAnalysis)}
+                        />
+                      )}
+
                       <FamilyHelpCard
                         insights={familyInsights}
                         fallback={familyHelpFallback}

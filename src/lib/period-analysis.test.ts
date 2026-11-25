@@ -658,6 +658,28 @@ describe("buildPeriodAnalysis — comportamento", () => {
     ).toBe(true);
   });
 
+  it("respeita transações já recortadas pelo chamador", () => {
+    const transaction = makeTransaction({
+      description: "Mercado",
+      amountCents: 10000,
+      date: at("2026-02-10"),
+      category: "Casa",
+    });
+
+    const filtered = buildPeriodAnalysis({
+      months: [makeMonth("2026-01")],
+      transactions: [transaction],
+    });
+    expect(filtered.behavior.transactionCount).toBe(0);
+
+    const preFiltered = buildPeriodAnalysis({
+      months: [makeMonth("2026-01")],
+      transactions: [transaction],
+      transactionsPreFiltered: true,
+    });
+    expect(preFiltered.behavior.transactionCount).toBe(1);
+  });
+
   it("calcula a fatia de fim de período da série exibida", () => {
     const analysis = buildPeriodAnalysis({
       months,

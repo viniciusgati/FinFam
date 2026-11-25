@@ -782,4 +782,19 @@ describe("ajuste rápido do cartão no dashboard", () => {
     );
     expect(page).toContain("invoiceMonthKeyForCycle(referenceMonthKey, cycleStartDay)");
   });
+
+  it("renderiza o diagnóstico do período na zona Explorar, antes da ajuda à família", () => {
+    const page = readSource(DASHBOARD_PAGE);
+
+    const exploreIndex = page.indexOf('case "explore":');
+    const diagnosisIndex = page.indexOf("<PeriodDiagnosisCard");
+    const familyIndex = page.indexOf("<FamilyHelpCard");
+
+    expect(exploreIndex).toBeGreaterThanOrEqual(0);
+    expect(diagnosisIndex).toBeGreaterThan(exploreIndex);
+    expect(familyIndex).toBeGreaterThan(diagnosisIndex);
+    expect(page).toContain("loadPeriodAnalysis");
+    expect(page).toContain("periodAnalysisView");
+    expect(page).toContain("periodAnalysis !== null");
+  });
 });
