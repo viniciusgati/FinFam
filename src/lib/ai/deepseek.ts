@@ -53,6 +53,10 @@ export interface ChatCompletionOptions {
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** `json_object` ativa o modo JSON da DeepSeek (resposta é um objeto). */
+  responseFormat?: "json_object";
+  temperature?: number;
+  maxTokens?: number;
 }
 
 interface ChatCompletionResponse {
@@ -83,6 +87,18 @@ export async function chatCompletion(
   const onExternalAbort = () => controller.abort();
   options.signal?.addEventListener("abort", onExternalAbort);
 
+  const body: Record<string, unknown> = {
+    model: config.model,
+    messages,
+    temperature: options.temperature ?? 0.2,
+  };
+  if (options.responseFormat) {
+    body.response_format = { type: options.responseFormat };
+  }
+  if (options.maxTokens !== undefined) {
+    body.max_tokens = options.maxTokens;
+  }
+
   try {
     const response = await fetchImpl(config.apiUrl, {
       method: "POST",
@@ -90,7 +106,7 @@ export async function chatCompletion(
         "content-type": "application/json",
         authorization: `Bearer ${config.apiKey}`,
       },
-      body: JSON.stringify({ model: config.model, messages, temperature: 0.2 }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 

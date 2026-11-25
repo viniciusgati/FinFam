@@ -98,6 +98,28 @@ describe("chatCompletion", () => {
     expect(JSON.parse(String(init.body))).toMatchObject({ model: "meu-modelo" });
   });
 
+  it("envia modo JSON, temperatura e limite de tokens quando configurados", async () => {
+    const fetchImpl = makeFetch();
+
+    await chatCompletion([{ role: "user", content: '{"a":1}' }], {
+      env: { DEEPSEEK_API_KEY: "k" },
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      responseFormat: "json_object",
+      temperature: 0.3,
+      maxTokens: 500,
+    });
+
+    const body = JSON.parse(String(fetchImpl.mock.calls[0][1].body)) as Record<
+      string,
+      unknown
+    >;
+    expect(body).toMatchObject({
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 500,
+    });
+  });
+
   it("lança erro em resposta não-2xx", async () => {
     const fetchImpl = makeFetch(async () => new Response("nope", { status: 500 }));
 

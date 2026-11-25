@@ -673,7 +673,9 @@ export default async function DashboardPage({
                     <>
                       {periodAnalysis !== null && (
                         <PeriodDiagnosisCard
+                          key={referenceMonthKey}
                           view={periodAnalysisView(periodAnalysis)}
+                          monthKey={referenceMonthKey}
                         />
                       )}
 

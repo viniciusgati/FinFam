@@ -731,18 +731,23 @@ arquivo apenas com o cabeçalho, e a tela avisa isso.
   %" anterior); o percentual continua sendo o protagonista.
 - **Privacidade**: por padrão sem envio para terceiros; tudo no PostgreSQL
   próprio. Exceção restrita aos recursos de IA (ajuda à família, avaliação de
-  mês fechado e simulador), que enviam **somente agregados numéricos** à
-  DeepSeek — nunca nomes, descrições, categorias ou texto do usuário. A ajuda à
-  família recebe o **agregado numérico completo do ciclo** (renda fixa/variável,
-  saídas, consumo, percentuais, projeção, dias/janela, orçamento livre, diária,
-  snapshots e desvios anônimos); a avaliação de mês fechado mantém os 10 campos
-  numéricos + histórico; o simulador envia apenas os números da simulação
-  (incluindo `installmentsTotal`, `installmentCents`, o compromisso futuro e a
-  meta), nunca descrições ou texto do usuário.
+  mês fechado, simulador e diagnóstico de período), que enviam **agregados
+  numéricos** à DeepSeek — nunca nomes, descrições ou texto do usuário. A ajuda
+  à família recebe o **agregado numérico completo do ciclo** (renda
+  fixa/variável, saídas, consumo, percentuais, projeção, dias/janela, orçamento
+  livre, diária, snapshots e desvios anônimos); a avaliação de mês fechado
+  mantém os 10 campos numéricos + histórico; o simulador envia apenas os números
+  da simulação (incluindo `installmentsTotal`, `installmentCents`, o compromisso
+  futuro e a meta), nunca descrições ou texto do usuário.
   **Exceção documentada à importação de fatura CSV (história #269):** na
   classificação de títulos da importação trafegam **apenas títulos de lançamento
    e rótulos de categoria** já usados pela família para a DeepSeek, e somente
-   nesta função — nenhum outro dado pessoal ou agregado sai do sistema.
+   nesta função.
+  **Exceção documentada ao diagnóstico de período:** o resumo por IA envia
+  agregados numéricos, **rótulos de categoria** e identificadores opacos de
+  ações/alertas (`lever-0`, `anomaly-1`); nunca nomes de estabelecimentos,
+  descrições, nomes de contas fixas ou metas. Nenhum outro dado pessoal ou
+  agregado sai do sistema.
 - **Exportação local e portabilidade**: "Baixar meus dados" em `/configuracoes`
   gera e baixa os arquivos **localmente**, sem enviar dados a terceiros. O JSON
   completo e os CSVs por tabela (via `/api/export`) incluem todas as tabelas

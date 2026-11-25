@@ -3,9 +3,12 @@ import type {
   PeriodAnalysisView,
 } from "@/lib/period-analysis-view";
 import type { PeriodAnomalySeverity } from "@/lib/period-analysis";
+import PeriodAiSummary from "@/components/PeriodAiSummary";
 
 export interface PeriodDiagnosisCardProps {
   view: PeriodAnalysisView;
+  /** Mês de início do ciclo, enviado à rota de narrativa por IA. */
+  monthKey: string;
   className?: string;
 }
 
@@ -28,8 +31,18 @@ const SEVERITY_CLASSES: Record<PeriodAnomalySeverity, string> = {
  */
 export default function PeriodDiagnosisCard({
   view,
+  monthKey,
   className = "",
 }: PeriodDiagnosisCardProps) {
+  const aiFallback = [
+    view.summaryLabel,
+    view.paceLabel,
+    view.commitmentLabel,
+    view.totalSavingsLabel,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" ");
+
   return (
     <section
       aria-label={view.title}
@@ -137,6 +150,8 @@ export default function PeriodDiagnosisCard({
               )}
             </div>
           )}
+
+          <PeriodAiSummary monthKey={monthKey} fallback={aiFallback} />
 
           {view.dataQualityLabel !== null && (
             <p className="mt-4 border-t border-border pt-3 text-xs text-subtle">

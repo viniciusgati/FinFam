@@ -125,6 +125,13 @@ leitura apenas esconde o card. `PeriodDiagnosisCard` é renderizado na zona
 "Explorar", antes da ajuda à família. Os textos exatos ficam em
 `period-analysis-view.ts` e são testados sem DOM.
 
+A narrativa por IA é opcional e sob demanda: `POST /api/ai/period-analysis`
+carrega o ciclo corrente, monta o **fact sheet anônimo**
+(`src/lib/ai/period-narrative.ts`) e chama a DeepSeek em modo JSON. A resposta
+é validada por Zod e por `factId`; sem chave/em falha, a rota devolve a
+narrativa determinística local (`source: "local"`). Nomes de estabelecimentos,
+descrições, contas fixas e metas nunca entram no prompt.
+
 ## Banco de dados
 
 - Migrations versionadas com Prisma (`prisma/migrations`).

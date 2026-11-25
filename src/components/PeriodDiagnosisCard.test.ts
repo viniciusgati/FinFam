@@ -47,7 +47,10 @@ function makeView(
 describe("PeriodDiagnosisCard", () => {
   it("renderiza resumo, variações, alertas, cortes e qualidade", () => {
     const html = renderToStaticMarkup(
-      createElement(PeriodDiagnosisCard, { view: makeView() }),
+      createElement(PeriodDiagnosisCard, {
+        view: makeView(),
+        monthKey: "2026-05",
+      }),
     );
 
     expect(html).toContain(`aria-label="${PERIOD_ANALYSIS_TITLE}"`);
@@ -64,6 +67,8 @@ describe("PeriodDiagnosisCard", () => {
     expect(html).toContain("Onde dá para cortar");
     expect(html).toContain("Reduzir frequência");
     expect(html).toContain("Cortes sugeridos: R$ 55,00/mês.");
+    expect(html).toContain("Leitura da IA");
+    expect(html).toContain("Gerar análise com IA");
     expect(html).toContain("Base parcial · 10% sem categoria");
   });
 
@@ -79,6 +84,7 @@ describe("PeriodDiagnosisCard", () => {
           totalSavingsLabel: null,
           dataQualityLabel: null,
         }),
+        monthKey: "2026-05",
       }),
     );
 
@@ -97,11 +103,13 @@ describe("PeriodDiagnosisCard", () => {
           summaryLabel: "Ainda não há meses fechados para comparar.",
           dataQualityLabel: null,
         }),
+        monthKey: "2026-05",
       }),
     );
 
     expect(html).toContain(PERIOD_ANALYSIS_EMPTY_MESSAGE);
     expect(html).not.toContain("Maiores variações");
     expect(html).not.toContain("Onde dá para cortar");
+    expect(html).not.toContain("Leitura da IA");
   });
 });
